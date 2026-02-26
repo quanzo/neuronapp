@@ -1,0 +1,80 @@
+#!/usr/bin/env php
+<?php
+
+require __DIR__ . '/../vendor/autoload.php';
+
+use app\modules\neron\classes\command\HelloCommand;
+use app\modules\neron\InteractiveCommand;
+use app\modules\neuron\classes\config\ConfigurationApp;
+use Symfony\Component\Console\Application;
+
+define('APP_ID', 'neuronapp');
+
+/**
+ * Инициализирует рабочую директорию приложения и конфигурацию.
+ *
+ * Рабочая директория определяется как скрытая папка в домашнем каталоге
+ * пользователя, имя которой совпадает с APP_ID с точкой перед ним
+ * (например, ~/.neuronapp). Внутри неё создаются поддиректории skills и todos.
+ *
+ * При ошибке определения домашнего каталога, создании директорий или
+ * разборе файла конфигурации приложение завершается с ненулевым кодом.
+ */
+function bootstrapApp(): void
+{
+    $homeDir = getenv('HOME');
+
+    if ($homeDir === false || $homeDir === '') {
+        $homeDir = $_SERVER['HOME'] ?? '';
+    }
+
+    if ($homeDir === '' || !is_dir($homeDir)) {
+        fwrite(STDERR, "Unable to determine user home directory.\n");
+        exit(1);
+    }
+
+    $appDirName = '.' . APP_ID;
+    $workDir = $homeDir . DIRECTORY_SEPARATOR . $appDirName;
+
+    if (!is_dir($workDir)) {
+        if (!mkdir($workDir, 0777, true) && !is_dir($workDir)) {
+            fwrite(STDERR, sprintf("Unable to create application directory: %s\n", $workDir));
+            exit(1);
+        }
+    }
+
+    foreach (['skills', 'todos', '.sessions', 'agents', '.logs', '.store'] as $subDir) {
+        $path = $workDir . DIRECTORY_SEPARATOR . $subDir;
+        if (!is_dir($path)) {
+            if (!mkdir($path, 0777, true) && !is_dir($path)) {
+                fwrite(STDERR, sprintf("Unable to create subdirectory: %s\n", $path));
+                exit(1);
+            }
+        }
+    }
+
+    if (!defined('APP_WORK_DIR')) {
+        define('APP_WORK_DIR', $workDir);
+    }
+
+    try {
+        ConfigurationApp::init($workDir);
+    } catch (\Throwable $e) {
+        fwrite(STDERR, "[CONFIG ERROR] " . $e->getMessage() . "\n");
+        exit(1);
+    }
+}
+
+bootstrapApp();
+
+$app = new Application('Моё TUI-приложение', '1.0.0');
+
+// Регистрируем команды
+$app->add(new HelloCommand());
+$app->add(new InteractiveCommand());
+
+// Можно также добавить встроенную команду list, которая уже есть в Symfony,
+// поэтому отдельная HelpCommand не требуется, но при желании можно добавить.
+
+$app->run();
+
