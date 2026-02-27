@@ -331,6 +331,21 @@ class ConfigurationAgent {
     }
 
     /**
+     * Заменяет текущий объект истории чата на переданный экземпляр.
+     *
+     * Метод позволяет внешнему коду установить произвольную реализацию
+     * {@see ChatHistoryInterface} для текущего агента, например, чтобы
+     * переиспользовать существующую историю или внедрить свою стратегию хранения.
+     *
+     * @param ChatHistoryInterface $history Новый объект истории чата.
+     *
+     * @return void
+     */
+    public function setChatHistory(ChatHistoryInterface $history): void {
+        $this->_chatHistory = $history;
+    }
+
+    /**
      * Принудительно сбрасывает текущую историю чата.
      *
      * При следующем вызове {@see ConfigurationAgent::getChatHistory()} будет создан
