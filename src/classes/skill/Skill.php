@@ -81,11 +81,11 @@ class Skill extends APromptComponent implements ISkill
     /**
      * @inheritDoc
      */
-    public function executeFromAgent(ConfigurationAgent $agentCfg): Future
+    public function executeFromAgent(ConfigurationAgent $agentCfg, MessageRole $role = MessageRole::USER): Future
     {
         $body = $this->getBody();
-        return \Amp\async(function () use ($agentCfg, $body): mixed {
-            $message = new NeuronMessage(MessageRole::USER, $body);
+        return \Amp\async(function () use ($agentCfg, $body, $role): mixed {
+            $message = new NeuronMessage($role, $body);
             return $agentCfg->sendMessage($message);
         });
     }

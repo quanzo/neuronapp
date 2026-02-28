@@ -11,6 +11,7 @@ use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\interfaces\ITodoList;
 use NeuronAI\Chat\Enums\MessageRole;
+use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
 
 /**
@@ -88,15 +89,17 @@ class TodoList extends APromptComponent implements ITodoList
 
     /**
      * @inheritDoc
+     *
+     * @return Future<list<NeuronMessage>> Завершается копией истории сообщений агента после выполнения всех заданий.
      */
-    public function executeFromAgent(ConfigurationAgent $agentCfg): Future
+    public function executeFromAgent(ConfigurationAgent $agentCfg, MessageRole $role = MessageRole::USER): Future
     {
-        return \Amp\async(function () use ($agentCfg): mixed {
+        return \Amp\async(function () use ($agentCfg, $role): ChatHistoryInterface {
             foreach ($this->getTodos() as $todo) {
-                $message = new NeuronMessage(MessageRole::USER, $todo->getTodo());
+                $message = new NeuronMessage($role, $todo->getTodo());
                 $agentCfg->sendMessage($message);
             }
-            return null;
+            return clone $agentCfg->getChatHistory();
         });
     }
 
