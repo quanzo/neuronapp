@@ -11,3 +11,24 @@
 В `bin/console` теперь при создании `ConfigurationApp` туда передаем экземпляр `DirPriority` с двумя директориями: APP_START_DIR, APP_WORK_DIR.
 
 Переписать класс `AgentProducer` на использование `DirPriority`.
+
+На основе класса `AgentProducer` составь классы producer для элементов приложения:
+- класс `TodoListProducer` используется для получения экземпляров класса `TodoList`
+- класс `SkillProducer` - для получения экземпляров класса `Skill`
+
+Все классы producer расположить в папке `src/classes/producers`.
+
+Папки с расположением:
+- для `AgentProducer` = `agents`
+- для `TodoListProducer` = `todos`
+- для `SkillProducer` = `skills`
+
+Все poducer должны реализовать статисный метод `getStorageDirName(): string` который должен возвращать имя директории хранения.
+
+Проанализировать повторяющийся функционал классов в папке проекта `src/classes/producers` и создать абстрактный класс `ProducerAbstract`, который будет содержать общие архитектурные решения для классов producer.
+
+Класс `ProducerAbstract` переименуем в `AProducer` и перенесем в папку `src/classes`.
+
+В `src/classes/config/ConfigurationApp.php` сделаем чтобы имя конфигурации 'config.jsonc' передавалось в виде второго параметра в методе `init` и соответственно, чтобы имя файла конфигурации было свойством класса ConfigurationApp.
+
+В папке `src/classes/producers` у нас классы, основная задача которых возвращать элементы приложения. `ConfigurationApp` настривается на определенные папки приложения и хранит опции приложения. Поэтому в `ConfigurationApp` добавить методы, которые позволяют возвращать элементы элементы. Следует предусмотреть, чтобы классы-prucer не создавались повторно при множественном вызове.

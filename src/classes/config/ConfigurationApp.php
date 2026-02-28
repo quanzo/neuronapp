@@ -5,6 +5,12 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\config;
 
 use app\modules\neuron\classes\dir\DirPriority;
+use app\modules\neuron\classes\producers\AgentProducer;
+use app\modules\neuron\classes\producers\SkillProducer;
+use app\modules\neuron\classes\producers\TodoListProducer;
+use app\modules\neuron\classes\skill\Skill;
+use app\modules\neuron\classes\todo\TodoList;
+use app\modules\neuron\ConfigurationAgent;
 use app\modules\neuron\helpers\CommentsHelper;
 use RuntimeException;
 
@@ -42,6 +48,15 @@ class ConfigurationApp
      * @var array<string, mixed>
      */
     private array $config = [];
+
+    /** Producer конфигураций агентов (создаётся при первом обращении). */
+    private ?AgentProducer $agentProducer = null;
+
+    /** Producer списков заданий (создаётся при первом обращении). */
+    private ?TodoListProducer $todoListProducer = null;
+
+    /** Producer навыков (создаётся при первом обращении). */
+    private ?SkillProducer $skillProducer = null;
 
     /**
      * Приватный конструктор, выполняющий загрузку конфигурации.
@@ -95,6 +110,78 @@ class ConfigurationApp
     public function getDirPriority(): DirPriority
     {
         return $this->dirPriority;
+    }
+
+    /**
+     * Возвращает producer конфигураций агентов (один и тот же экземпляр при повторных вызовах).
+     */
+    public function getAgentProducer(): AgentProducer
+    {
+        if ($this->agentProducer === null) {
+            $this->agentProducer = new AgentProducer($this->dirPriority);
+        }
+
+        return $this->agentProducer;
+    }
+
+    /**
+     * Возвращает producer списков заданий (один и тот же экземпляр при повторных вызовах).
+     */
+    public function getTodoListProducer(): TodoListProducer
+    {
+        if ($this->todoListProducer === null) {
+            $this->todoListProducer = new TodoListProducer($this->dirPriority);
+        }
+
+        return $this->todoListProducer;
+    }
+
+    /**
+     * Возвращает producer навыков (один и тот же экземпляр при повторных вызовах).
+     */
+    public function getSkillProducer(): SkillProducer
+    {
+        if ($this->skillProducer === null) {
+            $this->skillProducer = new SkillProducer($this->dirPriority);
+        }
+
+        return $this->skillProducer;
+    }
+
+    /**
+     * Возвращает конфигурацию агента по имени.
+     *
+     * @param string $name Имя агента (соответствует имени файла без расширения).
+     *
+     * @return ConfigurationAgent|null Экземпляр конфигурации агента или null.
+     */
+    public function getAgent(string $name): ?ConfigurationAgent
+    {
+        return $this->getAgentProducer()->get($name);
+    }
+
+    /**
+     * Возвращает список заданий по имени.
+     *
+     * @param string $name Имя списка (соответствует имени файла без расширения).
+     *
+     * @return TodoList|null Экземпляр списка заданий или null.
+     */
+    public function getTodoList(string $name): ?TodoList
+    {
+        return $this->getTodoListProducer()->get($name);
+    }
+
+    /**
+     * Возвращает навык по имени.
+     *
+     * @param string $name Имя навыка (соответствует имени файла без расширения).
+     *
+     * @return Skill|null Экземпляр навыка или null.
+     */
+    public function getSkill(string $name): ?Skill
+    {
+        return $this->getSkillProducer()->get($name);
     }
 
     /**
