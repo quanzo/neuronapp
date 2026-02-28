@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\config;
 
+use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\helpers\CommentsHelper;
 use RuntimeException;
 
@@ -11,7 +12,7 @@ use RuntimeException;
  * Синглтон конфигурации консольного приложения.
  *
  * Отвечает за загрузку и предоставление настроек из файла config.jsonc,
- * расположенного в рабочей директории приложения пользователя.
+ * искомого в приоритетных директориях через {@see DirPriority}.
  */
 class ConfigurationApp
 {
@@ -21,14 +22,14 @@ class ConfigurationApp
     private static ?ConfigurationApp $instance = null;
 
     /**
-     * Абсолютный путь к рабочей директории приложения.
+     * Приоритетный список директорий для поиска файлов конфигурации.
      */
-    private string $workDir;
+    private DirPriority $dirPriority;
 
     /**
-     * Абсолютный путь к файлу конфигурации config.jsonc.
+     * Абсолютный путь к файлу конфигурации config.jsonc (определяется при загрузке).
      */
-    private string $configPath;
+    private ?string $configPath = null;
 
     /**
      * Ассоциативный массив с настройками приложения.
@@ -40,12 +41,11 @@ class ConfigurationApp
     /**
      * Приватный конструктор, выполняющий загрузку конфигурации.
      *
-     * @param string $workDir Абсолютный путь к рабочей директории приложения.
+     * @param DirPriority $dirPriority Приоритетный список директорий для поиска config.jsonc.
      */
-    private function __construct(string $workDir)
+    private function __construct(DirPriority $dirPriority)
     {
-        $this->workDir = rtrim($workDir, DIRECTORY_SEPARATOR);
-        $this->configPath = $this->workDir . DIRECTORY_SEPARATOR . 'config.jsonc';
+        $this->dirPriority = $dirPriority;
 
         $this->load();
     }
@@ -56,15 +56,15 @@ class ConfigurationApp
      * Метод должен вызываться один раз при старте приложения.
      * Повторные вызовы игнорируются.
      *
-     * @param string $workDir Абсолютный путь к рабочей директории приложения.
+     * @param DirPriority $dirPriority Приоритетный список директорий для поиска config.jsonc.
      */
-    public static function init(string $workDir): void
+    public static function init(DirPriority $dirPriority): void
     {
         if (self::$instance !== null) {
             return;
         }
 
-        self::$instance = new self($workDir);
+        self::$instance = new self($dirPriority);
     }
 
     /**
@@ -79,6 +79,14 @@ class ConfigurationApp
         }
 
         return self::$instance;
+    }
+
+    /**
+     * Возвращает приоритетный список директорий, используемый для поиска конфигурации.
+     */
+    public function getDirPriority(): DirPriority
+    {
+        return $this->dirPriority;
     }
 
     /**
@@ -111,15 +119,18 @@ class ConfigurationApp
     /**
      * Загружает конфигурацию из файла config.jsonc.
      *
-     * При отсутствии файла используются настройки по умолчанию (пустой массив).
-     * При ошибке чтения или разбора JSONC выбрасывается исключение.
+     * Файл ищется в директориях через {@see DirPriority}. При отсутствии файла
+     * используются настройки по умолчанию (пустой массив). При ошибке чтения или
+     * разбора JSONC выбрасывается исключение.
      *
      * @throws RuntimeException При ошибке чтения или разбора файла конфигурации.
      */
     private function load(): void
     {
-        if (!is_file($this->configPath)) {
-            // Файл отсутствует — используем настройки по умолчанию.
+        $this->configPath = $this->dirPriority->resolveFile('config.jsonc');
+
+        if ($this->configPath === null) {
+            // Файл не найден в приоритетных директориях — используем настройки по умолчанию.
             $this->config = [];
 
             return;

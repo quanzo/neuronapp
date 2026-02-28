@@ -6,9 +6,15 @@ require __DIR__ . '/../vendor/autoload.php';
 use app\modules\neron\classes\command\HelloCommand;
 use app\modules\neron\InteractiveCommand;
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dir\DirPriority;
 use Symfony\Component\Console\Application;
 
 define('APP_ID', 'neuronapp');
+
+/** Директория, из которой запущена программа (текущая рабочая директория на момент запуска). */
+if (!defined('APP_START_DIR')) {
+    define('APP_START_DIR', (string) getcwd());
+}
 
 /**
  * Инициализирует рабочую директорию приложения и конфигурацию.
@@ -57,8 +63,10 @@ function bootstrapApp(): void
         define('APP_WORK_DIR', $workDir);
     }
 
+    $dirPriority = new DirPriority([APP_START_DIR, APP_WORK_DIR]);
+
     try {
-        ConfigurationApp::init($workDir);
+        ConfigurationApp::init($dirPriority);
     } catch (\Throwable $e) {
         fwrite(STDERR, "[CONFIG ERROR] " . $e->getMessage() . "\n");
         exit(1);

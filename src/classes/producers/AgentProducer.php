@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\producers;
 
+use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\ConfigurationAgent;
 
 /**
  * Фабрика конфигураций агентов по имени.
  *
- * Отвечает за поиск файлов конфигураций в указанной директории (как правило,
- * это поддиректория "agents" в рабочей папке приложения) и создание
- * экземпляров {@see ConfigurationAgent} с учетом приоритета форматов.
+ * Ищет файлы конфигураций в поддиректории "agents" через {@see DirPriority}
+ * (приоритет директорий задаётся снаружи, например APP_START_DIR и APP_WORK_DIR)
+ * и создаёт экземпляры {@see ConfigurationAgent} с учётом приоритета форматов.
  *
  * Приоритет форматов конфигурации:
  *  - в первую очередь используется PHP-файл "<name>.php";
@@ -19,10 +20,12 @@ use app\modules\neuron\ConfigurationAgent;
  */
 class AgentProducer
 {
+    private const AGENTS_SUBDIR = 'agents';
+
     /**
-     * Абсолютный путь к директории, где расположены файлы конфигураций агентов.
+     * Приоритетный список директорий для поиска файлов агентов (в каждой ищется поддиректория agents).
      */
-    private string $directory;
+    private DirPriority $dirPriority;
 
     /**
      * Внутренний кеш созданных конфигураций агентов.
@@ -35,22 +38,20 @@ class AgentProducer
     private array $cache = [];
 
     /**
-     * Создает новый экземпляр производителя конфигураций агентов.
+     * Создаёт новый экземпляр производителя конфигураций агентов.
      *
-     * @param string $directory Абсолютный путь к директории с файлами агентов.
+     * @param DirPriority $dirPriority Приоритетный список директорий (в каждой ожидается поддиректория agents).
      */
-    public function __construct(string $directory)
+    public function __construct(DirPriority $dirPriority)
     {
-        $this->directory = rtrim($directory, DIRECTORY_SEPARATOR);
+        $this->dirPriority = $dirPriority;
     }
 
     /**
      * Проверяет существование агента с указанным именем.
      *
-     * Агент считается существующим, если в директории найден хотя бы один
-     * из файлов конфигурации:
-     *  - "<name>.php";
-     *  - "<name>.jsonc".
+     * Агент считается существующим, если в приоритетных директориях найден хотя бы один
+     * из файлов конфигурации: "<name>.php" или "<name>.jsonc" в поддиректории agents.
      *
      * @param string $name Имя агента (без расширения файла).
      *
@@ -58,17 +59,14 @@ class AgentProducer
      */
     public function exist(string $name): bool
     {
-        $phpFile = $this->buildPath($name, 'php');
-        $jsoncFile = $this->buildPath($name, 'jsonc');
-
-        return is_file($phpFile) || is_file($jsoncFile);
+        return $this->resolveAgentFile($name) !== null;
     }
 
     /**
      * Возвращает конфигурацию агента по его имени.
      *
      * При наличии одновременно файлов "<name>.php" и "<name>.jsonc"
-     * приоритет отдается PHP-файлу.
+     * приоритет отдается PHP-файлу (порядок расширений в resolveFile).
      *
      * @param string $name Имя агента (соответствует имени файла без расширения).
      *
@@ -82,16 +80,7 @@ class AgentProducer
             return $this->cache[$name];
         }
 
-        $phpFile = $this->buildPath($name, 'php');
-        $jsoncFile = $this->buildPath($name, 'jsonc');
-
-        $fileToLoad = null;
-
-        if (is_file($phpFile)) {
-            $fileToLoad = $phpFile;
-        } elseif (is_file($jsoncFile)) {
-            $fileToLoad = $jsoncFile;
-        }
+        $fileToLoad = $this->resolveAgentFile($name);
 
         if ($fileToLoad === null) {
             $this->cache[$name] = null;
@@ -117,20 +106,15 @@ class AgentProducer
     }
 
     /**
-     * Формирует полный путь к файлу конфигурации агента.
+     * Ищет файл конфигурации агента в приоритетных директориях (поддиректория agents).
      *
-     * @param string $name      Имя агента (без расширения).
-     * @param string $extension Расширение файла (без точки).
-     *
-     * @return string Абсолютный путь к файлу конфигурации.
+     * @return string|null Абсолютный путь к файлу или null.
      */
-    private function buildPath(string $name, string $extension): string
+    private function resolveAgentFile(string $name): ?string
     {
-        return $this->directory
-            . DIRECTORY_SEPARATOR
-            . $name
-            . '.'
-            . ltrim($extension, '.');
+        $relPath = self::AGENTS_SUBDIR . '/' . $name;
+
+        return $this->dirPriority->resolveFile($relPath, ['php', 'jsonc']);
     }
 }
 
