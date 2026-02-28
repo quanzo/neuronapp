@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\producers;
 
-use app\modules\neuron\classes\dir\DirPriority;
+use app\modules\neuron\classes\AProducer;
 use app\modules\neuron\ConfigurationAgent;
 
 /**
@@ -18,103 +18,55 @@ use app\modules\neuron\ConfigurationAgent;
  *  - в первую очередь используется PHP-файл "<name>.php";
  *  - если PHP-файл отсутствует, используется JSONC-файл "<name>.jsonc".
  */
-class AgentProducer
+class AgentProducer extends AProducer
 {
-    private const AGENTS_SUBDIR = 'agents';
-
     /**
-     * Приоритетный список директорий для поиска файлов агентов (в каждой ищется поддиректория agents).
+     * @inheritDoc
      */
-    private DirPriority $dirPriority;
-
-    /**
-     * Внутренний кеш созданных конфигураций агентов.
-     *
-     * Ключом выступает имя агента, значением — экземпляр {@see ConfigurationAgent}
-     * или null, если конфигурацию не удалось создать.
-     *
-     * @var array<string, ConfigurationAgent|null>
-     */
-    private array $cache = [];
-
-    /**
-     * Создаёт новый экземпляр производителя конфигураций агентов.
-     *
-     * @param DirPriority $dirPriority Приоритетный список директорий (в каждой ожидается поддиректория agents).
-     */
-    public function __construct(DirPriority $dirPriority)
+    public static function getStorageDirName(): string
     {
-        $this->dirPriority = $dirPriority;
+        return 'agents';
     }
 
     /**
-     * Проверяет существование агента с указанным именем.
+     * @inheritDoc
      *
-     * Агент считается существующим, если в приоритетных директориях найден хотя бы один
-     * из файлов конфигурации: "<name>.php" или "<name>.jsonc" в поддиректории agents.
-     *
-     * @param string $name Имя агента (без расширения файла).
-     *
-     * @return bool true, если конфигурационный файл агента найден, иначе false.
+     * @return list<string>
      */
-    public function exist(string $name): bool
+    protected function getExtensions(): array
     {
-        return $this->resolveAgentFile($name) !== null;
+        return ['php', 'jsonc'];
     }
 
     /**
-     * Возвращает конфигурацию агента по его имени.
-     *
-     * При наличии одновременно файлов "<name>.php" и "<name>.jsonc"
-     * приоритет отдается PHP-файлу (порядок расширений в resolveFile).
-     *
-     * @param string $name Имя агента (соответствует имени файла без расширения).
-     *
-     * @return ConfigurationAgent|null Экземпляр конфигурации агента или null,
-     *                                 если подходящий файл не найден или не удалось
-     *                                 корректно создать конфигурацию.
+     * @inheritDoc
      */
-    public function get(string $name): ?ConfigurationAgent
+    protected function createFromFile(string $path, string $name): ?ConfigurationAgent
     {
-        if (array_key_exists($name, $this->cache)) {
-            return $this->cache[$name];
-        }
-
-        $fileToLoad = $this->resolveAgentFile($name);
-
-        if ($fileToLoad === null) {
-            $this->cache[$name] = null;
-
-            return null;
-        }
-
-        $config = ConfigurationAgent::makeFromFile($fileToLoad);
+        $config = ConfigurationAgent::makeFromFile($path);
 
         if ($config instanceof ConfigurationAgent) {
-            // Проставляем имя агента в конфигурации для формирования ключа сессии.
             $config->agentName = $name;
 
-            // При отключенной истории (in-memory) очищаем историю при каждом получении.
             if ($config->enableChatHistory === false) {
                 $config->resetChatHistory();
             }
         }
 
-        $this->cache[$name] = $config;
-
         return $config;
     }
 
     /**
-     * Ищет файл конфигурации агента в приоритетных директориях (поддиректория agents).
+     * Возвращает конфигурацию агента по его имени.
      *
-     * @return string|null Абсолютный путь к файлу или null.
+     * @param string $name Имя агента (соответствует имени файла без расширения).
+     *
+     * @return ConfigurationAgent|null Экземпляр конфигурации агента или null.
      */
-    private function resolveAgentFile(string $name): ?string
+    public function get(string $name): ?ConfigurationAgent
     {
-        $relPath = self::AGENTS_SUBDIR . '/' . $name;
+        $result = parent::get($name);
 
-        return $this->dirPriority->resolveFile($relPath, ['php', 'jsonc']);
+        return $result instanceof ConfigurationAgent ? $result : null;
     }
 }
-

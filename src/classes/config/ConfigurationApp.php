@@ -27,7 +27,12 @@ class ConfigurationApp
     private DirPriority $dirPriority;
 
     /**
-     * Абсолютный путь к файлу конфигурации config.jsonc (определяется при загрузке).
+     * Имя файла конфигурации (например, config.jsonc).
+     */
+    private string $configFileName;
+
+    /**
+     * Абсолютный путь к файлу конфигурации (определяется при загрузке).
      */
     private ?string $configPath = null;
 
@@ -41,11 +46,13 @@ class ConfigurationApp
     /**
      * Приватный конструктор, выполняющий загрузку конфигурации.
      *
-     * @param DirPriority $dirPriority Приоритетный список директорий для поиска config.jsonc.
+     * @param DirPriority $dirPriority    Приоритетный список директорий для поиска файла конфигурации.
+     * @param string      $configFileName Имя файла конфигурации (например, config.jsonc).
      */
-    private function __construct(DirPriority $dirPriority)
+    private function __construct(DirPriority $dirPriority, string $configFileName)
     {
         $this->dirPriority = $dirPriority;
+        $this->configFileName = $configFileName;
 
         $this->load();
     }
@@ -56,15 +63,16 @@ class ConfigurationApp
      * Метод должен вызываться один раз при старте приложения.
      * Повторные вызовы игнорируются.
      *
-     * @param DirPriority $dirPriority Приоритетный список директорий для поиска config.jsonc.
+     * @param DirPriority $dirPriority    Приоритетный список директорий для поиска файла конфигурации.
+     * @param string      $configFileName Имя файла конфигурации (например, config.jsonc).
      */
-    public static function init(DirPriority $dirPriority): void
+    public static function init(DirPriority $dirPriority, string $configFileName = 'config.jsonc'): void
     {
         if (self::$instance !== null) {
             return;
         }
 
-        self::$instance = new self($dirPriority);
+        self::$instance = new self($dirPriority, $configFileName);
     }
 
     /**
@@ -127,7 +135,7 @@ class ConfigurationApp
      */
     private function load(): void
     {
-        $this->configPath = $this->dirPriority->resolveFile('config.jsonc');
+        $this->configPath = $this->dirPriority->resolveFile($this->configFileName);
 
         if ($this->configPath === null) {
             // Файл не найден в приоритетных директориях — используем настройки по умолчанию.
