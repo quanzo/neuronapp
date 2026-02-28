@@ -45,7 +45,7 @@ class SkillProducer extends AProducer
             return null;
         }
 
-        return new Skill($contents);
+        return new Skill($contents, $name);
     }
 
     /**
