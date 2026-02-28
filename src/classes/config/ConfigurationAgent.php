@@ -214,6 +214,20 @@ class ConfigurationAgent {
         return $this->_agent;
     }
 
+    /**
+     * Возвращает клон конфигурации с сброшенным кешем агента.
+     * Используется для исполнения с дополнительными инструментами (например, skills)
+     * без изменения основного состояния агента.
+     *
+     * @return self
+     */
+    public function cloneForSession(): self
+    {
+        $clone = clone $this;
+        $clone->_agent = null;
+        return $clone;
+    }
+
     //-----------------------------------------
 
     /**

@@ -6,6 +6,7 @@ namespace app\modules\neuron\classes\todo;
 
 use Amp\Future;
 use app\modules\neuron\classes\APromptComponent;
+use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\ConfigurationAgent;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ITodo;
@@ -88,18 +89,58 @@ class TodoList extends APromptComponent implements ITodoList
     }
 
     /**
+     * Возвращает имена навыков (Skill), которые нужно подключить при исполнении списка.
+     * Берутся из опции "skills" — строка с именами через запятую (пробелы обрезаются).
+     *
+     * @return list<string>
+     */
+    public function getNeedSkills(): array
+    {
+        $skillsOpt = $this->getOptions()['skills'] ?? '';
+        $raw = is_string($skillsOpt) ? $skillsOpt : (string) $skillsOpt;
+        $names = array_map('trim', explode(',', $raw));
+
+        return array_values(array_filter($names, static fn(string $s): bool => $s !== ''));
+    }
+
+    /**
      * @inheritDoc
      *
-     * @return Future<list<NeuronMessage>> Завершается копией истории сообщений агента после выполнения всех заданий.
+     * При передаче SkillProducer в список инструментов агента добавляются навыки из опции "skills".
+     * Используется клон конфигурации агента, чтобы не менять основной состав инструментов.
+     *
+     * @param ConfigurationAgent $agentCfg       Конфигурация агента-исполнителя.
+     * @param MessageRole        $role           Роль сообщений.
+     * @param SkillProducer|null $skillProducer   Producer навыков для разрешения имён из getNeedSkills().
+     * @return Future<ChatHistoryInterface> Завершается копией истории сообщений агента после выполнения всех заданий.
      */
-    public function executeFromAgent(ConfigurationAgent $agentCfg, MessageRole $role = MessageRole::USER): Future
-    {
-        return \Amp\async(function () use ($agentCfg, $role): ChatHistoryInterface {
+    public function executeFromAgent(
+        ConfigurationAgent $agentCfg,
+        MessageRole $role = MessageRole::USER,
+        ?SkillProducer $skillProducer = null
+    ): Future {
+        return \Amp\async(function () use ($agentCfg, $role, $skillProducer): ChatHistoryInterface {
+            $sessionCfg = $agentCfg->cloneForSession();
+
+            if ($skillProducer !== null && $this->getNeedSkills() !== []) {
+                $skillTools = [];
+                foreach ($this->getNeedSkills() as $skillName) {
+                    $skill = $skillProducer->get($skillName);
+                    if ($skill !== null) {
+                        $skillTools[] = $skill->getTool($sessionCfg, $role);
+                    }
+                }
+                if ($skillTools !== []) {
+                    $sessionCfg->tools = array_merge($agentCfg->getTools(), $skillTools);
+                }
+            }
+
             foreach ($this->getTodos() as $todo) {
                 $message = new NeuronMessage($role, $todo->getTodo());
-                $agentCfg->sendMessage($message);
+                $sessionCfg->sendMessage($message);
             }
-            return clone $agentCfg->getChatHistory();
+
+            return clone $sessionCfg->getChatHistory();
         });
     }
 
