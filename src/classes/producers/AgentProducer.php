@@ -21,6 +21,19 @@ use app\modules\neuron\ConfigurationAgent;
 class AgentProducer extends AProducer
 {
     /**
+     * Имя агента по умолчанию.
+     */
+    protected static string $defaultAgentName = 'default';
+
+    /**
+     * Возвращает имя агента по умолчанию.
+     */
+    public static function getDefaultAgentName(): string
+    {
+        return static::$defaultAgentName;
+    }
+
+    /**
      * @inheritDoc
      */
     public static function getStorageDirName(): string

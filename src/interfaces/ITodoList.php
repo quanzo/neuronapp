@@ -27,6 +27,13 @@ interface ITodoList
     public function popTodo(): ?ITodo;
 
     /**
+     * Возвращает массив заданий (копию списка) для итерации без изменения очереди.
+     *
+     * @return list<ITodo>
+     */
+    public function getTodos(): array;
+
+    /**
      * Возвращает массив опций списка заданий.
      *
      * @return array<string, mixed>

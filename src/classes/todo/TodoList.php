@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\todo;
 
+use Amp\Future;
 use app\modules\neuron\classes\APromptComponent;
+use app\modules\neuron\ConfigurationAgent;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\interfaces\ITodoList;
+use NeuronAI\Chat\Enums\MessageRole;
+use NeuronAI\Chat\Messages\Message as NeuronMessage;
 
 /**
  * Список заданий Todo, формируемый из текстового ввода.
@@ -70,6 +74,30 @@ class TodoList extends APromptComponent implements ITodoList
         $todo = array_shift($this->todos);
 
         return $todo;
+    }
+
+    /**
+     * Возвращает массив заданий (копию списка) для итерации без изменения очереди.
+     *
+     * @return list<ITodo>
+     */
+    public function getTodos(): array
+    {
+        return array_values($this->todos);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function executeFromAgent(ConfigurationAgent $agentCfg): Future
+    {
+        return \Amp\async(function () use ($agentCfg): mixed {
+            foreach ($this->getTodos() as $todo) {
+                $message = new NeuronMessage(MessageRole::USER, $todo->getTodo());
+                $agentCfg->sendMessage($message);
+            }
+            return null;
+        });
     }
 
     /**

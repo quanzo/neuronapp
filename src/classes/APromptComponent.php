@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes;
 
+use Amp\Future;
+use app\modules\neuron\classes\producers\AgentProducer;
+use app\modules\neuron\ConfigurationAgent;
+
 /**
  * Абстрактный компонент для работы с текстовыми промптами.
  *
@@ -200,5 +204,26 @@ abstract class APromptComponent
     {
         return $this->body;
     }
+
+    /**
+     * Возвращает имя агента-исполнителя.
+     *
+     * Берётся из опции "agent", если задана и не пуста; иначе — имя агента по умолчанию.
+     */
+    public function getAgentName(): string
+    {
+        $agent = $this->options['agent'] ?? null;
+        if (is_string($agent) && $agent !== '') {
+            return $agent;
+        }
+        return AgentProducer::getDefaultAgentName();
+    }
+
+    /**
+     * Запускает асинхронное выполнение содержимого компонента через переданную конфигурацию агента.
+     *
+     * @return Future<mixed> Завершается по окончании выполнения (для Skill — один проход, для TodoList — после последнего элемента).
+     */
+    abstract public function executeFromAgent(ConfigurationAgent $agentCfg): Future;
 }
 

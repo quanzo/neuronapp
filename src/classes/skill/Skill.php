@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\skill;
 
+use Amp\Future;
 use app\modules\neuron\classes\APromptComponent;
-use app\modules\neuron\interfaces\ISkill;
+use app\modules\neuron\ConfigurationAgent;
 use app\modules\neuron\helpers\CommentsHelper;
+use app\modules\neuron\interfaces\ISkill;
+use NeuronAI\Chat\Enums\MessageRole;
+use NeuronAI\Chat\Messages\Message as NeuronMessage;
 
 /**
  * Класс текстового навыка (Skill).
@@ -72,5 +76,17 @@ class Skill extends APromptComponent implements ISkill
 
         // Выполняем замены за один проход, чтобы избежать пересечений ($1 и $10 и т.п.).
         return strtr($template, $replacements);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function executeFromAgent(ConfigurationAgent $agentCfg): Future
+    {
+        $body = $this->getBody();
+        return \Amp\async(function () use ($agentCfg, $body): mixed {
+            $message = new NeuronMessage(MessageRole::USER, $body);
+            return $agentCfg->sendMessage($message);
+        });
     }
 }
