@@ -59,6 +59,13 @@ class ConfigurationApp
     private ?SkillProducer $skillProducer = null;
 
     /**
+     * Базовый ключ сессии (временна́я часть без имени агента).
+     *
+     * Генерируется лениво при первом обращении через {@see getSessionKey()}.
+     */
+    private ?string $sessionKey = null;
+
+    /**
      * Приватный конструктор, выполняющий загрузку конфигурации.
      *
      * @param DirPriority $dirPriority    Приоритетный список директорий для поиска файла конфигурации.
@@ -119,6 +126,7 @@ class ConfigurationApp
     {
         if ($this->agentProducer === null) {
             $this->agentProducer = new AgentProducer($this->dirPriority);
+            $this->agentProducer->setSessionKey($this->getSessionKey());
         }
 
         return $this->agentProducer;
@@ -146,6 +154,46 @@ class ConfigurationApp
         }
 
         return $this->skillProducer;
+    }
+
+    /**
+     * Формирует уникальный базовый ключ сессии на основе текущего microtime.
+     *
+     * Формат: `YYYYMMDD-HHMMSS-μs` (без имени агента — агент добавляет
+     * свою часть самостоятельно в {@see ConfigurationAgent}).
+     */
+    public static function buildSessionKey(): string
+    {
+        $microtime = microtime(true);
+        $dt = \DateTime::createFromFormat('U.u', sprintf('%.6f', $microtime));
+
+        if ($dt === false) {
+            $dt = new \DateTime();
+        }
+
+        return $dt->format('Ymd-His-u');
+    }
+
+    /**
+     * Возвращает текущий базовый ключ сессии.
+     *
+     * При первом вызове лениво генерирует ключ через {@see buildSessionKey()}.
+     */
+    public function getSessionKey(): string
+    {
+        if ($this->sessionKey === null) {
+            $this->sessionKey = $this::buildSessionKey();
+        }
+
+        return $this->sessionKey;
+    }
+
+    /**
+     * Устанавливает базовый ключ сессии.
+     */
+    public function setSessionKey(string $sessionKey): void
+    {
+        $this->sessionKey = $sessionKey;
     }
 
     /**

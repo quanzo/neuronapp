@@ -5,6 +5,7 @@ namespace app\modules\neuron;
 use app\components\App;
 use app\modules\neuron\classes\Agent;
 use app\modules\neuron\classes\ChatHistory;
+use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\RAG;
 use app\modules\neuron\events\Event;
 use app\modules\neuron\helpers\CallableWrapper;
@@ -102,6 +103,16 @@ class ConfigurationAgent {
      * @var ChatHistoryInterface|null
      */
     protected ?ChatHistoryInterface $_chatHistory = null;
+
+    /**
+     * Базовый ключ сессии (без имени агента).
+     *
+     * Имя агента добавляется при формировании итогового ключа
+     * в {@see getChatHistory()}.
+     *
+     * @var string|null
+     */
+    protected ?string $sessionKey = null;
 
     /**
      * Системный промпт
@@ -330,7 +341,7 @@ class ConfigurationAgent {
 
         if ($this->enableChatHistory) {
             $directory = APP_WORK_DIR . DIRECTORY_SEPARATOR . '.sessions';
-            $key = $this->buildSessionKey();
+            $key = $this->sessionKey . '-' . ($this->agentName ?: 'unknown');
 
             $this->_chatHistory = new FileChatHistory(
                 $directory,
@@ -372,27 +383,18 @@ class ConfigurationAgent {
     }
 
     /**
-     * Формирует уникальный ключ сессии истории сообщений для агента.
-     *
-     * Ключ строится по правилу:
-     *  `<YYYYMMDD-HHMMSS-μs>-<agentName>`,
-     * где часть с датой и временем формируется на основе текущего microtime.
-     *
-     * Если имя агента не задано, используется строка "unknown".
-     *
-     * @return string Уникальный ключ истории сообщений.
+     * Возвращает базовый ключ сессии (без имени агента).
      */
-    protected function buildSessionKey(): string {
-        $microtime = microtime(true);
-        $dt = \DateTime::createFromFormat('U.u', sprintf('%.6f', $microtime));
+    public function getSessionKey(): ?string {
+        return $this->sessionKey;
+    }
 
-        if ($dt === false) {
-            $dt = new \DateTime();
-        }
-
-        $agentName = $this->agentName ?: 'unknown';
-
-        return $dt->format('Ymd-His-u') . '-' . $agentName;
+    /**
+     * Устанавливает базовый ключ сессии и сбрасывает кешированную историю чата.
+     */
+    public function setSessionKey(?string $sessionKey): void {
+        $this->sessionKey = $sessionKey;
+        $this->resetChatHistory();
     }
 
     /**
@@ -438,11 +440,13 @@ class ConfigurationAgent {
      *  - embeddingChunkSize (int)
      *  - vectorStore (VectorStoreInterface|callable|null)
      *
-     * @param array<string, mixed> $cfg Ассоциативный массив с настройками агента.
+     * @param array<string, mixed> $cfg        Ассоциативный массив с настройками агента.
+     * @param string|null          $sessionKey Базовый ключ сессии (без имени агента).
+     *                                         Если null — генерируется через ConfigurationApp.
      *
      * @return ConfigurationAgent|null Экземпляр конфигурации или null при пустом массиве.
      */
-    public static function makeFromArray(array $cfg): ?ConfigurationAgent {
+    public static function makeFromArray(array $cfg, ?string $sessionKey = null): ?ConfigurationAgent {
         if ($cfg === []) {
             return null;
         }
@@ -498,6 +502,8 @@ class ConfigurationAgent {
             $config->vectorStore = $cfg['vectorStore'];
         }
 
+        $config->setSessionKey($sessionKey ?? ConfigurationApp::buildSessionKey());
+
         return $config;
     }
 
@@ -511,12 +517,14 @@ class ConfigurationAgent {
      * Приоритет формата задается внешней логикой (например, {@see AgentProducer}),
      * сам метод просто обрабатывает переданный путь.
      *
-     * @param string $filename Абсолютный путь к файлу конфигурации агента.
+     * @param string      $filename   Абсолютный путь к файлу конфигурации агента.
+     * @param string|null $sessionKey Базовый ключ сессии (без имени агента).
+     *                                Если null — генерируется через ConfigurationApp.
      *
      * @return ConfigurationAgent|null Экземпляр конфигурации или null, если файл не найден
      *                                 или не удалось корректно разобрать его содержимое.
      */
-    public static function makeFromFile(string $filename): ?ConfigurationAgent {
+    public static function makeFromFile(string $filename, ?string $sessionKey = null): ?ConfigurationAgent {
         if ($filename === '' || !is_file($filename)) {
             return null;
         }
@@ -554,6 +562,6 @@ class ConfigurationAgent {
             return null;
         }
 
-        return self::makeFromArray($configArray);
+        return self::makeFromArray($configArray, $sessionKey);
     }
 }
