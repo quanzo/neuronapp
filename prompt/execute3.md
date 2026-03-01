@@ -22,3 +22,6 @@
 
 В классе ConfigurationApp, метод getAgentProducer - вот именно в этом методе надо устанавливать sessionKey в создаваемом экземпляре класса AgentProducer!
 
+
+В классе `ConfigurationApp` определим статичный метод `getSessionDirName(): string` он будет возвращать имя директории для хранении сессий. Имя папки для хранения сессий == `.sessions`. Это используется в методе `getChatHistory` класса `ConfigurationAgent`. Создадим В классе `ConfigurationApp` статичный метод `getSessionDir(): string` и он будет возвращать полный путь к папке хранения сессий - скорректировать `getChatHistory`
+

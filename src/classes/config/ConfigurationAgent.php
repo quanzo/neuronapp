@@ -323,8 +323,8 @@ class ConfigurationAgent {
      * Возвращает объект истории чата для текущей конфигурации агента.
      *
      * При включенной истории (`enableChatHistory === true`) используется файловое
-     * хранилище {@see FileChatHistory}, сохраняющее сообщения в поддиректории
-     * `.sessions` рабочей директории приложения.
+     * хранилище {@see FileChatHistory}, сохраняющее сообщения в директории
+     * {@see ConfigurationApp::getSessionDir()}.
      *
      * При отключенной истории (`enableChatHistory === false`) используется
      * оперативное хранилище {@see InMemoryChatHistory}, не сохраняющее сообщения
@@ -340,11 +340,10 @@ class ConfigurationAgent {
         }
 
         if ($this->enableChatHistory) {
-            $directory = APP_WORK_DIR . DIRECTORY_SEPARATOR . '.sessions';
             $key = $this->sessionKey . '-' . ($this->agentName ?: 'unknown');
 
             $this->_chatHistory = new FileChatHistory(
-                $directory,
+                ConfigurationApp::getSessionDir(),
                 $key,
                 $this->contextWindow
             );

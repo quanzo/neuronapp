@@ -157,6 +157,28 @@ class ConfigurationApp
     }
 
     /**
+     * Возвращает имя директории для хранения сессий.
+     *
+     * @return string Имя папки (например, `.sessions`).
+     */
+    public static function getSessionDirName(): string
+    {
+        return '.sessions';
+    }
+
+    /**
+     * Возвращает полный путь к директории хранения сессий.
+     *
+     * Путь формируется как {@see APP_WORK_DIR} + разделитель + {@see getSessionDirName()}.
+     *
+     * @return string Абсолютный путь к папке сессий.
+     */
+    public static function getSessionDir(): string
+    {
+        return APP_WORK_DIR . \DIRECTORY_SEPARATOR . self::getSessionDirName();
+    }
+
+    /**
      * Формирует уникальный базовый ключ сессии на основе текущего microtime.
      *
      * Формат: `YYYYMMDD-HHMMSS-μs` (без имени агента — агент добавляет
