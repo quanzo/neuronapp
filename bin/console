@@ -5,6 +5,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use app\modules\neron\classes\command\HelloCommand;
 use app\modules\neron\InteractiveCommand;
+use app\modules\neuron\classes\command\SimpleMessageCommand;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
 use Symfony\Component\Console\Application;
@@ -80,6 +81,7 @@ $app = new Application('Моё TUI-приложение', '1.0.0');
 // Регистрируем команды
 $app->add(new HelloCommand());
 $app->add(new InteractiveCommand());
+$app->add(new SimpleMessageCommand());
 
 // Можно также добавить встроенную команду list, которая уже есть в Symfony,
 // поэтому отдельная HelpCommand не требуется, но при желании можно добавить.

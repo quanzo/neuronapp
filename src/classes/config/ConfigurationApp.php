@@ -179,6 +179,25 @@ class ConfigurationApp
     }
 
     /**
+     * Проверяет, существует ли файл сессии для заданного ключа и агента.
+     *
+     * Использует тот же формат имени файла, что и {@see \NeuronAI\Chat\History\FileChatHistory}
+     * (префикс neuron_, расширение .chat).
+     *
+     * @param string $sessionKey Базовый ключ сессии (формат buildSessionKey()).
+     * @param string $agentName  Имя агента.
+     *
+     * @return bool true, если файл сессии существует.
+     */
+    public static function sessionExists(string $sessionKey, string $agentName): bool
+    {
+        $key = $sessionKey . '-' . ($agentName ?: 'unknown');
+        $path = self::getSessionDir() . \DIRECTORY_SEPARATOR . 'neuron_' . $key . '.chat';
+
+        return \is_file($path);
+    }
+
+    /**
      * Формирует уникальный базовый ключ сессии на основе текущего microtime.
      *
      * Формат: `YYYYMMDD-HHMMSS-μs` (без имени агента — агент добавляет
