@@ -7,7 +7,7 @@
         "symfony/console": "^6.4",
         "amphp/amp": "^3",
         "amphp/http-client": "^5",
-        "neuron-core/neuron-ai": "^2",
+        "neuron-core/neuron-ai": "^3",
         "html2text/html2text": "^4"
     },
     "require-dev": {

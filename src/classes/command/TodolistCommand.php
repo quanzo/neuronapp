@@ -8,6 +8,8 @@ use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\todo\TodoList;
 use app\modules\neuron\ConfigurationAgent;
 use NeuronAI\Chat\Enums\MessageRole;
+use NeuronAI\Chat\History\ChatHistoryInterface;
+use NeuronAI\Chat\Messages\Message;
 use Revolt\EventLoop;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -134,23 +136,30 @@ class TodolistCommand extends Command
             return Command::FAILURE;
         }
 
+        /**
+         * @var ChatHistoryInterface $history
+         */
+
         $lastMessage = $history->getLastMessage();
         if ($lastMessage === false) {
             $output->writeln('<error>Нет ответа в истории чата.</error>');
             return Command::FAILURE;
         }
+
+        /**
+         * @var Message $lastMessage
+         */
         $content = $lastMessage->getContent();
 
-        if (is_string($content)) {
-            $output->writeln($content);
-        } elseif (is_scalar($content)) {
-            $output->writeln((string) $content);
-        } else {
-            $output->writeln(json_encode($content, \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR));
-        }
-
-        $output->writeln('');
-        $output->writeln('sessionKey: ' . $agentCfg->getSessionKey());
+        $output->writeln(
+            json_encode(
+                [
+                    'response' => $content,
+                    'sessionKey' => $agentCfg->getSessionKey()
+                ],
+                \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR
+            )
+        );
 
         return Command::SUCCESS;
     }

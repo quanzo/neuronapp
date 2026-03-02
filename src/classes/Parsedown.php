@@ -1720,6 +1720,7 @@ class Parsedown
         }
 
         $permitRawHtml = false;
+        $text = null;
 
         if (isset($Element['text']))
         {

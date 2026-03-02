@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes;
 
 use app\modules\neuron\traits\AgentUseModuleTrait;
-use NeuronAI\Agent as NeuronAIAgent;
+use NeuronAI\Agent\Agent as NeuronAIAgent;
 
 /**
  * Агент частично настраиваемый через модуль

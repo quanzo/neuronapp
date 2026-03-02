@@ -175,7 +175,8 @@ class ConfigurationApp
      */
     public static function getSessionDir(): string
     {
-        return APP_WORK_DIR . \DIRECTORY_SEPARATOR . self::getSessionDirName();
+        $baseDir = \defined('APP_WORK_DIR') ? APP_WORK_DIR : \getcwd();
+        return $baseDir . \DIRECTORY_SEPARATOR . self::getSessionDirName();
     }
 
     /**

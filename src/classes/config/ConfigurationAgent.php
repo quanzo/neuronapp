@@ -11,7 +11,7 @@ use app\modules\neuron\events\Event;
 use app\modules\neuron\helpers\CallableWrapper;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\models\Message;
-use NeuronAI\AgentInterface;
+use NeuronAI\Agent\AgentInterface;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\History\FileChatHistory;
@@ -179,6 +179,10 @@ class ConfigurationAgent {
     public function sendMessage(NeuronMessage $message): mixed {
         $agent = $this->getAgent();
 
+        /**
+         * @var Agent|RAG $agent
+         */
+
         $start = microtime(true);
         
         $isStruct = false;
@@ -190,16 +194,19 @@ class ConfigurationAgent {
             );
             $isStruct = true;
         } else {
-            $response = $agent->chat($message);
+            $handler = $agent->chat($message);
+            $response = $handler->getMessage();
         }
         $duration = round(microtime(true) - $start, 2);
+
+        /**
+         * @var Agent|RAG $agent
+         * 
+         */
     
         // логирование
-        $chatHistory = $agent->resolveChatHistory();
-        /**
-         * @var ChatHistory $chatHistory
-         */
-        $historyModel = $chatHistory->getHistoryModel();
+        // В v3 агент хранит историю внутри состояния; получаем ее через публичный метод.
+        $chatHistory = $agent->getChatHistory();
         return $response;
     }
 
