@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\neuron\providers;
 
 use Generator;
+use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\AssistantMessage;
 use NeuronAI\Chat\Messages\Message;
 use NeuronAI\Chat\Messages\Stream\Chunks\TextChunk;
@@ -153,7 +154,7 @@ class EchoProvider implements AIProviderInterface
     public function chat(Message ...$messages): Message
     {
         $lastUserMessage = $this->extractLastUserMessage($messages);
-        $content = $lastUserMessage instanceof UserMessage
+        $content = $lastUserMessage
             ? $lastUserMessage->getContent()
             : '';
 
@@ -182,7 +183,7 @@ class EchoProvider implements AIProviderInterface
     public function stream(Message ...$messages): Generator
     {
         $lastUserMessage = $this->extractLastUserMessage($messages);
-        $content = $lastUserMessage instanceof UserMessage
+        $content = $lastUserMessage
             ? $lastUserMessage->getContent()
             : '';
 
@@ -215,7 +216,7 @@ class EchoProvider implements AIProviderInterface
         // Приводим входные данные к массиву для единообразной обработки
         $messageArray = is_array($messages) ? $messages : [$messages];
         $lastUserMessage = $this->extractLastUserMessage($messageArray);
-        $content = $lastUserMessage instanceof UserMessage
+        $content = $lastUserMessage
             ? $lastUserMessage->getContent()
             : '';
 
@@ -244,12 +245,12 @@ class EchoProvider implements AIProviderInterface
      * объект типа UserMessage. Если таких сообщений нет, возвращает null.
      *
      * @param Message[] $messages Массив объектов, наследующих Message.
-     * @return UserMessage|null Последнее сообщение пользователя или null.
+     * @return Message|null Последнее сообщение пользователя или null.
      */
-    protected function extractLastUserMessage(array $messages): ?UserMessage
+    protected function extractLastUserMessage(array $messages): ?Message
     {
         for ($i = count($messages) - 1; $i >= 0; $i--) {
-            if ($messages[$i] instanceof UserMessage) {
+            if ($messages[$i] instanceof Message && $messages[$i]->getRole() == MessageRole::USER->value) {
                 return $messages[$i];
             }
         }

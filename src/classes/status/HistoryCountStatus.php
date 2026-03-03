@@ -1,7 +1,7 @@
 <?php
 
-namespace app\modules\neron\classes\status;
-use app\modules\neron\interfaces\StatusInterface;
+namespace app\modules\neuron\classes\status;
+use app\modules\neuron\interfaces\StatusInterface;
 
 /**
  * Статус, отображающий количество сообщений в истории.

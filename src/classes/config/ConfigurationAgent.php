@@ -1,12 +1,12 @@
 <?php
 
-namespace app\modules\neuron;
+namespace app\modules\neuron\classes\config;
 
 use app\components\App;
-use app\modules\neuron\classes\Agent;
+use app\modules\neuron\classes\neuron\Agent;
 use app\modules\neuron\classes\ChatHistory;
 use app\modules\neuron\classes\config\ConfigurationApp;
-use app\modules\neuron\classes\RAG;
+use app\modules\neuron\classes\neuron\RAG;
 use app\modules\neuron\events\Event;
 use app\modules\neuron\helpers\CallableWrapper;
 use app\modules\neuron\helpers\CommentsHelper;
@@ -350,7 +350,7 @@ class ConfigurationAgent {
             $key = $this->sessionKey . '-' . ($this->agentName ?: 'unknown');
 
             $this->_chatHistory = new FileChatHistory(
-                ConfigurationApp::getSessionDir(),
+                ConfigurationApp::getInstance()->getSessionDir(),
                 $key,
                 $this->contextWindow
             );

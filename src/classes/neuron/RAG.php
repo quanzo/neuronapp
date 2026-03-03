@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace app\modules\neuron\classes;
+namespace app\modules\neuron\classes\neuron;
 
 use app\modules\neuron\traits\AgentUseModuleTrait;
 use app\modules\neuron\traits\RagUseModuleTrait;

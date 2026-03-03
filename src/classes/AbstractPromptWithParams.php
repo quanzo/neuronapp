@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes;
 
+use app\modules\neuron\classes\dto\params\ParamListDto;
 use app\modules\neuron\helpers\PlaceholderHelper;
 
 /**
@@ -17,10 +18,40 @@ use app\modules\neuron\helpers\PlaceholderHelper;
  */
 abstract class AbstractPromptWithParams extends APromptComponent
 {
+    private ?ParamListDto $paramListCache = null;
+    private bool $paramListCacheInitialized = false;
+
     /**
      * Имя компонента, используемое, например, для проверки самоссылок в skills.
      */
     abstract protected function getComponentName(): string;
+
+    /**
+     * Возвращает список параметров (опция params) в виде DTO.
+     *
+     * Если опция отсутствует, возвращается пустой список параметров.
+     * При некорректной опции (невалидный JSON/тип) возвращает null.
+     */
+    public function getParamList(): ?ParamListDto
+    {
+        if ($this->paramListCacheInitialized) {
+            return $this->paramListCache;
+        }
+
+        $this->paramListCacheInitialized = true;
+
+        $options = $this->getOptions();
+        $paramsOption = $options['params'] ?? null;
+
+        [$list, $errors] = ParamListDto::tryFromOptionValue($paramsOption);
+        if ($errors !== []) {
+            $this->paramListCache = null;
+            return null;
+        }
+
+        $this->paramListCache = $list;
+        return $this->paramListCache;
+    }
 
     /**
      * Собирает список плейсхолдеров вида $paramName в теле компонента.
@@ -40,11 +71,14 @@ abstract class AbstractPromptWithParams extends APromptComponent
      */
     protected function validateParamsOption(array $placeholders): array
     {
-        $errors = [];
         $options = $this->getOptions();
         $paramsOption = $options['params'] ?? null;
+        [$paramList, $parseErrors] = ParamListDto::tryFromOptionValue($paramsOption);
 
-        return PlaceholderHelper::validateParams($paramsOption, $placeholders);
+        return array_merge(
+            $parseErrors,
+            PlaceholderHelper::validateParamList($paramList, $placeholders),
+        );
     }
 
     /**

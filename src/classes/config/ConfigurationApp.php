@@ -10,7 +10,7 @@ use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\classes\producers\TodoListProducer;
 use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\classes\todo\TodoList;
-use app\modules\neuron\ConfigurationAgent;
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\helpers\CommentsHelper;
 use RuntimeException;
 
@@ -173,10 +173,9 @@ class ConfigurationApp
      *
      * @return string Абсолютный путь к папке сессий.
      */
-    public static function getSessionDir(): string
+    public function getSessionDir(): string
     {
-        $baseDir = \defined('APP_WORK_DIR') ? APP_WORK_DIR : \getcwd();
-        return $baseDir . \DIRECTORY_SEPARATOR . self::getSessionDirName();
+        return $this->dirPriority->resolveDir(self::getSessionDirName());
     }
 
     /**
@@ -190,12 +189,14 @@ class ConfigurationApp
      *
      * @return bool true, если файл сессии существует.
      */
-    public static function sessionExists(string $sessionKey, string $agentName): bool
+    public function sessionExists(string $sessionKey, string $agentName): bool
     {
         $key = $sessionKey . '-' . ($agentName ?: 'unknown');
-        $path = self::getSessionDir() . \DIRECTORY_SEPARATOR . 'neuron_' . $key . '.chat';
-
-        return \is_file($path);
+        $path = $this->dirPriority->resolveFile($this->getSessionDirName() . DIRECTORY_SEPARATOR . 'neuron_' . $key . '.chat');
+        if ($path) {
+            return true;
+        }
+        return false;
     }
 
     /**

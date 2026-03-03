@@ -1,6 +1,6 @@
 <?php
 
-namespace app\modules\neron\interfaces;
+namespace app\modules\neuron\interfaces;
 
 /**
  * Интерфейс для всех компонентов строки состояния.

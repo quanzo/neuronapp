@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
-use app\modules\neuron\classes\todo\TodoList;
-use app\modules\neuron\ConfigurationAgent;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\Messages\Message;
@@ -104,7 +102,7 @@ class TodolistCommand extends Command
                 return Command::FAILURE;
             }
 
-            if (!ConfigurationApp::sessionExists($sessionId, $agentName)) {
+            if (!ConfigurationApp::getInstance()->sessionExists($sessionId, $agentName)) {
                 $output->writeln(sprintf('<error>Сессия с session_id "%s" для агента "%s" не найдена.</error>', $sessionId, $agentName));
                 return Command::FAILURE;
             }

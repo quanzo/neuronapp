@@ -1,15 +1,15 @@
 <?php
 
-namespace app\modules\neron;
+namespace app\modules\neuron\classes\command;
 
-use app\modules\neron\classes\status\ModeStatus;
+use app\modules\neuron\classes\status\ModeStatus;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Terminal;
-use app\modules\neron\classes\status\StatusBar;
-use app\modules\neron\classes\status\CursorPositionStatus;
-use app\modules\neron\classes\status\HistoryCountStatus;
+use app\modules\neuron\classes\status\StatusBar;
+use app\modules\neuron\classes\status\CursorPositionStatus;
+use app\modules\neuron\classes\status\HistoryCountStatus;
 
 /**
  * Интерактивная TUI-команда.

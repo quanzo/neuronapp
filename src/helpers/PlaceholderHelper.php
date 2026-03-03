@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\helpers;
 
+use app\modules\neuron\classes\dto\params\ParamListDto;
+
 /**
  * Вспомогательные методы для работы с плейсхолдерами вида $paramName.
  */
@@ -63,60 +65,20 @@ class PlaceholderHelper
     }
 
     /**
-     * Проверяет соответствие опции params списку плейсхолдеров.
+     * Проверяет соответствие описания params списку плейсхолдеров.
      *
-     * @param mixed                $optionsParams  Значение опции params (ожидается массив).
-     * @param string[]             $placeholders   Имена плейсхолдеров без '$'.
+     * @param ParamListDto|null $paramList     Описание параметров (может быть null при ошибке парсинга).
+     * @param string[]          $placeholders  Имена плейсхолдеров без '$'.
+     *
      * @return array<int, array{type:string, message:string, param?:string}>
      */
-    public static function validateParams(mixed $optionsParams, array $placeholders): array
+    public static function validateParamList(?ParamListDto $paramList, array $placeholders): array
     {
         $errors = [];
-        $definedParams = [];
-
-        if ($optionsParams !== null && !is_array($optionsParams)) {
-            $errors[] = [
-                'type' => 'invalid_params_type',
-                'message' => 'Опция params должна быть JSON-объектом (массивом) с описаниями параметров.',
-            ];
-
-            return $errors;
-        }
-
-        if (is_array($optionsParams)) {
-            foreach ($optionsParams as $paramName => $def) {
-                if (!is_string($paramName) || preg_match('/^[a-zA-Z]+$/', $paramName) !== 1) {
-                    $errors[] = [
-                        'type' => 'invalid_param_name',
-                        'param' => (string) $paramName,
-                        'message' => 'Имя параметра должно содержать только латинские буквы [a-zA-Z].',
-                    ];
-                    continue;
-                }
-
-                $definedParams[] = $paramName;
-
-                if (!is_string($def) && !is_array($def)) {
-                    $errors[] = [
-                        'type' => 'invalid_param_definition_type',
-                        'param' => $paramName,
-                        'message' => 'Описание параметра должно быть строкой (тип) или массивом с ключом type.',
-                    ];
-                    continue;
-                }
-
-                if (is_array($def) && isset($def['type']) && !is_string($def['type'])) {
-                    $errors[] = [
-                        'type' => 'invalid_param_type_value',
-                        'param' => $paramName,
-                        'message' => 'Поле type в описании параметра должно быть строкой.',
-                    ];
-                }
-            }
-        }
+        $definedParams = $paramList?->all() ?? [];
 
         foreach ($placeholders as $placeholder) {
-            if (!in_array($placeholder, $definedParams, true)) {
+            if ($paramList === null || !$paramList->has($placeholder)) {
                 $errors[] = [
                     'type' => 'missing_param_definition',
                     'param' => $placeholder,
@@ -126,11 +88,12 @@ class PlaceholderHelper
         }
 
         foreach ($definedParams as $defined) {
-            if (!in_array($defined, $placeholders, true)) {
+            $name = $defined->getName();
+            if (!in_array($name, $placeholders, true)) {
                 $errors[] = [
                     'type' => 'unused_param_definition',
-                    'param' => $defined,
-                    'message' => "Параметр {$defined} описан в опции params, но не используется в тексте.",
+                    'param' => $name,
+                    'message' => "Параметр {$name} описан в опции params, но не используется в тексте.",
                 ];
             }
         }

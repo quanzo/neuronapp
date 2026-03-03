@@ -84,6 +84,36 @@ class DirPriority
     }
 
     /**
+     * Ищет директорию в списке приоритетных директорий и возвращает первый подходящий путь.
+     *
+     * Для каждой базовой директории из списка приоритетов строится путь вида
+     * "<base>/<relDirPath>" и проверяется существование директории. Возвращается
+     * первый найденный путь в порядке приоритета базовых директорий.
+     *
+     * @param string $relDirPath Относительный путь к директории (например, "agents"
+     *                           или "prompt/todo"). Ведущие и хвостовые разделители
+     *                           пути будут отброшены.
+     *
+     * @return string|null Абсолютный путь к директории или null, если директория не найдена.
+     */
+    public function resolveDir(string $relDirPath): ?string
+    {
+        $relDirPath = trim($relDirPath, DIRECTORY_SEPARATOR);
+
+        foreach ($this->directories as $dir) {
+            $path = $relDirPath === ''
+                ? $dir
+                : $dir . DIRECTORY_SEPARATOR . $relDirPath;
+
+            if (is_dir($path)) {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Убирает расширение из имени файла, если оно входит в список.
      */
     private function stripExtension(string $relFileName, array $extensions): string

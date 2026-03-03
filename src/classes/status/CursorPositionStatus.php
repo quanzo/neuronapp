@@ -1,8 +1,8 @@
 <?php
 
-namespace app\modules\neron\classes\status;
+namespace app\modules\neuron\classes\status;
 
-use app\modules\neron\interfaces\StatusInterface;
+use app\modules\neuron\interfaces\StatusInterface;
 
 /**
  * Статус, показывающий текущую позицию курсора в поле ввода.

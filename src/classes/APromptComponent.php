@@ -6,7 +6,7 @@ namespace app\modules\neuron\classes;
 
 use Amp\Future;
 use app\modules\neuron\classes\producers\AgentProducer;
-use app\modules\neuron\ConfigurationAgent;
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use NeuronAI\Chat\Enums\MessageRole;
 
 /**

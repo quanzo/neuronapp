@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\producers;
 
 use app\modules\neuron\classes\AProducer;
-use app\modules\neuron\ConfigurationAgent;
+use app\modules\neuron\classes\config\ConfigurationAgent;
 
 /**
  * Фабрика конфигураций агентов по имени.
  *
  * Ищет файлы конфигураций в поддиректории "agents" через {@see DirPriority}
- * (приоритет директорий задаётся снаружи, например APP_START_DIR и APP_WORK_DIR)
+ * (приоритет директорий задаётся снаружи через конструктор и класс DirPriority)
  * и создаёт экземпляры {@see ConfigurationAgent} с учётом приоритета форматов.
  *
  * Приоритет форматов конфигурации:

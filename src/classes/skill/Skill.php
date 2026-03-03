@@ -6,8 +6,9 @@ namespace app\modules\neuron\classes\skill;
 
 use Amp\Future;
 use app\modules\neuron\classes\AbstractPromptWithParams;
+use app\modules\neuron\classes\dto\params\ParamListDto;
 use app\modules\neuron\helpers\PlaceholderHelper;
-use app\modules\neuron\ConfigurationAgent;
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ISkill;
 use NeuronAI\Chat\Enums\MessageRole;
@@ -123,7 +124,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
         // Критичные ошибки конфигурации skill считаем поводом не строить инструмент и явно сообщить об этом.
         $errors = $this->checkErrors();
         foreach ($errors as $error) {
-            if (in_array($error['type'], ['missing_param_definition', 'invalid_params_type', 'invalid_param_name', 'invalid_param_definition_type', 'invalid_param_type_value'], true)) {
+            if (in_array($error['type'], ['missing_param_definition', 'invalid_params_type', 'invalid_params_json', 'invalid_param_name', 'invalid_param_definition_type', 'invalid_param_type_value', 'invalid_param_description_value'], true)) {
                 $message = $error['message'] ?? 'Некорректная конфигурация skill.';
                 throw new \RuntimeException(
                     sprintf('Некорректная конфигурация skill "%s": %s', $this->getName(), $message)
@@ -138,25 +139,22 @@ class Skill extends AbstractPromptWithParams implements ISkill
 
         $tool = new Tool($toolName, is_string($description) ? $description : null);
 
-        $paramsDef = $options['params'] ?? [];
+        $paramsOption = $options['params'] ?? null;
+        [$paramList, $paramErrors] = ParamListDto::tryFromOptionValue($paramsOption);
+        // Ошибки должны были отфильтроваться выше (через checkErrors), но на всякий случай.
+        if ($paramErrors !== []) {
+            throw new \RuntimeException(
+                sprintf('Некорректная конфигурация skill "%s": %s', $this->getName(), $paramErrors[0]['message'] ?? 'Ошибка в params')
+            );
+        }
 
-        if (is_array($paramsDef)) {
-            foreach ($paramsDef as $paramName => $def) {
-                if (!is_string($paramName) || preg_match('/^[a-zA-Z]+$/', $paramName) !== 1) {
-                    continue;
-                }
-
-                if (is_string($def)) {
-                    $tool->addProperty(new ToolProperty($paramName, PropertyType::from($def)));
-                } elseif (is_array($def)) {
-                    $tool->addProperty(new ToolProperty(
-                        $paramName,
-                        PropertyType::from($def['type'] ?? 'string'),
-                        $def['description'] ?? null,
-                        (bool) ($def['required'] ?? false),
-                    ));
-                }
-            }
+        foreach (($paramList?->all() ?? []) as $param) {
+            $tool->addProperty(new ToolProperty(
+                $param->getName(),
+                PropertyType::from($param->getType()),
+                $param->getDescription(),
+                $param->isRequired(),
+            ));
         }
 
         $tool->setCallable(function (mixed ...$args) use ($agentCfg, $role): mixed {

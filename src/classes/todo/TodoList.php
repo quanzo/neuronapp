@@ -7,7 +7,7 @@ namespace app\modules\neuron\classes\todo;
 use Amp\Future;
 use app\modules\neuron\classes\AbstractPromptWithParams;
 use app\modules\neuron\classes\producers\SkillProducer;
-use app\modules\neuron\ConfigurationAgent;
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\interfaces\ITodoList;
