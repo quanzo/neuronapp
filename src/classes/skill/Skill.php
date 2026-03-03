@@ -6,6 +6,7 @@ namespace app\modules\neuron\classes\skill;
 
 use Amp\Future;
 use app\modules\neuron\classes\AbstractPromptWithParams;
+use app\modules\neuron\helpers\PlaceholderHelper;
 use app\modules\neuron\ConfigurationAgent;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ISkill;
@@ -97,29 +98,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
      */
     public function getSkill(array $params = []): string
     {
-        $template = $this->getBody();
-
-        if ($template === '') {
-            return '';
-        }
-
-        $matches = [];
-        preg_match_all('/\$([a-zA-Z]+)/', $template, $matches);
-
-        $replacements = [];
-
-        if (!empty($matches[1])) {
-            foreach (array_unique($matches[1]) as $placeholder) {
-                $value = array_key_exists($placeholder, $params) ? (string) $params[$placeholder] : '';
-                $replacements['$' . $placeholder] = $value;
-            }
-        }
-
-        if ($replacements === []) {
-            return $template;
-        }
-
-        return strtr($template, $replacements);
+        return PlaceholderHelper::renderWithParams($this->getBody(), $params);
     }
 
     /**

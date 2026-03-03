@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes;
 
+use app\modules\neuron\helpers\PlaceholderHelper;
+
 /**
  * Базовый компонент для промптов с параметрами и опцией skills.
  *
@@ -27,20 +29,7 @@ abstract class AbstractPromptWithParams extends APromptComponent
      */
     protected function collectPlaceholdersFromBody(): array
     {
-        $body = $this->getBody();
-
-        if ($body === '') {
-            return [];
-        }
-
-        $matches = [];
-        preg_match_all('/\$([a-zA-Z]+)/', $body, $matches);
-
-        if (empty($matches[1])) {
-            return [];
-        }
-
-        return array_values(array_unique($matches[1]));
+        return PlaceholderHelper::collectPlaceholders($this->getBody());
     }
 
     /**
@@ -53,68 +42,9 @@ abstract class AbstractPromptWithParams extends APromptComponent
     {
         $errors = [];
         $options = $this->getOptions();
-
         $paramsOption = $options['params'] ?? null;
-        $definedParams = [];
 
-        if ($paramsOption !== null && !is_array($paramsOption)) {
-            $errors[] = [
-                'type' => 'invalid_params_type',
-                'message' => 'Опция params должна быть JSON-объектом (массивом) с описаниями параметров.',
-            ];
-        } elseif (is_array($paramsOption)) {
-            foreach ($paramsOption as $paramName => $def) {
-                if (!is_string($paramName) || preg_match('/^[a-zA-Z]+$/', $paramName) !== 1) {
-                    $errors[] = [
-                        'type' => 'invalid_param_name',
-                        'param' => (string) $paramName,
-                        'message' => 'Имя параметра должно содержать только латинские буквы [a-zA-Z].',
-                    ];
-                    continue;
-                }
-
-                $definedParams[] = $paramName;
-
-                if (!is_string($def) && !is_array($def)) {
-                    $errors[] = [
-                        'type' => 'invalid_param_definition_type',
-                        'param' => $paramName,
-                        'message' => 'Описание параметра должно быть строкой (тип) или массивом с ключом type.',
-                    ];
-                    continue;
-                }
-
-                if (is_array($def) && isset($def['type']) && !is_string($def['type'])) {
-                    $errors[] = [
-                        'type' => 'invalid_param_type_value',
-                        'param' => $paramName,
-                        'message' => 'Поле type в описании параметра должно быть строкой.',
-                    ];
-                }
-            }
-        }
-
-        foreach ($placeholders as $placeholder) {
-            if (!in_array($placeholder, $definedParams, true)) {
-                $errors[] = [
-                    'type' => 'missing_param_definition',
-                    'param' => $placeholder,
-                    'message' => "Параметр \${$placeholder} используется в тексте, но не описан в опции params.",
-                ];
-            }
-        }
-
-        foreach ($definedParams as $defined) {
-            if (!in_array($defined, $placeholders, true)) {
-                $errors[] = [
-                    'type' => 'unused_param_definition',
-                    'param' => $defined,
-                    'message' => "Параметр {$defined} описан в опции params, но не используется в тексте.",
-                ];
-            }
-        }
-
-        return $errors;
+        return PlaceholderHelper::validateParams($paramsOption, $placeholders);
     }
 
     /**

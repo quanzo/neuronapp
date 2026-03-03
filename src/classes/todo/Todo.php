@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\todo;
 
 use app\modules\neuron\interfaces\ITodo;
+use app\modules\neuron\helpers\PlaceholderHelper;
 
 /**
  * Класс одного задания Todo.
@@ -50,25 +51,11 @@ class Todo implements ITodo
      */
     public function getTodo(?array $params = null): string
     {
-        if ($params === null || $this->text === '') {
+        if ($params === null) {
             return $this->text;
         }
 
-        $matches = [];
-        preg_match_all('/\$([a-zA-Z]+)/', $this->text, $matches);
-
-        if (empty($matches[1])) {
-            return $this->text;
-        }
-
-        $replacements = [];
-
-        foreach (array_unique($matches[1]) as $placeholder) {
-            $value = array_key_exists($placeholder, $params) ? (string) $params[$placeholder] : '';
-            $replacements['$' . $placeholder] = $value;
-        }
-
-        return strtr($this->text, $replacements);
+        return PlaceholderHelper::renderWithParams($this->text, $params);
     }
 }
 
