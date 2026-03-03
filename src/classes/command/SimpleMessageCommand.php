@@ -154,17 +154,15 @@ class SimpleMessageCommand extends Command
         }
         $content = $lastMessage->getContent();
 
-        if (is_string($content)) {
-            $output->writeln($content);
-        } elseif (is_scalar($content)) {
-            $output->writeln((string) $content);
-        } else {
-            $output->writeln(json_encode($content, \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR));
-        }
-
-        // Вывод sessionKey для использования в следующем вызове (--session_id)
-        $output->writeln('');
-        $output->writeln('sessionKey: ' . $agentCfg->getSessionKey());
+        $output->writeln(
+            json_encode(
+                [
+                    'response' => $content,
+                    'sessionKey' => $agentCfg->getSessionKey()
+                ],
+                \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR
+            )
+        );
 
         return Command::SUCCESS;
     }
