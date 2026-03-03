@@ -45,7 +45,7 @@ class TodoListProducer extends AProducer
             return null;
         }
 
-        return new TodoList($contents);
+        return new TodoList($contents, $name);
     }
 
     /**

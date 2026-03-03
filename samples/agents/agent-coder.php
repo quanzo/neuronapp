@@ -7,7 +7,7 @@
 
 use app\modules\neuron\helpers\CallableWrapper;
 use NeuronAI\Providers\Ollama\Ollama;
-use NeuronAI\SystemPrompt;
+use NeuronAI\Agent\SystemPrompt;
 
 return [
     'enableChatHistory' => true,

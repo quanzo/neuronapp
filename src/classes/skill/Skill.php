@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\skill;
 
 use Amp\Future;
-use app\modules\neuron\classes\APromptComponent;
+use app\modules\neuron\classes\AbstractPromptWithParams;
 use app\modules\neuron\ConfigurationAgent;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ISkill;
@@ -22,7 +22,7 @@ use NeuronAI\Tools\ToolProperty;
  * именованных параметров вида $paramName при получении финального текста.
  * Имя параметра — только латинские буквы [a-zA-Z]+, регистр учитывается.
  */
-class Skill extends APromptComponent implements ISkill
+class Skill extends AbstractPromptWithParams implements ISkill
 {
     private string $name;
 
@@ -48,6 +48,41 @@ class Skill extends APromptComponent implements ISkill
     public function getName(): string
     {
         return $this->name;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function getComponentName(): string
+    {
+        return $this->getName();
+    }
+
+    /**
+     * Возвращает имена навыков (Skill), которые нужно подключить при исполнении.
+     * Берутся из опции "skills" — строка с именами через запятую (пробелы обрезаются),
+     * при этом исключается имя текущего skill, чтобы избежать самоссылок.
+     *
+     * @return list<string>
+     */
+    public function getNeedSkills(): array
+    {
+        return $this->parseSkills(true);
+    }
+
+    /**
+     * Проверяет корректность настройки Skill и возвращает список найденных проблем.
+     *
+     * Формат элемента ошибки:
+     *  - type: строковый код ошибки
+     *  - message: человекочитаемое описание
+     *  - param: опционально, имя параметра, к которому относится ошибка
+     *
+     * @return array<int, array{type:string, message:string, param?:string}>
+     */
+    public function checkErrors(): array
+    {
+        return $this->getErrors();
     }
 
     /**
@@ -106,6 +141,17 @@ class Skill extends APromptComponent implements ISkill
      */
     public function getTool(ConfigurationAgent $agentCfg, MessageRole $role = MessageRole::USER): Tool
     {
+        // Критичные ошибки конфигурации skill считаем поводом не строить инструмент и явно сообщить об этом.
+        $errors = $this->checkErrors();
+        foreach ($errors as $error) {
+            if (in_array($error['type'], ['missing_param_definition', 'invalid_params_type', 'invalid_param_name', 'invalid_param_definition_type', 'invalid_param_type_value'], true)) {
+                $message = $error['message'] ?? 'Некорректная конфигурация skill.';
+                throw new \RuntimeException(
+                    sprintf('Некорректная конфигурация skill "%s": %s', $this->getName(), $message)
+                );
+            }
+        }
+
         $options = $this->getOptions();
 
         $toolName = str_replace('/', '__', $this->name);
@@ -146,11 +192,14 @@ class Skill extends APromptComponent implements ISkill
     /**
      * @inheritDoc
      */
-    public function executeFromAgent(ConfigurationAgent $agentCfg, MessageRole $role = MessageRole::USER): Future
-    {
-        $body = $this->getBody();
-        return \Amp\async(function () use ($agentCfg, $body, $role): mixed {
-            $message = new NeuronMessage($role, $body);
+    public function executeFromAgent(
+        ConfigurationAgent $agentCfg,
+        MessageRole $role = MessageRole::USER,
+        ?array $params = null
+    ): Future {
+        $text = $this->getSkill($params ?? []);
+        return \Amp\async(function () use ($agentCfg, $text, $role): mixed {
+            $message = new NeuronMessage($role, $text);
             return $agentCfg->sendMessage($message);
         });
     }

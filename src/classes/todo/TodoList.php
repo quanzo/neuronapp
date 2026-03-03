@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\todo;
 
 use Amp\Future;
-use app\modules\neuron\classes\APromptComponent;
+use app\modules\neuron\classes\AbstractPromptWithParams;
 use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\ConfigurationAgent;
 use app\modules\neuron\helpers\CommentsHelper;
@@ -22,7 +22,7 @@ use NeuronAI\Chat\Messages\Message as NeuronMessage;
  * а затем строит очередь заданий из текстового блока.
  * Задания хранятся в виде очереди и извлекаются по принципу FIFO.
  */
-class TodoList extends APromptComponent implements ITodoList
+class TodoList extends AbstractPromptWithParams implements ITodoList
 {
     /**
      * Очередь заданий в порядке FIFO.
@@ -30,6 +30,11 @@ class TodoList extends APromptComponent implements ITodoList
      * @var ITodo[]
      */
     private array $todos = [];
+
+    /**
+     * Имя списка заданий (может соответствовать имени файла).
+     */
+    private string $name = '';
 
     /**
      * Создает список заданий на основе входного текста.
@@ -42,10 +47,11 @@ class TodoList extends APromptComponent implements ITodoList
      *
      * @param string $input Полный текст описания списка.
      */
-    public function __construct(string $input)
+    public function __construct(string $input, string $name = '')
     {
         parent::__construct($input);
         $this->body = CommentsHelper::stripComments($this->body);
+        $this->name = $name;
         $this->initTodos();
     }
 
@@ -88,6 +94,19 @@ class TodoList extends APromptComponent implements ITodoList
         return array_values($this->todos);
     }
 
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function getComponentName(): string
+    {
+        return $this->getName();
+    }
+
     /**
      * Возвращает имена навыков (Skill), которые нужно подключить при исполнении списка.
      * Берутся из опции "skills" — строка с именами через запятую (пробелы обрезаются).
@@ -96,11 +115,17 @@ class TodoList extends APromptComponent implements ITodoList
      */
     public function getNeedSkills(): array
     {
-        $skillsOpt = $this->getOptions()['skills'] ?? '';
-        $raw = is_string($skillsOpt) ? $skillsOpt : (string) $skillsOpt;
-        $names = array_map('trim', explode(',', $raw));
+        return $this->parseSkills(true);
+    }
 
-        return array_values(array_filter($names, static fn(string $s): bool => $s !== ''));
+    /**
+     * Проверяет корректность конфигурации TodoList и возвращает список найденных проблем.
+     *
+     * @return array<int, array{type:string, message:string, param?:string}>
+     */
+    public function checkErrors(): array
+    {
+        return $this->getErrors();
     }
 
     /**
@@ -117,9 +142,10 @@ class TodoList extends APromptComponent implements ITodoList
     public function executeFromAgent(
         ConfigurationAgent $agentCfg,
         MessageRole $role = MessageRole::USER,
-        ?SkillProducer $skillProducer = null
+        ?SkillProducer $skillProducer = null,
+        ?array $params = null
     ): Future {
-        return \Amp\async(function () use ($agentCfg, $role, $skillProducer): ChatHistoryInterface {
+        return \Amp\async(function () use ($agentCfg, $role, $skillProducer, $params): ChatHistoryInterface {
             $sessionCfg = $agentCfg->cloneForSession();
 
             if ($skillProducer !== null && $this->getNeedSkills() !== []) {
@@ -136,7 +162,7 @@ class TodoList extends APromptComponent implements ITodoList
             }
 
             foreach ($this->getTodos() as $todo) {
-                $message = new NeuronMessage($role, $todo->getTodo());
+                $message = new NeuronMessage($role, $todo->getTodo($params));
                 $sessionCfg->sendMessage($message);
             }
 

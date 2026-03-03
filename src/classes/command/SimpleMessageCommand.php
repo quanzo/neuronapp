@@ -121,7 +121,7 @@ class SimpleMessageCommand extends Command
         }
 
         // Список из одного задания (текст сообщения) и producer навыков для возможных skills в todo
-        $todoList = new TodoList($messageText);
+        $todoList = new TodoList($messageText, 'inline_message');
         $skillProducer = $configApp->getSkillProducer();
 
         // Запуск асинхронного выполнения в очереди событийного цикла и ожидание результата

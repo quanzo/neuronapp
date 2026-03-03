@@ -48,9 +48,27 @@ class Todo implements ITodo
     /**
      * Возвращает сохраненный текст задания.
      */
-    public function getTodo(): string
+    public function getTodo(?array $params = null): string
     {
-        return $this->text;
+        if ($params === null || $this->text === '') {
+            return $this->text;
+        }
+
+        $matches = [];
+        preg_match_all('/\$([a-zA-Z]+)/', $this->text, $matches);
+
+        if (empty($matches[1])) {
+            return $this->text;
+        }
+
+        $replacements = [];
+
+        foreach (array_unique($matches[1]) as $placeholder) {
+            $value = array_key_exists($placeholder, $params) ? (string) $params[$placeholder] : '';
+            $replacements['$' . $placeholder] = $value;
+        }
+
+        return strtr($this->text, $replacements);
     }
 }
 

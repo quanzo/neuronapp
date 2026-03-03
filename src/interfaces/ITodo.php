@@ -14,6 +14,6 @@ interface ITodo
     /**
      * Возвращает полный текст задания.
      */
-    public function getTodo(): string;
+    public function getTodo(?array $params = null): string;
 }
 

@@ -7,7 +7,7 @@
 
 use app\modules\neuron\helpers\CallableWrapper;
 use NeuronAI\Providers\Ollama\Ollama;
-use NeuronAI\SystemPrompt;
+use NeuronAI\Agent\SystemPrompt;
 use NeuronAI\Tools\Toolkits\Calculator\CalculatorToolkit;
 use NeuronAI\Tools\Toolkits\Calendar\CurrentDateTimeTool;
 
