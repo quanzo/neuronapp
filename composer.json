@@ -18,5 +18,10 @@
         "psr-4": {
             "app\\modules\\neuron\\": "src/"
         }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
     }
 }
