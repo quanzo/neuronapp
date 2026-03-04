@@ -6,6 +6,7 @@ namespace app\modules\neuron\classes\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\todo\TodoList;
+use app\modules\neuron\helpers\ConsoleHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 use Revolt\EventLoop;
 use Symfony\Component\Console\Command\Command;
@@ -58,7 +59,8 @@ class SimpleMessageCommand extends Command
             ->setDescription('Отправляет сообщение агенту и выводит ответ с sessionKey для продолжения сессии')
             ->addOption('agent', null, InputOption::VALUE_REQUIRED, 'Имя агента LLM (например, default)')
             ->addOption('message', null, InputOption::VALUE_REQUIRED, 'Текст сообщения')
-            ->addOption('session_id', null, InputOption::VALUE_OPTIONAL, 'Ключ сессии для продолжения (формат buildSessionKey)');
+            ->addOption('session_id', null, InputOption::VALUE_OPTIONAL, 'Ключ сессии для продолжения (формат buildSessionKey)')
+            ->addOption('format', null, InputOption::VALUE_OPTIONAL, 'Формат вывода. Доступно: md, txt, json', 'md');
     }
 
     /**
@@ -80,9 +82,15 @@ class SimpleMessageCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $arFormatAvailable = [
+            'md',
+            'json',
+            'txt'
+        ];
         $agentName = $input->getOption('agent');
         $messageText = $input->getOption('message');
         $sessionId = $input->getOption('session_id');
+        $formatOut = $input->getOption('format');
 
         // Проверка обязательных опций
         if ($agentName === null || $agentName === '') {
@@ -92,6 +100,14 @@ class SimpleMessageCommand extends Command
 
         if ($messageText === null || $messageText === '') {
             $output->writeln('<error>Не указано сообщение. Используйте --message.</error>');
+            return Command::FAILURE;
+        }
+
+        if ($formatOut === null || $formatOut === '') {
+            $formatOut = 'md';
+        }
+        if (!in_array($formatOut, $arFormatAvailable)) {
+            $output->writeln('<error>Формат вывода задан не корректно.</error>');
             return Command::FAILURE;
         }
 
@@ -155,13 +171,7 @@ class SimpleMessageCommand extends Command
         $content = $lastMessage->getContent();
 
         $output->writeln(
-            json_encode(
-                [
-                    'response' => $content,
-                    'sessionKey' => $agentCfg->getSessionKey()
-                ],
-                \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR
-            )
+            ConsoleHelper::formatOut($content, $agentCfg->getSessionKey(), $formatOut)
         );
 
         return Command::SUCCESS;

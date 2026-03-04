@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\helpers\ConsoleHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\Messages\Message;
@@ -67,9 +68,15 @@ class TodolistCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $arFormatAvailable = [
+            'md',
+            'json',
+            'txt'
+        ];
         $todolistName = $input->getOption('todolist');
         $agentName = $input->getOption('agent');
         $sessionId = $input->getOption('session_id');
+        $formatOut = $input->getOption('format');
 
         if ($todolistName === null || $todolistName === '') {
             $output->writeln('<error>Не указан список заданий. Используйте --todolist.</error>');
@@ -78,6 +85,14 @@ class TodolistCommand extends Command
 
         if ($agentName === null || $agentName === '') {
             $output->writeln('<error>Не указан агент. Используйте --agent.</error>');
+            return Command::FAILURE;
+        }
+
+        if ($formatOut === null || $formatOut === '') {
+            $formatOut = 'md';
+        }
+        if (!in_array($formatOut, $arFormatAvailable)) {
+            $output->writeln('<error>Формат вывода задан не корректно.</error>');
             return Command::FAILURE;
         }
 
@@ -150,13 +165,7 @@ class TodolistCommand extends Command
         $content = $lastMessage->getContent();
 
         $output->writeln(
-            json_encode(
-                [
-                    'response' => $content,
-                    'sessionKey' => $agentCfg->getSessionKey()
-                ],
-                \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR
-            )
+            ConsoleHelper::formatOut($content, $agentCfg->getSessionKey(), $formatOut)
         );
 
         return Command::SUCCESS;
