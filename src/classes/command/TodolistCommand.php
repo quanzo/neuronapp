@@ -6,6 +6,7 @@ namespace app\modules\neuron\classes\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\helpers\ConsoleHelper;
+use app\modules\neuron\helpers\AttachmentHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\Messages\Message;
@@ -41,6 +42,7 @@ class TodolistCommand extends Command
      * - todolist   — имя списка заданий (файл в todos/ без расширения), обязательно.
      * - agent      — имя агента LLM для исполнения, обязательно.
      * - session_id — необязательный ключ сессии для продолжения диалога.
+     * - file/-f    — пути к файлам, которые будут прикреплены к запросу (можно указывать несколько раз).
      */
     protected function configure(): void
     {
@@ -48,7 +50,13 @@ class TodolistCommand extends Command
             ->setDescription('Выполняет список заданий TodoList через указанного агента и выводит ответ с sessionKey')
             ->addOption('todolist', null, InputOption::VALUE_REQUIRED, 'Имя списка заданий (например, code-review)')
             ->addOption('agent', null, InputOption::VALUE_REQUIRED, 'Имя агента LLM для исполнения (например, default)')
-            ->addOption('session_id', null, InputOption::VALUE_OPTIONAL, 'Ключ сессии для продолжения (формат buildSessionKey)');
+            ->addOption('session_id', null, InputOption::VALUE_OPTIONAL, 'Ключ сессии для продолжения (формат buildSessionKey)')
+            ->addOption(
+                'file',
+                'f',
+                InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
+                'Путь к файлу для прикрепления (можно указать несколько раз)'
+            );
     }
 
     /**
@@ -70,6 +78,7 @@ class TodolistCommand extends Command
         $agentName = $input->getOption('agent');
         $sessionId = $input->getOption('session_id');
         $formatOut = $input->getOption('format');
+        $fileOptions = $input->getOption('file');
 
         if ($todolistName === null || $todolistName === '') {
             $output->writeln('<error>Не указан список заданий. Используйте --todolist.</error>');
@@ -87,6 +96,16 @@ class TodolistCommand extends Command
         if (!in_array($formatOut, $arFormatAvailable)) {
             $output->writeln('<error>Формат вывода задан не корректно.</error>');
             return Command::FAILURE;
+        }
+
+        // Подготовка вложений (attachments) из указанных файлов, если они есть.
+        $attachments = [];
+        if (is_array($fileOptions) && $fileOptions !== []) {
+            $attachments = AttachmentHelper::buildAttachmentsFromPaths($fileOptions, $output);
+            if ($attachments === null) {
+                // Сообщение об ошибке уже выведено.
+                return Command::FAILURE;
+            }
         }
 
         $configApp = ConfigurationApp::getInstance();
@@ -123,12 +142,12 @@ class TodolistCommand extends Command
         $history = null;
         $error = null;
 
-        EventLoop::queue(static function () use ($todoList, $agentCfg, $skillProducer, &$history, &$error): void {
+        EventLoop::queue(static function () use ($todoList, $agentCfg, $skillProducer, $attachments, &$history, &$error): void {
             try {
                 $history = $todoList->executeFromAgent(
                     $agentCfg,
                     MessageRole::USER,
-                    [],
+                    $attachments,
                     null,
                     $skillProducer
                 )->await();
@@ -165,4 +184,5 @@ class TodolistCommand extends Command
 
         return Command::SUCCESS;
     }
+
 }

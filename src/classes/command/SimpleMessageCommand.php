@@ -7,6 +7,7 @@ namespace app\modules\neuron\classes\command;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\todo\TodoList;
 use app\modules\neuron\helpers\ConsoleHelper;
+use app\modules\neuron\helpers\AttachmentHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 use Revolt\EventLoop;
 use Symfony\Component\Console\Command\Command;
@@ -44,6 +45,7 @@ class SimpleMessageCommand extends Command
      * - message — текст сообщения пользователя, обязательно.
      * - session_id — необязательный ключ сессии для продолжения диалога;
      *   должен существовать в хранилище сессий, иначе выводится ошибка.
+     * - file/-f — пути к файлам, которые будут прикреплены к запросу (можно указывать несколько раз).
      */
     protected function configure(): void
     {
@@ -52,7 +54,13 @@ class SimpleMessageCommand extends Command
             ->addOption('agent', null, InputOption::VALUE_REQUIRED, 'Имя агента LLM (например, default)')
             ->addOption('message', null, InputOption::VALUE_REQUIRED, 'Текст сообщения')
             ->addOption('session_id', null, InputOption::VALUE_OPTIONAL, 'Ключ сессии для продолжения (формат buildSessionKey)')
-            ->addOption('format', null, InputOption::VALUE_OPTIONAL, 'Формат вывода. Доступно: md, txt, json', 'md');
+            ->addOption('format', null, InputOption::VALUE_OPTIONAL, 'Формат вывода. Доступно: md, txt, json', 'md')
+            ->addOption(
+                'file',
+                'f',
+                InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
+                'Путь к файлу для прикрепления (можно указать несколько раз)'
+            );
     }
 
     /**
@@ -83,6 +91,7 @@ class SimpleMessageCommand extends Command
         $messageText = $input->getOption('message');
         $sessionId = $input->getOption('session_id');
         $formatOut = $input->getOption('format');
+        $fileOptions = $input->getOption('file');
 
         // Проверка обязательных опций
         if ($agentName === null || $agentName === '') {
@@ -101,6 +110,16 @@ class SimpleMessageCommand extends Command
         if (!in_array($formatOut, $arFormatAvailable)) {
             $output->writeln('<error>Формат вывода задан не корректно.</error>');
             return Command::FAILURE;
+        }
+
+        // Подготовка вложений (attachments) из указанных файлов, если они есть.
+        $attachments = [];
+        if (is_array($fileOptions) && $fileOptions !== []) {
+            $attachments = AttachmentHelper::buildAttachmentsFromPaths($fileOptions, $output);
+            if ($attachments === null) {
+                // Сообщение об ошибке уже выведено.
+                return Command::FAILURE;
+            }
         }
 
         // Получение конфигурации приложения и конфига агента по имени
@@ -135,12 +154,12 @@ class SimpleMessageCommand extends Command
         $history = null;
         $error = null;
 
-        EventLoop::queue(static function () use ($todoList, $agentCfg, $skillProducer, &$history, &$error): void {
+        EventLoop::queue(static function () use ($todoList, $agentCfg, $skillProducer, $attachments, &$history, &$error): void {
             try {
                 $history = $todoList->executeFromAgent(
                     $agentCfg,
                     MessageRole::USER,
-                    [],
+                    $attachments,
                     null,
                     $skillProducer
                 )->await();
@@ -170,4 +189,5 @@ class SimpleMessageCommand extends Command
 
         return Command::SUCCESS;
     }
+
 }
