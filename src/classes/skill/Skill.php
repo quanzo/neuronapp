@@ -7,6 +7,7 @@ namespace app\modules\neuron\classes\skill;
 use Amp\Future;
 use app\modules\neuron\classes\AbstractPromptWithParams;
 use app\modules\neuron\classes\dto\params\ParamListDto;
+use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\helpers\PlaceholderHelper;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\helpers\CommentsHelper;
@@ -167,17 +168,25 @@ class Skill extends AbstractPromptWithParams implements ISkill
     }
 
     /**
-     * @inheritDoc
+     * Выполняет навык, отправляя сгенерированный текст и дополнительные вложения в LLM.
+     *
+     * @param ConfigurationAgent         $agentCfg    Конфигурация агента-исполнителя.
+     * @param MessageRole                $role        Роль сообщения.
+     * @param AttachmentDto[]            $attachments Дополнительные вложения, передаваемые вместе с текстом навыка.
+     * @param array<string,mixed>|null   $params      Параметры для подстановки в шаблон навыка.
+     *
+     * @return Future<mixed> Результат выполнения запроса к LLM.
      */
     public function executeFromAgent(
         ConfigurationAgent $agentCfg,
         MessageRole $role = MessageRole::USER,
+        array $attachments = [],
         ?array $params = null
     ): Future {
         $text = $this->getSkill($params ?? []);
-        return \Amp\async(function () use ($agentCfg, $text, $role): mixed {
+        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments): mixed {
             $message = new NeuronMessage($role, $text);
-            return $agentCfg->sendMessage($message);
+            return $agentCfg->sendMessageWithAttachments($message, $attachments);
         });
     }
 }

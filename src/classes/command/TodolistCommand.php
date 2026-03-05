@@ -35,13 +35,6 @@ class TodolistCommand extends Command
     protected static $defaultName = 'todolist';
 
     /**
-     * Регулярное выражение для проверки формата sessionKey (Ymd-His-u).
-     *
-     * @see ConfigurationApp::buildSessionKey()
-     */
-    private const SESSION_KEY_PATTERN = '/^\d{8}-\d{6}-\d+$/';
-
-    /**
      * Настраивает команду: описание и опции.
      *
      * Опции:
@@ -112,7 +105,7 @@ class TodolistCommand extends Command
         }
 
         if ($sessionId !== null && $sessionId !== '') {
-            if (preg_match(self::SESSION_KEY_PATTERN, $sessionId) !== 1) {
+            if (!ConfigurationApp::isValidSessionKey($sessionId)) {
                 $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u (например, 20250301-143022-123456).</error>');
                 return Command::FAILURE;
             }
@@ -135,6 +128,8 @@ class TodolistCommand extends Command
                 $history = $todoList->executeFromAgent(
                     $agentCfg,
                     MessageRole::USER,
+                    [],
+                    null,
                     $skillProducer
                 )->await();
             } catch (\Throwable $e) {

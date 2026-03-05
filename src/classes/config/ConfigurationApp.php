@@ -23,6 +23,14 @@ use RuntimeException;
 class ConfigurationApp
 {
     /**
+     * Регулярное выражение для проверки формата sessionKey.
+     *
+     * Формат совпадает с {@see ConfigurationApp::buildSessionKey()}: Ymd-His-u
+     * (дата 8 цифр, дефис, время 6 цифр, дефис, микросекунды).
+     */
+    const SESSION_KEY_PATTERN = '/^\d{8}-\d{6}-\d+$/';
+    
+    /**
      * Единственный экземпляр конфигурации.
      */
     private static ?ConfigurationApp $instance = null;
@@ -237,6 +245,19 @@ class ConfigurationApp
     public function setSessionKey(string $sessionKey): void
     {
         $this->sessionKey = $sessionKey;
+    }
+
+    /**
+     * Проверка ключа сессии на корректность
+     *
+     * @param string $sessionKey
+     * @return boolean
+     */
+    public static function isValidSessionKey(string $sessionKey): bool {
+        if (preg_match(self::SESSION_KEY_PATTERN, $sessionKey) !== 1) {
+            return false;
+        }
+        return true;
     }
 
     /**

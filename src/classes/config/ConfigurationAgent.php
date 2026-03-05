@@ -17,10 +17,12 @@ use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\History\FileChatHistory;
 use NeuronAI\Chat\History\InMemoryChatHistory;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
+use NeuronAI\Chat\Messages\ContentBlocks\ContentBlockInterface;
 use NeuronAI\MCP\McpConnector;
 use NeuronAI\Providers\AIProviderInterface;
 use NeuronAI\RAG\Embeddings\EmbeddingsProviderInterface;
 use NeuronAI\RAG\VectorStore\VectorStoreInterface;
+use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use NeuronAI\Tools\ProviderToolInterface;
 use NeuronAI\Tools\ToolInterface;
 use NeuronAI\Tools\Toolkits\ToolkitInterface;
@@ -171,12 +173,34 @@ class ConfigurationAgent {
     public $vectorStore = null;
 
     /**
-     * Отправить сообщение в LLM
+     * Отправить сообщение в LLM без дополнительных вложений.
+     *
+     * Для передачи вложений (картинок, текстовых файлов и т.п.) используйте
+     * {@see ConfigurationAgent::sendMessageWithAttachments()}.
      *
      * @param NeuronMessage $message
-     * @return null|NeuronMessage|object - null сообщение не отправлено или объект сообщения-ответа или dto если ответ структурирован
+     * @return null|NeuronMessage|object null — сообщение не отправлено, либо объект сообщения-ответа,
+     *                                   либо DTO, если ответ структурирован.
      */
     public function sendMessage(NeuronMessage $message): mixed {
+        return $this->sendMessageWithAttachments($message, []);
+    }
+
+    /**
+     * Отправить сообщение в LLM с дополнительными вложениями.
+     *
+     * Вложения прикрепляются к сообщению как content blocks NeuronAI.\n
+     * Поддерживаются два формата элементов массива:\n
+     * - {@see AttachmentDto} (будет преобразован в {@see ContentBlockInterface} через getContentBlock())\n
+     * - {@see ContentBlockInterface} (будет добавлен напрямую)\n
+     *
+     * @param NeuronMessage         $message     Основное сообщение диалога.
+     * @param array<int,AttachmentDto|ContentBlockInterface> $attachments Вложения (по умолчанию — пустой массив).
+     *
+     * @return null|NeuronMessage|object null — сообщение не отправлено, либо объект сообщения-ответа,
+     *                                   либо DTO, если ответ структурирован.
+     */
+    public function sendMessageWithAttachments(NeuronMessage $message, array $attachments = []): mixed {
         $agent = $this->getAgent();
 
         /**
@@ -184,15 +208,26 @@ class ConfigurationAgent {
          */
 
         $start = microtime(true);
-        
-        $isStruct = false;
+
+        // В NeuronAI вложения прикрепляются к сообщению через content blocks.
+        foreach ($attachments as $attachment) {
+            if ($attachment instanceof AttachmentDto) {
+                $message->addContent($attachment->getContentBlock());
+                continue;
+            }
+
+            if ($attachment instanceof ContentBlockInterface) {
+                $message->addContent($attachment);
+                continue;
+            }
+        }
+
         if ($this->reponseStructClass) {
             $response = $agent->structured(
                 $message,
                 $this->reponseStructClass,
                 2
             );
-            $isStruct = true;
         } else {
             $handler = $agent->chat($message);
             $response = $handler->getMessage();
@@ -205,10 +240,16 @@ class ConfigurationAgent {
          */
     
         // логирование
-        // В v3 агент хранит историю внутри состояния; получаем ее через публичный метод.
-        $chatHistory = $agent->getChatHistory();
+        // В NeuronAI агент может хранить историю внутри состояния.
+        // Метод getChatHistory() не является частью AgentInterface, поэтому вызываем безопасно.
+        if (method_exists($agent, 'getChatHistory')) {
+            /** @var mixed $chatHistory */
+            $chatHistory = $agent->getChatHistory();
+            unset($chatHistory);
+        }
         return $response;
     }
+
 
     /**
      * Агент для отправки сообщений в LLM.

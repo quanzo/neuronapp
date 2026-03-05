@@ -37,14 +37,6 @@ class SimpleMessageCommand extends Command
     protected static $defaultName = 'simplemessage';
 
     /**
-     * Регулярное выражение для проверки формата sessionKey.
-     *
-     * Формат совпадает с {@see ConfigurationApp::buildSessionKey()}: Ymd-His-u
-     * (дата 8 цифр, дефис, время 6 цифр, дефис, микросекунды).
-     */
-    private const SESSION_KEY_PATTERN = '/^\d{8}-\d{6}-\d+$/';
-
-    /**
      * Настраивает команду: описание и опции.
      *
      * Опции:
@@ -122,7 +114,7 @@ class SimpleMessageCommand extends Command
 
         // Если передан session_id — проверяем формат и существование сессии, затем подставляем ключ
         if ($sessionId !== null && $sessionId !== '') {
-            if (preg_match(self::SESSION_KEY_PATTERN, $sessionId) !== 1) {
+            if (!ConfigurationApp::isValidSessionKey($sessionId)) {
                 $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u (например, 20250301-143022-123456).</error>');
                 return Command::FAILURE;
             }
@@ -148,6 +140,8 @@ class SimpleMessageCommand extends Command
                 $history = $todoList->executeFromAgent(
                     $agentCfg,
                     MessageRole::USER,
+                    [],
+                    null,
                     $skillProducer
                 )->await();
             } catch (\Throwable $e) {

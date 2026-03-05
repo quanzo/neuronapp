@@ -8,6 +8,7 @@ use Amp\Future;
 use app\modules\neuron\classes\AbstractPromptWithParams;
 use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\interfaces\ITodoList;
@@ -129,23 +130,27 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
     }
 
     /**
-     * @inheritDoc
+     * Выполняет все задания списка через переданную конфигурацию агента.
      *
      * При передаче SkillProducer в список инструментов агента добавляются навыки из опции "skills".
      * Используется клон конфигурации агента, чтобы не менять основной состав инструментов.
      *
-     * @param ConfigurationAgent $agentCfg       Конфигурация агента-исполнителя.
-     * @param MessageRole        $role           Роль сообщений.
-     * @param SkillProducer|null $skillProducer   Producer навыков для разрешения имён из getNeedSkills().
+     * @param ConfigurationAgent         $agentCfg     Конфигурация агента-исполнителя.
+     * @param MessageRole                $role         Роль сообщений.
+     * @param AttachmentDto[]            $attachments  Дополнительные вложения, передаваемые с каждым заданием.
+     * @param array<string,mixed>|null   $params       Параметры, передаваемые в {@see ITodo::getTodo()}.
+     * @param SkillProducer|null         $skillProducer Producer навыков для разрешения имён из getNeedSkills().
+     *
      * @return Future<ChatHistoryInterface> Завершается копией истории сообщений агента после выполнения всех заданий.
      */
     public function executeFromAgent(
         ConfigurationAgent $agentCfg,
         MessageRole $role = MessageRole::USER,
-        ?SkillProducer $skillProducer = null,
-        ?array $params = null
+        array $attachments = [],
+        ?array $params = null,
+        ?SkillProducer $skillProducer = null
     ): Future {
-        return \Amp\async(function () use ($agentCfg, $role, $skillProducer, $params): ChatHistoryInterface {
+        return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $skillProducer): ChatHistoryInterface {
             $sessionCfg = $agentCfg->cloneForSession();
 
             if ($skillProducer !== null && $this->getNeedSkills() !== []) {
@@ -163,7 +168,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
 
             foreach ($this->getTodos() as $todo) {
                 $message = new NeuronMessage($role, $todo->getTodo($params));
-                $sessionCfg->sendMessage($message);
+                $sessionCfg->sendMessageWithAttachments($message, $attachments);
             }
 
             return clone $sessionCfg->getChatHistory();

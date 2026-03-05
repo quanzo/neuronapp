@@ -7,6 +7,7 @@ namespace app\modules\neuron\classes;
 use Amp\Future;
 use app\modules\neuron\classes\producers\AgentProducer;
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use NeuronAI\Chat\Enums\MessageRole;
 
 /**
@@ -223,13 +224,18 @@ abstract class APromptComponent
     /**
      * Запускает асинхронное выполнение содержимого компонента через переданную конфигурацию агента.
      *
-     * @param ConfigurationAgent $agentCfg Конфигурация агента-исполнителя.
-     * @param MessageRole        $role     Роль сообщений, отправляемых агенту (по умолчанию — пользователь).
+     * @param ConfigurationAgent         $agentCfg    Конфигурация агента-исполнителя.
+     * @param MessageRole                $role        Роль сообщений, отправляемых агенту (по умолчанию — пользователь).
+     * @param AttachmentDto[]            $attachments Дополнительные вложения (картинки, текст, файлы), передаваемые в LLM.
+     * @param array<string,mixed>|null   $params      Именованные параметры компонента (для подстановки в шаблоны и т.п.).
+     *
      * @return Future<mixed> Завершается по окончании выполнения (для Skill — один проход, для TodoList — после последнего элемента).
      */
     abstract public function executeFromAgent(
         ConfigurationAgent $agentCfg,
-        MessageRole $role = MessageRole::USER
+        MessageRole $role = MessageRole::USER,
+        array $attachments = [],
+        ?array $params = null
     ): Future;
 }
 
