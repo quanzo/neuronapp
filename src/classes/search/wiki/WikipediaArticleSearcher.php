@@ -24,9 +24,9 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
 
     /**
      * Загрузчик для загрузки полного контента статей
-     * @var WikipediaLoader
+     * @var ContentLoaderInterface
      */
-    private WikipediaLoader $loader;
+    private ContentLoaderInterface $loader;
 
     /**
      * Тип источника
@@ -40,12 +40,17 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
      * @param string $language Язык Wikipedia (например, 'en', 'ru', 'de')
      */
     public function __construct(
-        string $language = 'en'
+        string $language = 'en',
+        ContentLoaderInterface|null $loader = null
     ) {
         parent::__construct();
         $this->language = $language;
-        // Используем конкретный загрузчик Wikipedia
-        $this->loader = new WikipediaLoader();
+        if (!$loader) {
+            // Используем конкретный загрузчик Wikipedia
+            $this->loader = new WikipediaLoader();
+        } else {
+            $this->loader = $loader;
+        }
         $this->sourceType = ContentSourceType::WIKIPEDIA;
     }
 

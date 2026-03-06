@@ -4,8 +4,10 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use app\modules\neuron\classes\command\HelloCommand;
 use app\modules\neuron\classes\command\InteractiveCommand;
+use app\modules\neuron\classes\command\RuwikiCommand;
 use app\modules\neuron\classes\command\SimpleMessageCommand;
 use app\modules\neuron\classes\command\TodolistCommand;
+use app\modules\neuron\classes\command\WikiCommand;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\producers\AgentProducer;
@@ -93,6 +95,8 @@ $app->add(new HelloCommand());
 $app->add(new InteractiveCommand());
 $app->add(new SimpleMessageCommand());
 $app->add(new TodolistCommand());
+$app->add(new WikiCommand());
+$app->add(new RuwikiCommand());
 
 // Можно также добавить встроенную команду list, которая уже есть в Symfony,
 // поэтому отдельная HelpCommand не требуется, но при желании можно добавить.

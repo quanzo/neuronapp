@@ -36,10 +36,14 @@ class RuWikiArticleSearcher extends ArticleSearcherAbstract
      *
      * @param ContentLoaderInterface $loader Загрузчик контента
      */
-    public function __construct(ContentLoaderInterface $loader)
+    public function __construct(?ContentLoaderInterface $loader = null)
     {
         parent::__construct();
-        $this->loader = $loader;
+        if (!$loader) {
+            $this->loader = new RuWikiLoader();
+        } else {
+            $this->loader = $loader;
+        }
         $this->sourceType = ContentSourceType::RUWIKI;
     }
 
