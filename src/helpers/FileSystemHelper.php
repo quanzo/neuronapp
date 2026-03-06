@@ -49,7 +49,7 @@ class FileSystemHelper
     private const BINARY_EXTENSIONS = [
         'png', 'jpg', 'jpeg', 'gif', 'bmp', 'ico', 'webp', 'svg',
         'mp3', 'mp4', 'avi', 'mkv', 'wav', 'flac', 'ogg',
-        'zip', 'tar', 'gz', 'bz2', 'rar', '7z', 'xz',
+        'zip', 'tar', 'gz', 'bz2', 'rar', '7z', 'xz', 'phar',
         'exe', 'dll', 'so', 'dylib', 'bin',
         'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
         'woff', 'woff2', 'ttf', 'otf', 'eot',
