@@ -2,8 +2,8 @@
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\tools\wiki\RuWikiFullLoader;
-use app\modules\neuron\classes\tools\wiki\search\RuWikiArticleSearcher;
+use app\modules\neuron\classes\loader\wiki\RuWikiFullLoader;
+use app\modules\neuron\classes\search\wiki\RuWikiArticleSearcher;
 
 /**
  * Инструмент для поиска страниц в российской RuWiki.

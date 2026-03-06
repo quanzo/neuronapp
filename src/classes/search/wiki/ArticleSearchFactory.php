@@ -1,11 +1,12 @@
 <?php
-// src/app/modules/neuron/classes/tools/wiki/search/ArticleSearchFactory.php
+// src/app/modules/neuron/classes/search/wiki/ArticleSearchFactory.php
 
-namespace app\modules\neuron\classes\tools\wiki\search;
+namespace app\modules\neuron\classes\search\wiki;
 
-use app\modules\neuron\classes\tools\ollama\search\OllamaArticleSearcher;
-use app\modules\neuron\classes\tools\wiki\RuWikiLoader;
-use app\modules\neuron\classes\tools\wiki\WikipediaLoader;
+use app\modules\neuron\classes\loader\wiki\RuWikiLoader;
+use app\modules\neuron\classes\loader\wiki\WikipediaLoader;
+use app\modules\neuron\classes\search\ollama\OllamaArticleSearcher;
+use app\modules\neuron\interfaces\ArticleSearcherInterface;
 
 /**
  * Фабрика для создания менеджеров поиска статей.
@@ -19,10 +20,9 @@ class ArticleSearchFactory
      */
     public static function createFullManager(): ArticleSearchManager
     {
-        $wikiLoader = new WikipediaLoader();
         return new ArticleSearchManager([
-            new WikipediaArticleSearcher($wikiLoader, 'en'),
-            new WikipediaArticleSearcher($wikiLoader, 'ru'),
+            new WikipediaArticleSearcher('en'),
+            new WikipediaArticleSearcher('ru'),
             new RuWikiArticleSearcher(new RuWikiLoader()),
         ]);
     }
@@ -35,9 +35,8 @@ class ArticleSearchFactory
      */
     public static function createWikipediaOnlyManager(string $language = 'en'): ArticleSearchManager
     {
-        $wikiLoader = new WikipediaLoader();
         return new ArticleSearchManager([
-            new WikipediaArticleSearcher($wikiLoader, $language),
+            new WikipediaArticleSearcher($language),
         ]);
     }
 
@@ -61,12 +60,11 @@ class ArticleSearchFactory
      */
     public static function createMultilingualWikipediaManager(array $languages): ArticleSearchManager
     {
-        $wikiLoader = new WikipediaLoader();
         $searchers = [];
         foreach ($languages as $language) {
-            $searchers[] = new WikipediaArticleSearcher($wikiLoader, $language);
+            $searchers[] = new WikipediaArticleSearcher($language);
         }
-        
+
         return new ArticleSearchManager($searchers);
     }
 
@@ -82,7 +80,7 @@ class ArticleSearchFactory
     }
 
     /**
-     * Создает менеджер поиска с Ollama Web Search
+     * Создает менеджер поиска с Ollama Web Search.
      */
     public static function createOllamaEnhancedManager(string $apiKey = ''): ArticleSearchManager
     {
@@ -90,17 +88,16 @@ class ArticleSearchFactory
             'https://ollama.com',
             $apiKey
         );
-        $wikiLoader = new WikipediaLoader();
         return new ArticleSearchManager([
-            new WikipediaArticleSearcher($wikiLoader, 'en'),
-            new WikipediaArticleSearcher($wikiLoader, 'ru'),
+            new WikipediaArticleSearcher('en'),
+            new WikipediaArticleSearcher('ru'),
             new RuWikiArticleSearcher(new RuWikiLoader()),
             new OllamaArticleSearcher($ollamaService),
         ]);
     }
 
     /**
-     * Создает менеджер поиска только с Ollama Web Search
+     * Создает менеджер поиска только с Ollama Web Search.
      */
     public static function createOllamaOnlyManager(string $apiKey = ''): ArticleSearchManager
     {
@@ -108,14 +105,19 @@ class ArticleSearchFactory
             'https://ollama.com',
             $apiKey
         );
-        
+
         return new ArticleSearchManager([
             new OllamaArticleSearcher($ollamaService),
         ]);
     }
 
     /**
-     * Создает гибридный менеджер с приоритетом Ollama
+     * Создает гибридный менеджер с приоритетом Ollama.
+     *
+     * @param string[] $wikipediaLanguages
+     * @param bool $includeRuWiki
+     * @param string $apiKey
+     * @return ArticleSearchManager
      */
     public static function createHybridManager(
         array $wikipediaLanguages = ['en', 'ru'],
@@ -123,7 +125,7 @@ class ArticleSearchFactory
         string $apiKey = ''
     ): ArticleSearchManager {
         $searchers = [];
-        
+
         // Ollama добавляется первым как основной поисковик
         $ollamaService = new \app\modules\neuron\services\ollama\OllamaApiService(
             'https://ollama.com',
@@ -131,17 +133,17 @@ class ArticleSearchFactory
         );
         $searchers[] = new OllamaArticleSearcher($ollamaService);
 
-        $wikiLoader = new WikipediaLoader();
         // Затем добавляем специализированные поисковики
         foreach ($wikipediaLanguages as $language) {
-            $searchers[] = new WikipediaArticleSearcher($wikiLoader, $language);
+            $searchers[] = new WikipediaArticleSearcher($language);
         }
-        
+
         // Добавляем RuWiki если нужно
         if ($includeRuWiki) {
             $searchers[] = new RuWikiArticleSearcher(new RuWikiLoader());
         }
-        
+
         return new ArticleSearchManager($searchers);
     }
 }
+

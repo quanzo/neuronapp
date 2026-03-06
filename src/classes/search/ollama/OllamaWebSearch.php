@@ -1,6 +1,7 @@
 <?php
+// src/app/modules/neuron/classes/search/ollama/OllamaWebSearch.php
 
-namespace app\modules\neuron\tools;
+namespace app\modules\neuron\classes\search\ollama;
 
 use Amp\Future;
 use Amp\Http\Client\HttpClientBuilder;
@@ -12,8 +13,8 @@ use function Amp\Future\await;
 
 /**
  * @deprecated
- * @see modules/neuron/tools/classes/wiki/search/ollama/OllamaArticleSearcher.php
- * @see modules/neuron/tools/classes/ollama/OllamaWebFetchLoader.php
+ * @see app\modules\neuron\classes\search\ollama\OllamaArticleSearcher
+ * @see app\modules\neuron\classes\loader\ollama\OllamaWebFetchLoader
  */
 class OllamaWebSearch
 {
@@ -27,9 +28,10 @@ class OllamaWebSearch
     }
 
     /**
-     * Сформировать запрос
+     * Сформировать запрос.
      */
-    protected function makeRequest(string $query, string $part = '/web_search'): Request {
+    protected function makeRequest(string $query, string $part = '/web_search'): Request
+    {
         $request = new Request($this->ollamaUrl . $part, 'POST', json_encode(['query' => $query]));
         $request->setHeader('Authorization', 'Bearer ' . $this->apiKey);
         $request->setHeader('Content-Type', 'application/json');
@@ -37,7 +39,8 @@ class OllamaWebSearch
         return $request;
     }
 
-    protected function sendRequest(string $query, string $part = '/web_search'): Future {
+    protected function sendRequest(string $query, string $part = '/web_search'): Future
+    {
         return async(
             function ($query) use ($part) {
                 $r = [
@@ -59,12 +62,17 @@ class OllamaWebSearch
                     $r['exception'] = $e;
                 }
                 return $r;
-            }, $query
+            },
+            $query
         );
     }
 
     /**
-     * Пакетный поиск по нескольким запросам
+     * Пакетный поиск по нескольким запросам.
+     *
+     * @param string[] $queries
+     * @param int $maxResults
+     * @return array<string, WebSearchResultDto[]>
      */
     public function search(array $queries, int $maxResults = 5): array
     {
@@ -72,11 +80,9 @@ class OllamaWebSearch
         foreach ($queries as $index => $query) {
             $futures[$index] = $this->sendRequest($query, '/web_search');
         }
-        $results = await(
-            $futures
-        );
+        $results = await($futures);
         $prepResult = [];
-        foreach ($results as $i => $r) {
+        foreach ($results as $r) {
             if ($r['isSuccess']) {
                 $prepResult[$r['query']] = [];
                 $arr = json_decode(
@@ -92,18 +98,5 @@ class OllamaWebSearch
         }
         return $prepResult;
     }
-
-    /**
-     * Пакетное получение содержимого страниц
-     */
-    /*public function fetch(array $urls): array {
-        $futures = [];
-        foreach ($urls as $index => $url) {
-            $futures[$index] = $this->sendRequest($url, '/web_fetch');
-        }
-        $results = await(
-            $futures
-        );
-        return $results;
-    }*/
 }
+

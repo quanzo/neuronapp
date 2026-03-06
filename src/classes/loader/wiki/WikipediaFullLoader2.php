@@ -1,25 +1,19 @@
 <?php
-// src/app/modules/neuron/classes/tools/wiki/WikipediaLoader.php
+// src/app/modules/neuron/classes/loader/wiki/WikipediaFullLoader2.php
 
-namespace app\modules\neuron\classes\tools\wiki;
+namespace app\modules\neuron\classes\loader\wiki;
 
-use Amp\Future;
-use Amp\Http\Client\HttpClient;
-use Amp\Http\Client\HttpClientBuilder;
 use Amp\Http\Client\Request;
-use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
-use app\modules\neuron\enums\ContentSourceType;
 
 /**
- * Загрузчик для статей Wikipedia.
- * Использует MediaWiki API для получения структурированного контента.
- * Поддерживает все языковые домены Wikipedia (en.wikipedia.org, ru.wikipedia.org и т.д.)
+ * Загрузчик для статей Wikipedia, использующий доступ к ревизиям.
+ * Наследует базовую логику WikipediaLoader и переопределяет метод загрузки.
  */
 class WikipediaFullLoader2 extends WikipediaLoader
 {
     /**
      * Загружает полное содержимое статьи через MediaWiki API.
-     * Использует действие "parse" для получения полного HTML-контента.
+     * Использует действие "query" с prop=revisions для получения содержимого.
      *
      * @param string $title Название статьи
      * @param string $language Язык Wikipedia
@@ -39,7 +33,7 @@ class WikipediaFullLoader2 extends WikipediaLoader
             'utf8'      => 1,
             'redirects' => 1
         ]);
-        
+
         $request = new Request($apiUrl, 'GET');
         $request->setHeader('User-Agent', 'WikipediaFullLoader/1.0');
 
@@ -55,8 +49,9 @@ class WikipediaFullLoader2 extends WikipediaLoader
                 return $data['revisions'][0]['slots']['main']['content'];
             }
         } catch (\Exception $e) {
-            
         }
+
         return '';
     }
 }
+

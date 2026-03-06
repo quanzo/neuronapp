@@ -1,7 +1,7 @@
 <?php
-// src/app/modules/neuron/classes/tools/wiki/search/ArticleSearcherInterface.php
+// src/app/modules/neuron/interfaces/wiki/search/ArticleSearcherInterface.php
 
-namespace app\modules\neuron\classes\tools\wiki\search;
+namespace app\modules\neuron\interfaces;
 
 use Amp\Future;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
@@ -23,3 +23,4 @@ interface ArticleSearcherInterface
      */
     public function search(string $query, int $limit = 10, int $offset = 0): Future;
 }
+

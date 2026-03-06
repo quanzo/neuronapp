@@ -1,7 +1,7 @@
 <?php
-// src/app/modules/neuron/classes/tools/wiki/RuWikiFullLoader.php
+// src/app/modules/neuron/classes/loader/wiki/RuWikiFullLoader.php
 
-namespace app\modules\neuron\classes\tools\wiki;
+namespace app\modules\neuron\classes\loader\wiki;
 
 use Amp\Future;
 use Amp\Http\Client\HttpClient;
@@ -9,6 +9,7 @@ use Amp\Http\Client\HttpClientBuilder;
 use Amp\Http\Client\Request;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\enums\ContentSourceType;
+use app\modules\neuron\interfaces\ContentLoaderInterface;
 use app\modules\neuron\traits\tools\wiki\HtmlToPlainTextConverterTrait;
 use app\modules\neuron\traits\tools\wiki\CoordinateExtractorTrait;
 use app\modules\neuron\traits\tools\wiki\LinkValidatorTrait;
@@ -19,14 +20,16 @@ use app\modules\neuron\traits\tools\wiki\LinkValidatorTrait;
  */
 class RuWikiFullLoader implements ContentLoaderInterface
 {
-    use HtmlToPlainTextConverterTrait, CoordinateExtractorTrait, LinkValidatorTrait;
-    
+    use HtmlToPlainTextConverterTrait;
+    use CoordinateExtractorTrait;
+    use LinkValidatorTrait;
+
     /**
      * HTTP-клиент Amp для выполнения запросов
      * @var HttpClient
      */
     protected HttpClient $httpClient;
-    
+
     /**
      * Тип источника
      * @var ContentSourceType
@@ -47,7 +50,7 @@ class RuWikiFullLoader implements ContentLoaderInterface
 
     /**
      * Конструктор загрузчика RuWiki.
-     * 
+     *
      * @param bool $collectLinks Собирать ссылки из статьи (по умолчанию true)
      * @param bool $collectCoordinates Собирать координаты из статьи (по умолчанию true)
      */
@@ -61,7 +64,7 @@ class RuWikiFullLoader implements ContentLoaderInterface
 
     /**
      * Устанавливает, нужно ли собирать ссылки из статьи.
-     * 
+     *
      * @param bool $collectLinks
      * @return self
      */
@@ -73,7 +76,7 @@ class RuWikiFullLoader implements ContentLoaderInterface
 
     /**
      * Устанавливает, нужно ли собирать координаты из статьи.
-     * 
+     *
      * @param bool $collectCoordinates
      * @return self
      */
@@ -92,13 +95,13 @@ class RuWikiFullLoader implements ContentLoaderInterface
     public function canLoad(string $url): bool
     {
         $parsedUrl = parse_url($url);
-        
+
         if (!isset($parsedUrl['host'])) {
             return false;
         }
-        
+
         $host = strtolower($parsedUrl['host']);
-        
+
         // Проверяем домены RuWiki
         return str_contains($host, 'ruwiki.ru') ||
                str_contains($host, 'ruwiki.org') ||
@@ -107,7 +110,7 @@ class RuWikiFullLoader implements ContentLoaderInterface
 
     /**
      * Загружает полное содержимое статьи RuWiki через MediaWiki API.
-     * 
+     *
      * @throws \InvalidArgumentException Если URL не поддерживается этим загрузчиком
      *
      * @param string $url URL статьи RuWiki
@@ -122,60 +125,60 @@ class RuWikiFullLoader implements ContentLoaderInterface
                     "URL не поддерживается RuWikiFullLoader: {$url}"
                 );
             }
-            
+
             // Извлекаем название статьи из URL
             $title = $this->extractArticleTitle($url);
-            
+
             if (!$title) {
                 throw new \InvalidArgumentException(
                     "Не удалось извлечь название статьи RuWiki из URL: {$url}"
                 );
             }
-            
+
             // Загружаем HTML контент через MediaWiki API
             $htmlContent = $this->fetchFullArticleContent($title);
-            
+
             // Преобразуем HTML в форматированный plain текст
             $conversionResult = $this->convertHtmlToPlainText($htmlContent);
             $plainText = $conversionResult['text'];
-            
+
             // Собираем ссылки только если нужно
             $links = $this->collectLinks ? $conversionResult['links'] : [];
-            
+
             // Извлекаем координаты только если нужно
             $coordinates = $this->collectCoordinates ? $this->extractCoordinates($plainText) : [];
-            
+
             // Проверяем ссылки на доступность асинхронно (только если собираем ссылки)
             $validatedLinks = [];
             $validLinks = [];
-            
+
             if ($this->collectLinks && !empty($links)) {
                 $validatedLinks = $this->validateLinks($links, $this->httpClient);
-                
+
                 // Фильтруем только корректные ссылки (статус 'valid')
-                $validLinks = array_filter($validatedLinks, function($link) {
+                $validLinks = array_filter($validatedLinks, static function ($link) {
                     return ($link['status'] ?? '') === 'valid';
                 });
             }
-            
+
             // Извлекаем заголовок статьи из API ответа
             $articleTitle = $this->extractTitleFromApiResponse($htmlContent) ?? urldecode($title);
-            
+
             // Создаем метаданные
             $metadata = [];
-            
+
             if ($this->collectLinks) {
                 $metadata['links'] = $validLinks; // Только корректные ссылки
                 $metadata['all_links'] = $validatedLinks; // Все ссылки с разными статусами
                 $metadata['link_count'] = count($validatedLinks);
                 $metadata['valid_links_count'] = count($validLinks);
             }
-            
+
             if ($this->collectCoordinates) {
                 $metadata['coordinates'] = $coordinates;
                 $metadata['coordinates_count'] = count($coordinates);
             }
-            
+
             // Используем enum для типа источника
             return new ArticleContentDto(
                 content: $plainText,
@@ -213,7 +216,7 @@ class RuWikiFullLoader implements ContentLoaderInterface
                 return urldecode($queryParams['title']);
             }
         }
-        
+
         return null;
     }
 
@@ -236,18 +239,18 @@ class RuWikiFullLoader implements ContentLoaderInterface
             'utf8'   => 1,
             'redirects' => 1
         ]);
-        
+
         $request = new Request($apiUrl, 'GET');
         $request->setHeader('User-Agent', 'RuWikiFullLoader/1.0');
-        
+
         $response = $this->httpClient->request($request);
         $body = $response->getBody()->buffer();
         $data = json_decode($body, true);
-        
+
         if (isset($data['parse']['text']['*'])) {
             return $data['parse']['text']['*'];
         }
-        
+
         return '';
     }
 
@@ -260,11 +263,12 @@ class RuWikiFullLoader implements ContentLoaderInterface
     protected function extractTitleFromApiResponse(string $apiResponse): ?string
     {
         $data = json_decode($apiResponse, true);
-        
+
         if (isset($data['parse']['title'])) {
             return $data['parse']['title'];
         }
-        
+
         return null;
     }
 }
+

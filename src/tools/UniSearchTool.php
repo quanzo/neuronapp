@@ -4,10 +4,10 @@ namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\classes\dto\wiki\SearchToolResultDto;
-use app\modules\neuron\classes\tools\wiki\search\ArticleSearchManager;
-use app\modules\neuron\classes\tools\wiki\search\ArticleSearcherInterface;
-use app\modules\neuron\classes\tools\wiki\search\WikipediaArticleSearcher;
-use app\modules\neuron\classes\tools\wiki\WikipediaFullLoader2;
+use app\modules\neuron\classes\search\wiki\ArticleSearchManager;
+use app\modules\neuron\interfaces\ArticleSearcherInterface;
+use app\modules\neuron\classes\search\wiki\WikipediaArticleSearcher;
+use app\modules\neuron\classes\loader\wiki\WikipediaFullLoader2;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\Tool;
 use NeuronAI\Tools\ToolProperty;
@@ -56,8 +56,8 @@ class UniSearchTool extends Tool
             // конфиг по умолчанию
             $wikiLoader = new WikipediaFullLoader2();
             $this->searchers = [
-                new WikipediaArticleSearcher($wikiLoader, 'ru'),
-                new WikipediaArticleSearcher($wikiLoader, 'en'),
+                new WikipediaArticleSearcher('ru'),
+                new WikipediaArticleSearcher('en'),
             ];
         }
     }

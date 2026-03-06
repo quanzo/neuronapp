@@ -1,14 +1,14 @@
 <?php
-// src/app/modules/neuron/classes/tools/wiki/search/WikipediaArticleSearcher.php
+// src/app/modules/neuron/classes/search/wiki/WikipediaArticleSearcher.php
 
-namespace app\modules\neuron\classes\tools\wiki\search;
+namespace app\modules\neuron\classes\search\wiki;
 
 use Amp\Future;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
+use app\modules\neuron\classes\loader\wiki\ContentLoaderManager;
+use app\modules\neuron\classes\loader\wiki\WikipediaLoader;
 use app\modules\neuron\enums\ContentSourceType;
-use app\modules\neuron\classes\tools\wiki\ContentLoaderInterface;
-use app\modules\neuron\classes\tools\wiki\ContentLoaderManager;
-use app\modules\neuron\classes\tools\wiki\WikipediaLoader;
+use app\modules\neuron\interfaces\ContentLoaderInterface;
 
 /**
  * Поисковик статей для Wikipedia.
@@ -21,13 +21,13 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
      * @var string
      */
     private string $language;
-    
+
     /**
      * Загрузчик для загрузки полного контента статей
      * @var WikipediaLoader
      */
     private WikipediaLoader $loader;
-    
+
     /**
      * Тип источника
      * @var ContentSourceType
@@ -40,28 +40,29 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
      * @param string $language Язык Wikipedia (например, 'en', 'ru', 'de')
      */
     public function __construct(
-        ContentLoaderInterface $loader,
         string $language = 'en'
     ) {
         parent::__construct();
         $this->language = $language;
+        // Используем конкретный загрузчик Wikipedia
         $this->loader = new WikipediaLoader();
         $this->sourceType = ContentSourceType::WIKIPEDIA;
     }
 
     /**
-     * @inheritDoc
      * Выполняет поиск статей в Wikipedia и загружает их полное содержимое.
+     *
+     * @inheritDoc
      */
     public function search(string $query, int $limit = 10, int $offset = 0): Future
     {
         return \Amp\async(function () use ($query, $limit, $offset) {
             // 1. Выполняем поиск через Wikipedia REST API
             $searchResults = $this->executeSearch($query, $limit, $offset);
-            
+
             // 2. Извлекаем URL найденных статей
             $articleUrls = $this->extractArticleUrls($searchResults);
-            
+
             // 3. Загружаем полный контент всех статей параллельно
             return $this->loadArticlesContent($articleUrls)->await();
         });
@@ -73,39 +74,39 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
      * @param string $query Поисковый запрос
      * @param int $limit Лимит результатов
      * @param int $offset Смещение
-     * @return array Результаты поиска
+     * @return array<string,mixed> Результаты поиска
      */
     protected function executeSearch(string $query, int $limit, int $offset): array
     {
         // Получаем базовый URL из ContentSourceType
         $baseUrl = $this->sourceType->getBaseUrl($this->language);
         $apiUrl = $baseUrl . '/w/rest.php/v1/search/page';
-        
+
         $body = $this->makeRequest('GET', $apiUrl, [
             'q' => $query,
             'limit' => $limit,
         ])->await();
-        
+
         return json_decode($body, true);
     }
 
     /**
      * Извлекает URL статей из результатов поиска.
      *
-     * @param array $searchResults Результаты поиска от Wikipedia API
+     * @param array<string,mixed> $searchResults Результаты поиска от Wikipedia API
      * @return string[] Массив URL статей
      */
     protected function extractArticleUrls(array $searchResults): array
     {
         $urls = [];
-        
+
         if (empty($searchResults['pages'])) {
             return $urls;
         }
-        
+
         // Получаем базовый URL из ContentSourceType
         $baseUrl = $this->sourceType->getBaseUrl($this->language);
-        
+
         foreach ($searchResults['pages'] as $page) {
             $title = $page['title'] ?? '';
             if ($title) {
@@ -114,13 +115,15 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
                 $urls[] = $url;
             }
         }
-        
+
         return $urls;
     }
 
     /**
-     * @inheritDoc
      * Загружает полное содержимое статей Wikipedia.
+     *
+     * @param string[] $urls
+     * @return Future<ArticleContentDto[]>
      */
     protected function loadArticlesContent(array $urls): Future
     {
@@ -128,7 +131,7 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
             // Используем менеджер загрузчиков для параллельной загрузки
             $manager = new ContentLoaderManager([$this->loader]);
             $results = $manager->loadMultiple($urls)->await();
-            
+
             // Фильтруем только успешные результаты
             $articles = [];
             foreach ($results as $content) {
@@ -136,15 +139,17 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
                     $articles[] = $content;
                 }
             }
-            
+
             return $articles;
         });
     }
 
     /**
-     * @inheritDoc
      * Создает ArticleContentDto из данных статьи Wikipedia.
      * Используется, когда нужно создать DTO без загрузки полного контента.
+     *
+     * @param array<string,mixed> $articleData
+     * @return ArticleContentDto
      */
     protected function createArticleDto(array $articleData): ArticleContentDto
     {
@@ -153,7 +158,7 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
         $baseUrl = $this->sourceType->getBaseUrl($this->language);
         $url = $baseUrl . '/wiki/' . rawurlencode($title);
         $extract = $articleData['excerpt'] ?? '';
-        
+
         return new ArticleContentDto(
             content: $extract,
             title: $title,
@@ -163,8 +168,9 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
     }
 
     /**
-     * @inheritDoc
      * Возвращает тип источника Wikipedia.
+     *
+     * @return ContentSourceType
      */
     protected function getSourceType(): ContentSourceType
     {
@@ -188,21 +194,21 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
      * @param string $query Поисковый запрос
      * @param int $limit Лимит результатов
      * @param int $offset Смещение
-     * @return Future<array> Future с массивом кратких данных статей
+     * @return Future<array<int, array<string, mixed>>>
      */
     public function searchBrief(string $query, int $limit = 10, int $offset = 0): Future
     {
         return \Amp\async(function () use ($query, $limit, $offset) {
             $searchResults = $this->executeSearch($query, $limit, $offset);
-            
+
             if (empty($searchResults['pages'])) {
                 return [];
             }
-            
+
             $briefResults = [];
             // Получаем базовый URL из ContentSourceType
             $baseUrl = $this->sourceType->getBaseUrl($this->language);
-            
+
             foreach ($searchResults['pages'] as $page) {
                 $briefResults[] = [
                     'title' => $page['title'] ?? '',
@@ -213,8 +219,9 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
                     'description' => $page['description'] ?? '',
                 ];
             }
-            
+
             return $briefResults;
         });
     }
 }
+

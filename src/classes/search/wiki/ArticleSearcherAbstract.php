@@ -1,7 +1,7 @@
 <?php
-// src/app/modules/neuron/classes/tools/wiki/search/ArticleSearcherAbstract.php
+// src/app/modules/neuron/classes/search/wiki/ArticleSearcherAbstract.php
 
-namespace app\modules\neuron\classes\tools\wiki\search;
+namespace app\modules\neuron\classes\search\wiki;
 
 use Amp\Future;
 use Amp\Http\Client\HttpClient;
@@ -9,6 +9,7 @@ use Amp\Http\Client\HttpClientBuilder;
 use Amp\Http\Client\Request;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\enums\ContentSourceType;
+use app\modules\neuron\interfaces\ArticleSearcherInterface;
 
 /**
  * Абстрактный базовый класс для поисковиков статей.
@@ -35,7 +36,8 @@ abstract class ArticleSearcherAbstract implements ArticleSearcherInterface
      *
      * @param string $method HTTP-метод (GET, POST)
      * @param string $url Полный URL для запроса
-     * @param array $queryParams Параметры запроса (будут добавлены в URL)
+     * @param array<string, scalar> $queryParams Параметры запроса (будут добавлены в URL)
+     *
      * @return Future<string> Future, которое разрешится в тело ответа
      */
     protected function makeRequest(string $method, string $url, array $queryParams = []): Future
@@ -47,7 +49,7 @@ abstract class ArticleSearcherAbstract implements ArticleSearcherInterface
 
             $request = new Request($url, $method);
             $request->setHeader('User-Agent', 'ArticleSearcher/1.0');
-            
+
             $response = $this->httpClient->request($request);
             return $response->getBody()->buffer();
         });
@@ -65,7 +67,7 @@ abstract class ArticleSearcherAbstract implements ArticleSearcherInterface
     /**
      * Создает ArticleContentDto из данных поиска.
      *
-     * @param array $articleData Данные статьи из API поиска
+     * @param array<string,mixed> $articleData Данные статьи из API поиска
      * @return ArticleContentDto DTO статьи
      */
     abstract protected function createArticleDto(array $articleData): ArticleContentDto;
@@ -77,3 +79,4 @@ abstract class ArticleSearcherAbstract implements ArticleSearcherInterface
      */
     abstract protected function getSourceType(): ContentSourceType;
 }
+

@@ -3,7 +3,7 @@
 namespace app\modules\neuron\tools;
 
 use app\modules\neuron\services\ollama\OllamaApiService;
-use app\modules\neuron\classes\tools\ollama\search\OllamaArticleSearcher;
+use app\modules\neuron\classes\search\ollama\OllamaArticleSearcher;
 
 /**
  * Поиск web страниц по текстовому запросу используя ollama api

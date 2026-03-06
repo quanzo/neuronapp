@@ -1,12 +1,12 @@
 <?php
-// src/app/modules/neuron/classes/tools/wiki/ContentLoaderFactory.php
+// src/app/modules/neuron/classes/loader/wiki/ContentLoaderFactory.php
 
-namespace app\modules\neuron\classes\tools\wiki;
-
-use app\modules\neuron\classes\tools\ollama\OllamaWebFetchLoader;
+namespace app\modules\neuron\classes\loader\wiki;
 
 use app\modules\neuron\classes\cache\ArrayCache;
-use app\modules\neuron\tools\ollama\OllamaWebFetchLoader;
+use app\modules\neuron\classes\loader\ollama\OllamaWebFetchLoader;
+use app\modules\neuron\classes\loader\web\GenericWebLoader;
+use app\modules\neuron\interfaces\ContentLoaderInterface;
 use Psr\Cache\CacheItemPoolInterface;
 
 /**
@@ -104,7 +104,7 @@ class ContentLoaderFactory
     }
 
     /**
-     * Создает менеджер загрузчиков с Ollama Web Fetch в качестве основного загрузчика
+     * Создает менеджер загрузчиков с Ollama Web Fetch в качестве основного загрузчика.
      */
     public static function createOllamaEnhancedManager(
         string $apiKey = '',
@@ -114,7 +114,7 @@ class ContentLoaderFactory
             'https://ollama.com',
             $apiKey
         );
-        
+
         return new ContentLoaderManager([
             new WikipediaLoader(),
             new RuWikiLoader(),
@@ -123,7 +123,7 @@ class ContentLoaderFactory
     }
 
     /**
-     * Создает менеджер загрузчиков только с Ollama Web Fetch
+     * Создает менеджер загрузчиков только с Ollama Web Fetch.
      */
     public static function createOllamaOnlyManager(
         string $apiKey = '',
@@ -133,9 +133,10 @@ class ContentLoaderFactory
             'https://ollama.com',
             $apiKey
         );
-        
+
         return new ContentLoaderManager([
             new OllamaWebFetchLoader($ollamaService, false),
         ], new ArrayCache($cacheLimit));
     }
 }
+

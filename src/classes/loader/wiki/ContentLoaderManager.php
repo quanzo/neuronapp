@@ -1,18 +1,19 @@
 <?php
-// src/app/modules/neuron/classes/tools/wiki/ContentLoaderManager.php
+// src/app/modules/neuron/classes/loader/wiki/ContentLoaderManager.php
 
-namespace app\modules\neuron\classes\tools\wiki;
+namespace app\modules\neuron\classes\loader\wiki;
 
 use Amp\Future;
-use Psr\Cache\CacheItemPoolInterface;
 use app\modules\neuron\classes\cache\ArrayCache;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
+use app\modules\neuron\interfaces\ContentLoaderInterface;
+use Psr\Cache\CacheItemPoolInterface;
 
 /**
  * Менеджер загрузчиков контента с поддержкой приоритетов.
  * Управляет несколькими загрузчиками, распределяя URL между ними
  * в соответствии с их способностью обрабатывать определенные типы ссылок.
- * 
+ *
  * Поддерживает кеширование через PSR-6 совместимый кеш.
  */
 class ContentLoaderManager
@@ -52,7 +53,7 @@ class ContentLoaderManager
     public function setLoaders(array $loaders): self
     {
         $this->loaders = [];
-        
+
         foreach ($loaders as $loader) {
             if ($loader instanceof ContentLoaderInterface) {
                 $this->addLoader($loader);
@@ -62,7 +63,7 @@ class ContentLoaderManager
                 );
             }
         }
-        
+
         return $this;
     }
 
@@ -104,28 +105,28 @@ class ContentLoaderManager
             // Проверяем кеш
             $cacheKey = $this->generateCacheKey($url);
             $cacheItem = $this->cache->getItem($cacheKey);
-            
+
             if ($cacheItem->isHit()) {
                 $cachedContent = $cacheItem->get();
                 if ($cachedContent instanceof ArticleContentDto) {
                     return $cachedContent;
                 }
             }
-            
+
             // Находим подходящий загрузчик
             $loader = $this->findLoaderForUrl($url);
-            
+
             if (!$loader) {
                 throw new \RuntimeException("Не найден подходящий загрузчик для URL: {$url}");
             }
-            
+
             // Загружаем контент
             $content = $loader->load($url)->await();
-            
+
             // Сохраняем в кеш (без срока истечения)
             $cacheItem->set($content);
             $this->cache->save($cacheItem);
-            
+
             return $content;
         });
     }
@@ -135,22 +136,22 @@ class ContentLoaderManager
      * Распределяет URL между загрузчиками и выполняет параллельную загрузку.
      *
      * @param string[] $urls Массив URL для загрузки
-     * @return Future<array> Future, которое разрешится в массив [url => ArticleContentDto]
+     * @return Future<array<string, ArticleContentDto>> Future, которое разрешится в массив [url => ArticleContentDto]
      */
     public function loadMultiple(array $urls): Future
     {
         return \Amp\async(function () use ($urls) {
             // Группируем URL по загрузчикам
             $loaderGroups = $this->groupUrlsByLoader($urls);
-            
+
             // Сначала проверяем кеш для всех URL
             $cachedResults = [];
             $urlsToLoad = [];
-            
+
             foreach ($urls as $url) {
                 $cacheKey = $this->generateCacheKey($url);
                 $cacheItem = $this->cache->getItem($cacheKey);
-                
+
                 if ($cacheItem->isHit()) {
                     $cachedContent = $cacheItem->get();
                     if ($cachedContent instanceof ArticleContentDto) {
@@ -158,34 +159,34 @@ class ContentLoaderManager
                         continue;
                     }
                 }
-                
+
                 $urlsToLoad[] = $url;
             }
-            
+
             // Запускаем загрузку для URL, которых нет в кеше
             $futures = [];
-            
+
             foreach ($loaderGroups as $loaderIndex => $urlGroup) {
                 $loader = $this->loaders[$loaderIndex];
-                
+
                 foreach ($urlGroup as $url) {
                     // Пропускаем URL, которые уже есть в кеше
                     if (isset($cachedResults[$url])) {
                         continue;
                     }
-                    
+
                     // Пропускаем URL, которые не нужно загружать
                     if (!in_array($url, $urlsToLoad, true)) {
                         continue;
                     }
-                    
+
                     $futures[$url] = $loader->load($url);
                 }
             }
-            
+
             // Ожидаем завершения всех загрузок
             $loadedResults = Future\await($futures);
-            
+
             // Сохраняем загруженные результаты в кеш
             foreach ($loadedResults as $url => $content) {
                 if ($content instanceof ArticleContentDto) {
@@ -195,7 +196,7 @@ class ContentLoaderManager
                     $this->cache->save($cacheItem);
                 }
             }
-            
+
             // Объединяем кешированные и загруженные результаты
             return array_merge($cachedResults, $loadedResults);
         });
@@ -227,7 +228,7 @@ class ContentLoaderManager
                 return $loader;
             }
         }
-        
+
         return null;
     }
 
@@ -235,24 +236,24 @@ class ContentLoaderManager
      * Группирует URL по индексам загрузчиков, которые могут их обработать.
      *
      * @param string[] $urls Массив URL
-     * @return array Массив групп [индекс_загрузчика => [url1, url2, ...]]
+     * @return array<int, string[]> Массив групп [индекс_загрузчика => [url1, url2, ...]]
      */
     protected function groupUrlsByLoader(array $urls): array
     {
         $groups = [];
-        
+
         foreach ($urls as $url) {
             $loaderIndex = $this->findLoaderIndexForUrl($url);
-            
+
             if ($loaderIndex !== null) {
                 if (!isset($groups[$loaderIndex])) {
                     $groups[$loaderIndex] = [];
                 }
-                
+
                 $groups[$loaderIndex][] = $url;
             }
         }
-        
+
         return $groups;
     }
 
@@ -269,7 +270,7 @@ class ContentLoaderManager
                 return $index;
             }
         }
-        
+
         return null;
     }
 
@@ -316,7 +317,7 @@ class ContentLoaderManager
         if ($this->cache instanceof ArrayCache) {
             return $this->cache->getStats();
         }
-        
+
         // Для других реализаций CacheItemPoolInterface возвращаем базовую статистику
         return [
             'cache_class' => get_class($this->cache),
@@ -334,3 +335,4 @@ class ContentLoaderManager
         return $this->loaders;
     }
 }
+

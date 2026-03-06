@@ -1,11 +1,12 @@
 <?php
-// src/app/modules/neuron/classes/tools/wiki/search/ArticleSearchManager.php
+// src/app/modules/neuron/classes/search/wiki/ArticleSearchManager.php
 
-namespace app\modules\neuron\classes\tools\wiki\search;
+namespace app\modules\neuron\classes\search\wiki;
 
 use Amp\Future;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\enums\ContentSourceType;
+use app\modules\neuron\interfaces\ArticleSearcherInterface;
 
 /**
  * Менеджер для поиска статей в нескольких источниках одновременно.
@@ -38,13 +39,13 @@ class ArticleSearchManager
     public function setSearchers(array $searchers): self
     {
         $this->searchers = [];
-        
+
         foreach ($searchers as $searcher) {
             if ($searcher instanceof ArticleSearcherInterface) {
                 $this->addSearcher($searcher);
             }
         }
-        
+
         return $this;
     }
 
@@ -77,10 +78,10 @@ class ArticleSearchManager
             foreach ($this->searchers as $searcher) {
                 $futures[] = $searcher->search($query, $limitPerSource, $offset);
             }
-            
+
             // Ожидаем завершения всех поисков
             $resultsBySource = Future\await($futures);
-            
+
             // Объединяем результаты из всех источников
             $allResults = [];
             foreach ($resultsBySource as $sourceResults) {
@@ -88,7 +89,7 @@ class ArticleSearchManager
                     $allResults = array_merge($allResults, $sourceResults);
                 }
             }
-            
+
             return $allResults;
         });
     }
@@ -105,31 +106,31 @@ class ArticleSearchManager
     {
         return \Amp\async(function () use ($query, $sourceTypes, $limitPerSource) {
             $futures = [];
-            
+
             // Фильтруем поисковики по типам источников
             foreach ($this->searchers as $searcher) {
-                if ($searcher instanceof WikipediaArticleSearcher && 
+                if ($searcher instanceof WikipediaArticleSearcher &&
                     in_array(ContentSourceType::WIKIPEDIA, $sourceTypes, true)) {
                     $futures[] = $searcher->search($query, $limitPerSource);
-                } elseif ($searcher instanceof RuWikiArticleSearcher && 
-                         in_array(ContentSourceType::RUWIKI, $sourceTypes, true)) {
+                } elseif ($searcher instanceof RuWikiArticleSearcher &&
+                    in_array(ContentSourceType::RUWIKI, $sourceTypes, true)) {
                     $futures[] = $searcher->search($query, $limitPerSource);
                 }
             }
-            
+
             if (empty($futures)) {
                 return [];
             }
-            
+
             $resultsBySource = Future\await($futures);
-            
+
             $allResults = [];
             foreach ($resultsBySource as $sourceResults) {
                 if (is_array($sourceResults)) {
                     $allResults = array_merge($allResults, $sourceResults);
                 }
             }
-            
+
             return $allResults;
         });
     }
@@ -140,13 +141,13 @@ class ArticleSearchManager
      *
      * @param string $query Поисковый запрос
      * @param int $limitPerSource Лимит результатов на каждый источник
-     * @return Future<array> Future с краткими результатами
+     * @return Future<array<int, array<string, mixed>>> Future с краткими результатами
      */
     public function searchBriefAll(string $query, int $limitPerSource = 5): Future
     {
         return \Amp\async(function () use ($query, $limitPerSource) {
             $futures = [];
-            
+
             foreach ($this->searchers as $searcher) {
                 if ($searcher instanceof WikipediaArticleSearcher) {
                     $futures[] = $searcher->searchBrief($query, $limitPerSource);
@@ -154,20 +155,20 @@ class ArticleSearchManager
                     $futures[] = $searcher->searchBrief($query, $limitPerSource);
                 }
             }
-            
+
             if (empty($futures)) {
                 return [];
             }
-            
+
             $resultsBySource = Future\await($futures);
-            
+
             $allResults = [];
             foreach ($resultsBySource as $sourceResults) {
                 if (is_array($sourceResults)) {
                     $allResults = array_merge($allResults, $sourceResults);
                 }
             }
-            
+
             return $allResults;
         });
     }
@@ -182,3 +183,4 @@ class ArticleSearchManager
         return count($this->searchers);
     }
 }
+

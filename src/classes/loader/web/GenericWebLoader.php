@@ -1,7 +1,7 @@
 <?php
-// src/app/modules/neuron/classes/tools/wiki/GenericWebLoader.php
+// src/app/modules/neuron/classes/loader/web/GenericWebLoader.php
 
-namespace app\modules\neuron\classes\tools\wiki;
+namespace app\modules\neuron\classes\loader\web;
 
 use Amp\Future;
 use Amp\Http\Client\HttpClient;
@@ -10,6 +10,7 @@ use Amp\Http\Client\Request;
 use app\modules\neuron\classes\convert\Mdify;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\enums\ContentSourceType;
+use app\modules\neuron\interfaces\ContentLoaderInterface;
 
 use Html2Text\Html2Text;
 
@@ -17,13 +18,12 @@ use Html2Text\Html2Text;
  * Универсальный загрузчик для произвольных веб-страниц.
  * Загружает HTML-контент любых сайтов, которые не обрабатываются
  * специализированными загрузчиками (WikipediaLoader, RuWikiLoader).
- * 
+ *
  * Внимание: Этот загрузчик должен быть последним в цепочке загрузчиков,
  * так как он всегда возвращает true в методе canLoad().
  */
 class GenericWebLoader implements ContentLoaderInterface
 {
-    
     /**
      * HTTP-клиент Amp для выполнения запросов
      * @var HttpClient
@@ -43,7 +43,7 @@ class GenericWebLoader implements ContentLoaderInterface
      * GenericWebLoader всегда возвращает true, так как он является
      * загрузчиком по умолчанию для любых URL, которые не были обработаны
      * другими загрузчиками.
-     * 
+     *
      * Внимание: Этот метод должен использоваться менеджером загрузчиков
      * для определения того, что данный URL не может быть обработан
      * специализированными загрузчиками.
@@ -61,7 +61,7 @@ class GenericWebLoader implements ContentLoaderInterface
     /**
      * Загружает содержимое произвольной веб-страницы.
      * Выполняет HTTP-запрос и извлекает контент из HTML.
-     * 
+     *
      * @throws \InvalidArgumentException Если URL пустой или невалидный
      *
      * @param string $url URL веб-страницы
@@ -76,14 +76,14 @@ class GenericWebLoader implements ContentLoaderInterface
                     "Некорректный URL: {$url}"
                 );
             }
-            
+
             try {
                 // Выполняем HTTP-запрос
                 $html = $this->fetchHtmlContent($url);
 
                 // Извлекаем заголовок из HTML
                 $title = $this->extractTitleFromHtml($html);
-                
+
                 // Очищаем HTML (убираем скрипты, стили и т.д.)
                 $cleanedHtml = $this->cleanHtml($html);
 
@@ -95,16 +95,12 @@ class GenericWebLoader implements ContentLoaderInterface
                 */
                 $content = Mdify::htmlToMarkdown($cleanedHtml);
 
-                //echo $content;exit;
-                
                 // Используем enum для типа источника
                 return new ArticleContentDto(
                     content   : $content,
-                    //content: $html,
                     title     : $title,
                     sourceUrl : $url,
                     sourceType: ContentSourceType::GENERIC,
-                    //metadata: $content['links']
                 );
             } catch (\Throwable $e) {
                 throw new \RuntimeException(
@@ -125,7 +121,7 @@ class GenericWebLoader implements ContentLoaderInterface
     protected function fetchHtmlContent(string $url): string
     {
         $request = new Request($url, 'GET');
-        
+
         // Устанавливаем разумные заголовки для имитации браузера
         $request->setHeaders([
             'User-Agent'                => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -135,9 +131,9 @@ class GenericWebLoader implements ContentLoaderInterface
             'Connection'                => 'keep-alive',
             'Upgrade-Insecure-Requests' => '1',
         ]);
-        
+
         $response = $this->httpClient->request($request);
-        
+
         // Проверяем успешность запроса
         if ($response->getStatus() !== 200) {
             throw new \RuntimeException(
@@ -158,6 +154,7 @@ class GenericWebLoader implements ContentLoaderInterface
                     break;
             }
         }
+
         return $content;
     }
 
@@ -176,7 +173,7 @@ class GenericWebLoader implements ContentLoaderInterface
                 return $title;
             }
         }
-        
+
         // Ищем заголовок в теге <h1>
         if (preg_match('/<h1[^>]*>\s*(.*?)\s*<\/h1>/is', $html, $matches)) {
             $title = trim(html_entity_decode(strip_tags($matches[1])));
@@ -184,7 +181,7 @@ class GenericWebLoader implements ContentLoaderInterface
                 return $title;
             }
         }
-        
+
         // Ищем заголовок в Open Graph meta тегах
         if (preg_match('/<meta[^>]*property="og:title"[^>]*content="([^"]*)"[^>]*>/i', $html, $matches)) {
             $title = trim(html_entity_decode(strip_tags($matches[1])));
@@ -192,7 +189,7 @@ class GenericWebLoader implements ContentLoaderInterface
                 return $title;
             }
         }
-        
+
         // Ищем заголовок в Twitter meta тегах
         if (preg_match('/<meta[^>]*name="twitter:title"[^>]*content="([^"]*)"[^>]*>/i', $html, $matches)) {
             $title = trim(html_entity_decode(strip_tags($matches[1])));
@@ -200,7 +197,7 @@ class GenericWebLoader implements ContentLoaderInterface
                 return $title;
             }
         }
-        
+
         return 'Без названия';
     }
 
@@ -216,14 +213,15 @@ class GenericWebLoader implements ContentLoaderInterface
         $cleaned = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $html);
         $cleaned = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $cleaned);
         $cleaned = preg_replace('/<noscript\b[^>]*>.*?<\/noscript>/is', '', $cleaned);
-        
+
         // Удаляем комментарии
         $cleaned = preg_replace('/<!--.*?-->/s', '', $cleaned);
-        
+
         // Удаляем пустые строки и лишние пробелы
         $cleaned = preg_replace('/\s+/', ' ', $cleaned);
         $cleaned = trim($cleaned);
-        
+
         return $cleaned;
     }
 }
+

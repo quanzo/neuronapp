@@ -7,14 +7,24 @@ namespace Tests\Tools;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\enums\ContentSourceType;
 use app\modules\neuron\tools\UniSearchTool;
-use app\modules\neuron\classes\tools\wiki\search\ArticleSearcherInterface;
+use app\modules\neuron\interfaces\ArticleSearcherInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Тесты для {@see UniSearchTool}.
+ *
+ * Покрывают базовый контракт инструмента:
+ * - корректный вызов асинхронных поисковиков и агрегацию результатов;
+ * - сериализацию результата в JSON со списком статей;
+ * - поведение при отсутствии результатов поиска.
  */
 final class UniSearchToolTest extends TestCase
 {
+    /**
+     * Проверяет, что инструмент корректно вызывает переданный поисковик
+     * и возвращает JSON с одной статьёй, где заголовок и контент
+     * зависят от поискового запроса.
+     */
     public function testInvokeReturnsArticlesJson(): void
     {
         $searcher = new class implements ArticleSearcherInterface {
@@ -49,6 +59,11 @@ final class UniSearchToolTest extends TestCase
         $this->assertSame('content-query', $data['articles'][0]['content']);
     }
 
+    /**
+     * Проверяет, что при отсутствии результатов от поисковика
+     * инструмент возвращает JSON с пустым массивом статей,
+     * сохраняя общий формат ответа.
+     */
     public function testInvokeWithNoResultsReturnsEmptyArticlesArray(): void
     {
         $searcher = new class implements ArticleSearcherInterface {
