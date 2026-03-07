@@ -10,6 +10,7 @@ use app\modules\neuron\classes\command\TodolistCommand;
 use app\modules\neuron\classes\command\WikiCommand;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
+use app\modules\neuron\classes\logger\FileLogger;
 use app\modules\neuron\classes\producers\AgentProducer;
 use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\classes\producers\TodoListProducer;
@@ -67,7 +68,7 @@ foreach ([
         TodoListProducer::getStorageDirName(),
         ConfigurationApp::getSessionDirName(),
         AgentProducer::getStorageDirName(),
-        '.logs',
+        ConfigurationApp::getLogDirName(),
         '.store'
     ] as $subDir
 ) {
@@ -85,6 +86,13 @@ $dirPriority = new DirPriority($arDirs);
 
 try {
     ConfigurationApp::init($dirPriority);
+
+    // установим логгер
+    $appCfg = ConfigurationApp::getInstance();
+    $logDir = $appCfg->getLogDir();
+    $fn     = $appCfg->getSessionKey() . '.log';
+    $logger = new FileLogger($logDir . PHP_EOL . $fn);
+    $appCfg->setLogger($logger);
 } catch (\Throwable $e) {
     fwrite(STDERR, "[CONFIG ERROR] " . $e->getMessage() . "\n");
     exit(1);

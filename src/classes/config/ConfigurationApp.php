@@ -195,6 +195,15 @@ class ConfigurationApp
     }
 
     /**
+     * Имя директории логов
+     *
+     * @return string
+     */
+    public static function getLogDirName(): string {
+        return '.logs';
+    }
+
+    /**
      * Возвращает полный путь к директории хранения сессий.
      *
      * Путь формируется как {@see APP_WORK_DIR} + разделитель + {@see getSessionDirName()}.
@@ -204,6 +213,16 @@ class ConfigurationApp
     public function getSessionDir(): string
     {
         return $this->dirPriority->resolveDir(self::getSessionDirName());
+    }
+
+    /**
+     * Возвращает полный путь к директории хранения логов.
+     *
+     * @return string Абсолютный путь к папке сессий.
+     */
+    public function getLogDir(): string
+    {
+        return $this->dirPriority->resolveDir(self::getLogDirName());
     }
 
     /**
