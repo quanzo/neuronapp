@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Skill;
 
+use Amp\Future;
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\interfaces\ISkill;
 use PHPUnit\Framework\TestCase;
@@ -194,6 +196,69 @@ class SkillTest extends TestCase
         $input = "---\nskills: 42\n---\nBody";
         $skill = new Skill($input, 'myskill');
         $this->assertSame([], $skill->getNeedSkills());
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  isPureContext — опция pure_context
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * Опция pure_context не задана — false.
+     */
+    public function testIsPureContextNotSetReturnsFalse(): void
+    {
+        $skill = new Skill('body', 'myskill');
+        $this->assertFalse($skill->isPureContext());
+    }
+
+    /**
+     * Опция pure_context задана 0 — false.
+     */
+    public function testIsPureContextZeroReturnsFalse(): void
+    {
+        $input = "---\npure_context: 0\n---\nBody";
+        $skill = new Skill($input, 'myskill');
+        $this->assertFalse($skill->isPureContext());
+    }
+
+    /**
+     * Опция pure_context задана строкой 'false' — false.
+     */
+    public function testIsPureContextStringFalseReturnsFalse(): void
+    {
+        $input = "---\npure_context: false\n---\nBody";
+        $skill = new Skill($input, 'myskill');
+        $this->assertFalse($skill->isPureContext());
+    }
+
+    /**
+     * Опция pure_context задана 1 — true.
+     */
+    public function testIsPureContextOneReturnsTrue(): void
+    {
+        $input = "---\npure_context: 1\n---\nBody";
+        $skill = new Skill($input, 'myskill');
+        $this->assertTrue($skill->isPureContext());
+    }
+
+    /**
+     * Опция pure_context задана строкой 'true' — true.
+     */
+    public function testIsPureContextStringTrueReturnsTrue(): void
+    {
+        $input = "---\npure_context: true\n---\nBody";
+        $skill = new Skill($input, 'myskill');
+        $this->assertTrue($skill->isPureContext());
+    }
+
+    /**
+     * Опция pure_context с неожиданным значением (например строка "yes") — false.
+     */
+    public function testIsPureContextUnexpectedValueReturnsFalse(): void
+    {
+        $input = "---\npure_context: yes\n---\nBody";
+        $skill = new Skill($input, 'myskill');
+        $this->assertFalse($skill->isPureContext());
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -438,5 +503,20 @@ class SkillTest extends TestCase
         $input = "---\nagent: myAgent\n---\nBody";
         $skill = new Skill($input);
         $this->assertSame('myAgent', $skill->getOptions()['agent']);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  executeFromAgent — возвращает Future
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * executeFromAgent() возвращает Future (без await, чтобы не требовать реальный бэкенд).
+     */
+    public function testExecuteFromAgentReturnsFuture(): void
+    {
+        $skill = new Skill('Hello', 'myskill');
+        $agentCfg = new ConfigurationAgent();
+        $future = $skill->executeFromAgent($agentCfg);
+        $this->assertInstanceOf(Future::class, $future);
     }
 }

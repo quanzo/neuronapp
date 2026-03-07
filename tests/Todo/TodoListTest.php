@@ -311,6 +311,29 @@ class TodoListTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════
+    //  isPureContext — по умолчанию true
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * isPureContext() для TodoList всегда возвращает true.
+     */
+    public function testIsPureContextAlwaysTrue(): void
+    {
+        $list = new TodoList('');
+        $this->assertTrue($list->isPureContext());
+    }
+
+    /**
+     * isPureContext() возвращает true даже при наличии опций (опция не учитывается).
+     */
+    public function testIsPureContextWithOptionsStillTrue(): void
+    {
+        $input = "---\nagent: test\n---\n1. Task";
+        $list = new TodoList($input);
+        $this->assertTrue($list->isPureContext());
+    }
+
+    // ══════════════════════════════════════════════════════════════
     //  checkErrors / getErrors — валидация конфигурации
     // ══════════════════════════════════════════════════════════════
 

@@ -8,8 +8,10 @@ use Amp\Future;
 use app\modules\neuron\classes\AbstractPromptWithParams;
 use app\modules\neuron\classes\dto\params\ParamListDto;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\PlaceholderHelper;
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ISkill;
 use NeuronAI\Chat\Enums\MessageRole;
@@ -71,6 +73,21 @@ class Skill extends AbstractPromptWithParams implements ISkill
     public function getNeedSkills(): array
     {
         return $this->parseSkills(true);
+    }
+
+    /**
+     * Определяет, нужно ли выполнять навык с чистым контекстом.
+     *
+     * Чистый контекст — использование клона конфигурации агента (cloneForSession),
+     * чтобы не изменять основное состояние агента (историю, кеш).
+     * Опция задаётся параметром "pure_context" в блоке опций навыка.
+     *
+     * @return bool true, если опция pure_context задана как 1 или 'true'; false — если не задана, 0 или 'false'.
+     */
+    public function isPureContext(): bool
+    {
+        $value = $this->getOptions()['pure_context'] ?? null;
+        return OptionsHelper::toBool($value);
     }
 
     /**
@@ -170,10 +187,14 @@ class Skill extends AbstractPromptWithParams implements ISkill
     /**
      * Выполняет навык, отправляя сгенерированный текст и дополнительные вложения в LLM.
      *
-     * @param ConfigurationAgent         $agentCfg    Конфигурация агента-исполнителя.
-     * @param MessageRole                $role        Роль сообщения.
-     * @param AttachmentDto[]            $attachments Дополнительные вложения, передаваемые вместе с текстом навыка.
-     * @param array<string,mixed>|null   $params      Параметры для подстановки в шаблон навыка.
+     * При isPureContext() используется клон конфигурации агента (чистый контекст).
+     * При переданном SkillProducer подключаются инструменты навыков из опции "skills".
+     *
+     * @param ConfigurationAgent         $agentCfg       Конфигурация агента-исполнителя.
+     * @param MessageRole                $role           Роль сообщения.
+     * @param AttachmentDto[]            $attachments    Дополнительные вложения, передаваемые вместе с текстом навыка.
+     * @param array<string,mixed>|null   $params         Параметры для подстановки в шаблон навыка.
+     * @param SkillProducer|null         $skillProducer  Producer навыков для разрешения имён из getNeedSkills().
      *
      * @return Future<mixed> Результат выполнения запроса к LLM.
      */
@@ -181,12 +202,28 @@ class Skill extends AbstractPromptWithParams implements ISkill
         ConfigurationAgent $agentCfg,
         MessageRole $role = MessageRole::USER,
         array $attachments = [],
-        ?array $params = null
+        ?array $params = null,
+        ?SkillProducer $skillProducer = null
     ): Future {
         $text = $this->getSkill($params ?? []);
-        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments): mixed {
+        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments, $skillProducer): mixed {
+            $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession() : $agentCfg;
+
+            if ($skillProducer !== null && $this->getNeedSkills() !== []) {
+                $skillTools = [];
+                foreach ($this->getNeedSkills() as $skillName) {
+                    $skill = $skillProducer->get($skillName);
+                    if ($skill !== null) {
+                        $skillTools[] = $skill->getTool($sessionCfg, $role);
+                    }
+                }
+                if ($skillTools !== []) {
+                    $sessionCfg->tools = array_merge($agentCfg->getTools(), $skillTools);
+                }
+            }
+
             $message = new NeuronMessage($role, $text);
-            return $agentCfg->sendMessageWithAttachments($message, $attachments);
+            return $sessionCfg->sendMessageWithAttachments($message, $attachments);
         });
     }
 }

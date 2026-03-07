@@ -120,6 +120,19 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
     }
 
     /**
+     * Определяет, нужно ли выполнять список с чистым контекстом.
+     *
+     * Для TodoList по умолчанию возвращает true: исполнение идёт через клон конфигурации агента,
+     * чтобы не изменять основное состояние агента.
+     *
+     * @return bool Всегда true для списка заданий.
+     */
+    public function isPureContext(): bool
+    {
+        return true;
+    }
+
+    /**
      * Проверяет корректность конфигурации TodoList и возвращает список найденных проблем.
      *
      * @return array<int, array{type:string, message:string, param?:string}>
@@ -151,7 +164,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
         ?SkillProducer $skillProducer = null
     ): Future {
         return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $skillProducer): ChatHistoryInterface {
-            $sessionCfg = $agentCfg->cloneForSession();
+            $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession() : $agentCfg;
 
             if ($skillProducer !== null && $this->getNeedSkills() !== []) {
                 $skillTools = [];
