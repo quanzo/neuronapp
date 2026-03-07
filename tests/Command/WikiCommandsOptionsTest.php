@@ -45,7 +45,7 @@ final class WikiCommandsOptionsTest extends TestCase
         $language = $definition->getOption('language');
         $this->assertFalse($language->isValueRequired());
         $this->assertFalse($language->isArray());
-        $this->assertSame('en', $language->getDefault());
+        $this->assertSame('ru', $language->getDefault());
     }
 
     public function testRuwikiCommandHasMessageOption(): void

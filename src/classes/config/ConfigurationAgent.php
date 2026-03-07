@@ -23,9 +23,14 @@ use NeuronAI\Providers\AIProviderInterface;
 use NeuronAI\RAG\Embeddings\EmbeddingsProviderInterface;
 use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\classes\logger\ContextualLogger;
+use app\modules\neuron\tools\ATool;
+use app\modules\neuron\traits\LoggerAwareContextualTrait;
+use app\modules\neuron\traits\LoggerAwareTrait;
 use NeuronAI\Tools\ProviderToolInterface;
 use NeuronAI\Tools\ToolInterface;
 use NeuronAI\Tools\Toolkits\ToolkitInterface;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Stringable;
 
@@ -34,6 +39,8 @@ use Stringable;
  * Конфигурация агента для работы с LLM через Neuron PHP
  */
 class ConfigurationAgent {
+    use LoggerAwareTrait;
+    use LoggerAwareContextualTrait;
 
     /**
      * Имя агента, для которого используется данная конфигурация.
@@ -209,36 +216,45 @@ class ConfigurationAgent {
 
         $start = microtime(true);
 
-        // В NeuronAI вложения прикрепляются к сообщению через content blocks.
-        foreach ($attachments as $attachment) {
-            if ($attachment instanceof AttachmentDto) {
-                $message->addContent($attachment->getContentBlock());
-                continue;
+        try {
+            // В NeuronAI вложения прикрепляются к сообщению через content blocks.
+            foreach ($attachments as $attachment) {
+                if ($attachment instanceof AttachmentDto) {
+                    $message->addContent($attachment->getContentBlock());
+                    continue;
+                }
+
+                if ($attachment instanceof ContentBlockInterface) {
+                    $message->addContent($attachment);
+                    continue;
+                }
             }
 
-            if ($attachment instanceof ContentBlockInterface) {
-                $message->addContent($attachment);
-                continue;
+            if ($this->reponseStructClass) {
+                $response = $agent->structured(
+                    $message,
+                    $this->reponseStructClass,
+                    2
+                );
+            } else {
+                $handler = $agent->chat($message);
+                $response = $handler->getMessage();
             }
+        } catch (\Throwable $e) {
+            $this->getLogger()->error('Ошибка при отправке сообщения агенту', array_merge(
+                $this->getLogContext(),
+                ['exception' => $e]
+            ));
+            throw $e;
         }
 
-        if ($this->reponseStructClass) {
-            $response = $agent->structured(
-                $message,
-                $this->reponseStructClass,
-                2
-            );
-        } else {
-            $handler = $agent->chat($message);
-            $response = $handler->getMessage();
-        }
         $duration = round(microtime(true) - $start, 2);
 
         /**
          * @var Agent|RAG $agent
-         * 
+         *
          */
-    
+
         // логирование
         // В NeuronAI агент может хранить историю внутри состояния.
         // Метод getChatHistory() не является частью AgentInterface, поэтому вызываем безопасно.
@@ -364,7 +380,27 @@ class ConfigurationAgent {
             }
         }
 
+        $loggerWithContext = $this->getLoggerWithContext();
+        foreach ($tools as $tool) {
+            if ($tool instanceof ATool) {
+                $tool->setLogger($loggerWithContext);
+            }
+        }
+
         return $tools;
+    }
+
+    /**
+     * Возвращает контекст для логирования: имя агента и ключ сессии.
+     *
+     * @return array{agent: string|null, session: string|null}
+     */
+    public function getLogContext(): array
+    {
+        return [
+            'agent'   => $this->agentName,
+            'session' => $this->getSessionKey(),
+        ];
     }
 
     /**
@@ -499,6 +535,14 @@ class ConfigurationAgent {
         }
 
         $config = new self();
+
+        if (array_key_exists('agentName', $cfg)) {
+            $config->agentName = $cfg['agentName'] === null ? null : (string) $cfg['agentName'];
+        }
+
+        if (array_key_exists('logger', $cfg) && $cfg['logger'] instanceof LoggerInterface) {
+            $config->setLogger($cfg['logger']);
+        }
 
         if (array_key_exists('enableChatHistory', $cfg)) {
             $config->enableChatHistory = (bool) $cfg['enableChatHistory'];

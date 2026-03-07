@@ -9,14 +9,13 @@ use app\modules\neuron\interfaces\ArticleSearcherInterface;
 use app\modules\neuron\classes\search\wiki\WikipediaArticleSearcher;
 use app\modules\neuron\classes\loader\wiki\WikipediaFullLoader2;
 use NeuronAI\Tools\PropertyType;
-use NeuronAI\Tools\Tool;
 use NeuronAI\Tools\ToolProperty;
 
 /**
  * Инструмент для поиска и загрузки содержимого статей из различных источников.
  * Использует набор поисковиков ({@see ArticleSearcherInterface}) и возвращает результат в виде JSON.
  */
-class UniSearchTool extends Tool
+class UniSearchTool extends ATool
 {
     /**
      * Массив поисковиков статей.

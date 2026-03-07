@@ -11,7 +11,11 @@ use app\modules\neuron\classes\producers\TodoListProducer;
 use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\classes\todo\TodoList;
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\logger\ContextualLogger;
 use app\modules\neuron\helpers\CommentsHelper;
+use app\modules\neuron\traits\LoggerAwareContextualTrait;
+use app\modules\neuron\traits\LoggerAwareTrait;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 
 /**
@@ -22,6 +26,9 @@ use RuntimeException;
  */
 class ConfigurationApp
 {
+    use LoggerAwareTrait;
+    use LoggerAwareContextualTrait;
+    
     /**
      * Регулярное выражение для проверки формата sessionKey.
      *
@@ -128,6 +135,18 @@ class ConfigurationApp
     }
 
     /**
+     * Возвращает контекст для логирования: имя агента и ключ сессии.
+     *
+     * @return array{session: string|null}
+     */
+    public function getLogContext(): array
+    {
+        return [
+            'session' => $this->getSessionKey(),
+        ];
+    }
+
+    /**
      * Возвращает producer конфигураций агентов (один и тот же экземпляр при повторных вызовах).
      */
     public function getAgentProducer(): AgentProducer
@@ -135,6 +154,7 @@ class ConfigurationApp
         if ($this->agentProducer === null) {
             $this->agentProducer = new AgentProducer($this->dirPriority);
             $this->agentProducer->setSessionKey($this->getSessionKey());
+            $this->agentProducer->logger = $this->getLoggerWithContext();
         }
 
         return $this->agentProducer;

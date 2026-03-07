@@ -6,6 +6,7 @@ namespace app\modules\neuron\classes\producers;
 
 use app\modules\neuron\classes\AProducer;
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\traits\LoggerAwareTrait;
 
 /**
  * Фабрика конфигураций агентов по имени.
@@ -20,6 +21,8 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
  */
 class AgentProducer extends AProducer
 {
+    use LoggerAwareTrait;
+    
     /**
      * Базовый ключ сессии, передаваемый создаваемым агентам.
      */
@@ -85,6 +88,10 @@ class AgentProducer extends AProducer
             if ($config->enableChatHistory === false) {
                 $config->resetChatHistory();
             }
+        }
+
+        if (empty($config->logger)) {
+            $config->setLogger($this->getLogger());
         }
 
         return $config;

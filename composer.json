@@ -9,7 +9,8 @@
         "amphp/http-client": "^5",
         "neuron-core/neuron-ai": "^3",
         "html2text/html2text": "^4",
-        "psr/cache": "^3.0"
+        "psr/cache": "^3.0",
+        "psr/log": "^3.0"
     },
     "require-dev": {
         "phpstan/phpstan": "^2.1",

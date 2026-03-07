@@ -7,8 +7,8 @@ namespace app\modules\neuron\tools;
 use app\modules\neuron\classes\dto\tools\GrepMatchDto;
 use app\modules\neuron\classes\dto\tools\GrepResultDto;
 use app\modules\neuron\helpers\FileSystemHelper;
+use app\modules\neuron\tools\ATool;
 use NeuronAI\Tools\PropertyType;
-use NeuronAI\Tools\Tool;
 use NeuronAI\Tools\ToolProperty;
 
 use function array_values;
@@ -54,7 +54,7 @@ use const PREG_OFFSET_CAPTURE;
  * @see GrepMatchDto  Структура одного совпадения
  * @see FileSystemHelper Вспомогательные методы для фильтрации и проверки файлов
  */
-class GrepTool extends Tool
+class GrepTool extends ATool
 {
     /** @var string Базовая директория для поиска */
     protected string $basePath;

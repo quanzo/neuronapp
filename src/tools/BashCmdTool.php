@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace app\modules\neuron\tools;
 
 use app\modules\neuron\helpers\PlaceholderHelper;
-use NeuronAI\Tools\Tool;
 use NeuronAI\Tools\ToolPropertyInterface;
 
 /**
@@ -46,7 +45,7 @@ use NeuronAI\Tools\ToolPropertyInterface;
  * @see PlaceholderHelper  Механизм подстановки плейсхолдеров
  * @see BashTool           Исполнитель shell-команд (делегат)
  */
-class BashCmdTool extends Tool
+class BashCmdTool extends ATool
 {
     /**
      * Шаблон bash-команды с плейсхолдерами вида $paramName.

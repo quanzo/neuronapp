@@ -175,10 +175,21 @@ class Skill extends AbstractPromptWithParams implements ISkill
             ));
         }
 
-        $tool->setCallable(function (mixed ...$args) use ($agentCfg, $role): mixed {
-            $text = $this->getSkill($args);
-            $message = new NeuronMessage($role, $text);
-            return $agentCfg->sendMessage($message);
+        $skillName = $this->getName();
+        $tool->setCallable(function (mixed ...$args) use ($agentCfg, $role, $skillName): mixed {
+            $logger = $agentCfg->getLoggerWithContext();
+            $context = ['skill' => $skillName];
+            $logger->info('Skill вызван', $context);
+            try {
+                $text    = $this->getSkill($args);
+                $message = new NeuronMessage($role, $text);
+                $result  = $agentCfg->sendMessage($message);
+                $logger->info('Skill завершён', $context);
+                return $result;
+            } catch (\Throwable $e) {
+                $logger->error('Ошибка выполнения skill', array_merge($context, ['exception' => $e]));
+                throw $e;
+            }
         });
 
         return $tool;
@@ -205,6 +216,10 @@ class Skill extends AbstractPromptWithParams implements ISkill
         ?array $params = null,
         ?SkillProducer $skillProducer = null
     ): Future {
+        $logger = $agentCfg->getLogger();
+        $context = array_merge($agentCfg->getLogContext(), ['skill' => $this->getName()]);
+        $logger->info('Skill started', $context);
+
         $text = $this->getSkill($params ?? []);
         return \Amp\async(function () use ($agentCfg, $text, $role, $attachments, $skillProducer): mixed {
             $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession() : $agentCfg;
@@ -222,8 +237,15 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 }
             }
 
-            $message = new NeuronMessage($role, $text);
-            return $sessionCfg->sendMessageWithAttachments($message, $attachments);
+            try {
+                $message = new NeuronMessage($role, $text);
+                $result = $sessionCfg->sendMessageWithAttachments($message, $attachments);
+                $agentCfg->getLogger()->info('Skill completed', array_merge($agentCfg->getLogContext(), ['skill' => $this->getName()]));
+                return $result;
+            } catch (\Throwable $e) {
+                $agentCfg->getLogger()->error('Ошибка выполнения skill', array_merge($agentCfg->getLogContext(), ['skill' => $this->getName(), 'exception' => $e]));
+                throw $e;
+            }
         });
     }
 }

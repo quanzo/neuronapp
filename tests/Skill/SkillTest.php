@@ -8,6 +8,10 @@ use Amp\Future;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\interfaces\ISkill;
+use NeuronAI\Agent\AgentHandler;
+use NeuronAI\Agent\AgentInterface;
+use NeuronAI\Chat\Enums\MessageRole;
+use NeuronAI\Chat\Messages\Message;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -511,12 +515,29 @@ class SkillTest extends TestCase
 
     /**
      * executeFromAgent() возвращает Future (без await, чтобы не требовать реальный бэкенд).
+     * Конфиг с мок-агентом, чтобы при выполнении Future не вызывался реальный getProvider().
      */
     public function testExecuteFromAgentReturnsFuture(): void
     {
         $skill = new Skill('Hello', 'myskill');
-        $agentCfg = new ConfigurationAgent();
+        $handler = $this->createMock(AgentHandler::class);
+        $handler->method('getMessage')->willReturn(new Message(MessageRole::ASSISTANT, 'ok'));
+        $agent = $this->createMock(AgentInterface::class);
+        $agent->method('chat')->willReturn($handler);
+
+        $agentCfg = new class($agent) extends ConfigurationAgent {
+            public function __construct(private readonly AgentInterface $agent)
+            {
+            }
+
+            public function getAgent(): AgentInterface
+            {
+                return $this->agent;
+            }
+        };
+
         $future = $skill->executeFromAgent($agentCfg);
         $this->assertInstanceOf(Future::class, $future);
+        $future->ignore();
     }
 }

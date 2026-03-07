@@ -6,8 +6,8 @@ namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\dto\tools\GlobResultDto;
 use app\modules\neuron\helpers\FileSystemHelper;
+use app\modules\neuron\tools\ATool;
 use NeuronAI\Tools\PropertyType;
-use NeuronAI\Tools\Tool;
 use NeuronAI\Tools\ToolProperty;
 
 use function array_slice;
@@ -47,7 +47,7 @@ use const GLOB_NOSORT;
  * @see GlobResultDto Структура результата поиска
  * @see FileSystemHelper Вспомогательные методы для работы с файловой системой
  */
-class GlobTool extends Tool
+class GlobTool extends ATool
 {
     /** @var string Базовая директория для поиска */
     protected string $basePath;

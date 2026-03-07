@@ -6,8 +6,8 @@ namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\dto\tools\ViewResultDto;
 use app\modules\neuron\helpers\FileSystemHelper;
+use app\modules\neuron\tools\ATool;
 use NeuronAI\Tools\PropertyType;
-use NeuronAI\Tools\Tool;
 use NeuronAI\Tools\ToolProperty;
 
 use function array_slice;
@@ -54,7 +54,7 @@ use const STR_PAD_LEFT;
  * @see ViewResultDto  Структура результата чтения
  * @see FileSystemHelper Проверка пути и типа файла
  */
-class ViewTool extends Tool
+class ViewTool extends ATool
 {
     /** @var string Базовая директория для разрешения путей */
     protected string $basePath;

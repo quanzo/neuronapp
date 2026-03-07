@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\dto\tools\BashResultDto;
+use app\modules\neuron\tools\ATool;
 use NeuronAI\Tools\PropertyType;
-use NeuronAI\Tools\Tool;
 use NeuronAI\Tools\ToolProperty;
 
 use function array_merge;
@@ -56,7 +56,7 @@ use const SIGTERM;
  *
  * @see BashResultDto Структура результата выполнения команды
  */
-class BashTool extends Tool
+class BashTool extends ATool
 {
     /** @var int Таймаут по умолчанию (секунды) */
     protected int $defaultTimeout = 30;

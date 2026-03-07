@@ -6,8 +6,8 @@ namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\dto\tools\EditResultDto;
 use app\modules\neuron\helpers\FileSystemHelper;
+use app\modules\neuron\tools\ATool;
 use NeuronAI\Tools\PropertyType;
-use NeuronAI\Tools\Tool;
 use NeuronAI\Tools\ToolProperty;
 
 use function copy;
@@ -58,7 +58,7 @@ use const JSON_UNESCAPED_UNICODE;
  * @see ViewTool         Обычно вызывается перед Edit для получения контекста
  * @see FileSystemHelper Проверка пути и безопасности
  */
-class EditTool extends Tool
+class EditTool extends ATool
 {
     /** @var string Базовая директория для разрешения путей */
     protected string $basePath;

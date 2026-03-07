@@ -164,6 +164,10 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
         ?SkillProducer $skillProducer = null
     ): Future {
         return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $skillProducer): ChatHistoryInterface {
+            $logger      = $agentCfg->getLoggerWithContext();
+            $baseContext = ['todolist' => $this->getName()];
+            $logger->info('TodoList started', $baseContext);
+
             $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession() : $agentCfg;
 
             if ($skillProducer !== null && $this->getNeedSkills() !== []) {
@@ -179,11 +183,21 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                 }
             }
 
-            foreach ($this->getTodos() as $todo) {
-                $message = new NeuronMessage($role, $todo->getTodo($params));
-                $sessionCfg->sendMessageWithAttachments($message, $attachments);
+            $todos = $this->getTodos();
+            foreach ($todos as $todoIndex => $todo) {
+                $todoText = $todo->getTodo($params);
+                $logger->info('Todo started', array_merge($baseContext, ['todo_index' => $todoIndex, 'todo' => $todoText]));
+                try {
+                    $message = new NeuronMessage($role, $todoText);
+                    $sessionCfg->sendMessageWithAttachments($message, $attachments);
+                    $logger->info('Todo completed', array_merge($baseContext, ['todo_index' => $todoIndex]));
+                } catch (\Throwable $e) {
+                    $logger->error('Ошибка выполнения todo', array_merge($baseContext, ['todo_index' => $todoIndex, 'exception' => $e]));
+                    throw $e;
+                }
             }
 
+            $logger->info('TodoList completed', $baseContext);
             return clone $sessionCfg->getChatHistory();
         });
     }
