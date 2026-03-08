@@ -77,11 +77,11 @@ class ViewTool extends ATool
      * @param string $description Описание инструмента
      */
     public function __construct(
-        string $basePath = '',
-        int $maxFileSize = 1048576,
-        int $maxLines = 2000,
-        string $encoding = 'UTF-8',
-        string $name = 'view',
+        string $basePath    = '',
+        int    $maxFileSize = 1048576,
+        int    $maxLines    = 2000,
+        string $encoding    = 'UTF-8',
+        string $name        = 'view',
         string $description = 'Чтение содержимого файла с нумерацией строк. Поддерживает выбор диапазона строк.',
     ) {
         parent::__construct(name: $name, description: $description);

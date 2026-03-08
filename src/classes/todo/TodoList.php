@@ -10,6 +10,7 @@ use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\helpers\CommentsHelper;
+use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\interfaces\ITodoList;
 use NeuronAI\Chat\Enums\MessageRole;
@@ -129,7 +130,8 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
      */
     public function isPureContext(): bool
     {
-        return true;
+        $value = $this->getOptions()['pure_context'] ?? true;
+        return OptionsHelper::toBool($value);
     }
 
     /**

@@ -86,14 +86,14 @@ class BashCmdTool extends ATool
      */
     public function __construct(
         string $commandTemplate,
-        string $name = 'bash_cmd',
-        string $description = 'Выполнение предопределённой shell-команды с параметрами.',
-        int $defaultTimeout = 30,
-        int $maxOutputSize = 102400,
+        string $name             = 'bash_cmd',
+        string $description      = 'Выполнение предопределённой shell-команды с параметрами.',
+        int    $defaultTimeout   = 30,
+        int    $maxOutputSize    = 102400,
         string $workingDirectory = '',
-        array $allowedPatterns = [],
-        array $blockedPatterns = [],
-        array $env = [],
+        array  $allowedPatterns  = [],
+        array  $blockedPatterns  = [],
+        array  $env              = [],
     ) {
         parent::__construct(name: $name, description: $description);
 

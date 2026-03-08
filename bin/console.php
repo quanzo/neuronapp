@@ -91,7 +91,7 @@ try {
     $appCfg = ConfigurationApp::getInstance();
     $logDir = $appCfg->getLogDir();
     $fn     = $appCfg->getSessionKey() . '.log';
-    $logger = new FileLogger($logDir . PHP_EOL . $fn);
+    $logger = new FileLogger($logDir . DIRECTORY_SEPARATOR . $fn);
     $appCfg->setLogger($logger);
 } catch (\Throwable $e) {
     fwrite(STDERR, "[CONFIG ERROR] " . $e->getMessage() . "\n");
