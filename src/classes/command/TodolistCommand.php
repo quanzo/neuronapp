@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
-use app\modules\neuron\helpers\ConsoleHelper;
 use app\modules\neuron\helpers\AttachmentHelper;
+use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
+use app\modules\neuron\helpers\ConsoleHelper;
+use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\Messages\Message;
 use Revolt\EventLoop;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Question\ChoiceQuestion;
 
 /**
  * Консольная команда выполнения списка заданий TodoList через указанного агента.
@@ -26,9 +30,15 @@ use Symfony\Component\Console\Output\OutputInterface;
  *
  * Исполнитель — всегда агент из опции --agent; в файле TodoList агент не задаётся.
  *
+ * При запуске с --session_id, если в сессии есть незавершённое выполнение (чекпоинт не finished),
+ * в интерактивном режиме выводится сообщение и запрос выбора: продолжить (resume) или прервать (abort).
+ * В неинтерактивном режиме в этом случае команда завершается с ошибкой и подсказкой указать --resume или --abort.
+ *
  * Примеры вызова:
  *   php bin/console todolist --todolist code-review --agent default
  *   php bin/console todolist --todolist research-topic --agent default --session_id 20250301-143022-123456
+ *   php bin/console todolist --todolist code-review --agent default --session_id 20250301-143022-123456 --resume
+ *   php bin/console todolist --agent default --session_id 20250301-143022-123456 --abort
  */
 class TodolistCommand extends Command
 {
@@ -39,9 +49,11 @@ class TodolistCommand extends Command
      * Настраивает команду: описание и опции.
      *
      * Опции:
-     * - todolist   — имя списка заданий (файл в todos/ без расширения), обязательно.
+     * - todolist   — имя списка заданий (файл в todos/ без расширения), обязательно (кроме --abort).
      * - agent      — имя агента LLM для исполнения, обязательно.
-     * - session_id — необязательный ключ сессии для продолжения диалога.
+     * - session_id — необязательный ключ сессии для продолжения диалога; обязателен для --resume и --abort.
+     * - resume     — продолжить прерванное выполнение с последнего чекпоинта (требует session_id и тот же todolist).
+     * - abort      — сбросить состояние незавершённого run для сессии (требует session_id и agent); список не выполняется.
      * - file/-f    — пути к файлам, которые будут прикреплены к запросу (можно указывать несколько раз).
      */
     protected function configure(): void
@@ -51,6 +63,9 @@ class TodolistCommand extends Command
             ->addOption('todolist', null, InputOption::VALUE_REQUIRED, 'Имя списка заданий (например, code-review)')
             ->addOption('agent', null, InputOption::VALUE_REQUIRED, 'Имя агента LLM для исполнения (например, default)')
             ->addOption('session_id', null, InputOption::VALUE_OPTIONAL, 'Ключ сессии для продолжения (формат buildSessionKey)')
+            ->addOption('resume', null, InputOption::VALUE_NONE, 'Продолжить выполнение с последнего чекпоинта')
+            ->addOption('abort', null, InputOption::VALUE_NONE, 'Сбросить состояние незавершённого run для сессии')
+            ->addOption('format', null, InputOption::VALUE_OPTIONAL, 'Формат вывода. Доступно: md, txt, json', 'md')
             ->addOption(
                 'file',
                 'f',
@@ -75,18 +90,34 @@ class TodolistCommand extends Command
             'txt'
         ];
         $todolistName = $input->getOption('todolist');
-        $agentName = $input->getOption('agent');
-        $sessionId = $input->getOption('session_id');
-        $formatOut = $input->getOption('format');
-        $fileOptions = $input->getOption('file');
-
-        if ($todolistName === null || $todolistName === '') {
-            $output->writeln('<error>Не указан список заданий. Используйте --todolist.</error>');
-            return Command::FAILURE;
-        }
+        $agentName    = $input->getOption('agent');
+        $sessionId    = $input->getOption('session_id');
+        $resume       = (bool) $input->getOption('resume');
+        $abort        = (bool) $input->getOption('abort');
+        $formatOut    = $input->getOption('format');
+        $fileOptions  = $input->getOption('file');
 
         if ($agentName === null || $agentName === '') {
             $output->writeln('<error>Не указан агент. Используйте --agent.</error>');
+            return Command::FAILURE;
+        }
+
+        if ($abort) {
+            if ($sessionId === null || $sessionId === '') {
+                $output->writeln('<error>Для --abort необходимо указать --session_id.</error>');
+                return Command::FAILURE;
+            }
+            if (!ConfigurationApp::isValidSessionKey($sessionId)) {
+                $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u.</error>');
+                return Command::FAILURE;
+            }
+            RunStateCheckpointHelper::delete($sessionId, $agentName);
+            $output->writeln(sprintf('Состояние незавершённого run для сессии "%s" и агента "%s" сброшено.', $sessionId, $agentName));
+            return Command::SUCCESS;
+        }
+
+        if ($todolistName === null || $todolistName === '') {
+            $output->writeln('<error>Не указан список заданий. Используйте --todolist.</error>');
             return Command::FAILURE;
         }
 
@@ -137,19 +168,91 @@ class TodolistCommand extends Command
             $agentCfg->setSessionKey($sessionId);
         }
 
+        $startFromTodoIndex = 0;
+
+        // При обычном запуске с session_id проверяем незавершённый run и при необходимости спрашиваем пользователя.
+        if (!$resume && !$abort && $sessionId !== null && $sessionId !== '') {
+            $unfinishedCheckpoint = RunStateCheckpointHelper::read($sessionId, $agentName);
+            if ($unfinishedCheckpoint !== null && !$unfinishedCheckpoint->isFinished()) {
+                if (!$input->isInteractive()) {
+                    $output->writeln(sprintf(
+                        '<error>В сессии обнаружено незавершённое выполнение списка "%s". Укажите --resume для продолжения или --abort для сброса.</error>',
+                        $unfinishedCheckpoint->getTodolistName()
+                    ));
+                    return Command::FAILURE;
+                }
+                $output->writeln(sprintf(
+                    'В этой сессии есть незавершённое выполнение списка "%s" (завершено заданий до индекса %d).',
+                    $unfinishedCheckpoint->getTodolistName(),
+                    $unfinishedCheckpoint->getLastCompletedTodoIndex()
+                ));
+                /** @var QuestionHelper $questionHelper */
+                $questionHelper = $this->getHelper('question');
+                $question = new ChoiceQuestion(
+                    'Продолжить выполнение или прервать?',
+                    ['Продолжить выполнение', 'Прервать и сбросить состояние'],
+                    0
+                );
+                $choice = $questionHelper->ask($input, $output, $question);
+                if ($choice === 'Прервать и сбросить состояние') {
+                    RunStateCheckpointHelper::delete($sessionId, $agentName);
+                    $output->writeln('Состояние сброшено.');
+                } else {
+                    $resume = true;
+                }
+            }
+        }
+
+        if ($resume) {
+            if ($sessionId === null || $sessionId === '') {
+                $output->writeln('<error>Для --resume необходимо указать --session_id.</error>');
+                return Command::FAILURE;
+            }
+            $checkpoint = RunStateCheckpointHelper::read($sessionId, $agentName);
+            if ($checkpoint === null) {
+                $output->writeln('<error>Нет сохранённого состояния для продолжения (чекпоинт не найден).</error>');
+                return Command::FAILURE;
+            }
+            if ($checkpoint->isFinished()) {
+                $output->writeln('<error>Выполнение списка уже завершено; продолжение недоступно.</error>');
+                return Command::FAILURE;
+            }
+            if ($checkpoint->getTodolistName() !== $todolistName) {
+                $output->writeln(sprintf(
+                    '<error>Продолжить можно только тот же список: в чекпоинте "%s", указан "%s".</error>',
+                    $checkpoint->getTodolistName(),
+                    $todolistName
+                ));
+                return Command::FAILURE;
+            }
+            $historyMessageCount = $checkpoint->getHistoryMessageCount();
+            if ($historyMessageCount !== null) {
+                $agentCfg->resetChatHistory();
+                $history = $agentCfg->getChatHistory();
+                ChatHistoryTruncateHelper::truncateToMessageCount($history, $historyMessageCount);
+            } else {
+                $logger = $agentCfg->getLogger();
+                if ($logger !== null) {
+                    $logger->warning('Откат истории невозможен: в чекпоинте нет history_message_count (возможен дубликат сообщения при сбое).');
+                }
+            }
+            $startFromTodoIndex = $checkpoint->getLastCompletedTodoIndex() + 1;
+        }
+
         $skillProducer = $configApp->getSkillProducer();
 
         $history = null;
         $error = null;
 
-        EventLoop::queue(static function () use ($todoList, $agentCfg, $skillProducer, $attachments, &$history, &$error): void {
+        EventLoop::queue(static function () use ($todoList, $agentCfg, $skillProducer, $attachments, $startFromTodoIndex, &$history, &$error): void {
             try {
                 $history = $todoList->executeFromAgent(
                     $agentCfg,
                     MessageRole::USER,
                     $attachments,
                     null,
-                    $skillProducer
+                    $skillProducer,
+                    $startFromTodoIndex
                 )->await();
             } catch (\Throwable $e) {
                 $error = $e;

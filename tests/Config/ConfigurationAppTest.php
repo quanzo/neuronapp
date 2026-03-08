@@ -32,6 +32,7 @@ class ConfigurationAppTest extends TestCase
         $this->tmpDir = sys_get_temp_dir() . '/neuronapp_appconf_' . uniqid();
         mkdir($this->tmpDir, 0777, true);
         mkdir($this->tmpDir . '/.sessions', 0777, true);
+        mkdir($this->tmpDir . '/.store', 0777, true);
 
         $this->resetSingleton();
     }
@@ -364,5 +365,47 @@ class ConfigurationAppTest extends TestCase
         $dp = new DirPriority([$this->tmpDir]);
         ConfigurationApp::init($dp);
         $this->assertTrue(ConfigurationApp::getInstance()->sessionExists('key', ''));
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  getStoreDirName / getStoreDir — хранилище чекпоинтов
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * getStoreDirName() возвращает строку .store.
+     */
+    public function testGetStoreDirName(): void
+    {
+        $this->assertSame('.store', ConfigurationApp::getStoreDirName());
+    }
+
+    /**
+     * getStoreDir() возвращает путь к .store, если директория есть в DirPriority.
+     */
+    public function testGetStoreDir(): void
+    {
+        $dp = new DirPriority([$this->tmpDir]);
+        ConfigurationApp::init($dp);
+        $storeDir = ConfigurationApp::getInstance()->getStoreDir();
+        $this->assertSame($this->tmpDir . '/.store', $storeDir);
+    }
+
+    /**
+     * getStoreDir() бросает RuntimeException, если .store не найдена.
+     */
+    public function testGetStoreDirThrowsWhenMissing(): void
+    {
+        $dirWithoutStore = sys_get_temp_dir() . '/neuronapp_nostore_' . uniqid();
+        mkdir($dirWithoutStore, 0777, true);
+        $dp = new DirPriority([$dirWithoutStore]);
+        ConfigurationApp::init($dp);
+        try {
+            ConfigurationApp::getInstance()->getStoreDir();
+            $this->fail('Ожидалось RuntimeException');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('.store', $e->getMessage());
+        } finally {
+            rmdir($dirWithoutStore);
+        }
     }
 }

@@ -398,7 +398,7 @@ class ConfigurationAgent {
     public function getLogContext(): array
     {
         return [
-            'agent'   => $this->agentName,
+            'agent'   => $this->getAgentName(),
             'session' => $this->getSessionKey(),
         ];
     }
@@ -424,11 +424,9 @@ class ConfigurationAgent {
         }
 
         if ($this->enableChatHistory) {
-            $key = $this->sessionKey . '-' . ($this->agentName ?: 'unknown');
-
             $this->_chatHistory = new FileChatHistory(
                 ConfigurationApp::getInstance()->getSessionDir(),
-                $key,
+                $this->getSessionKeyWithAgent(),
                 $this->contextWindow
             );
         } else {
@@ -478,6 +476,24 @@ class ConfigurationAgent {
     public function setSessionKey(?string $sessionKey): void {
         $this->sessionKey = $sessionKey;
         $this->resetChatHistory();
+    }
+
+    /**
+     * Имя сессии вместе с имененм агента
+     *
+     * @return string|null
+     */
+    public function getSessionKeyWithAgent(): ?string {
+        return $this->getSessionKey() . '-' . $this->getAgentName();
+    }
+
+    /**
+     * Имя агента
+     *
+     * @return string
+     */
+    public function getAgentName(): string {
+        return $this->agentName ?: 'unknown';
     }
 
     /**

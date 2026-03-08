@@ -8,9 +8,13 @@ use Amp\Future;
 use app\modules\neuron\classes\AbstractPromptWithParams;
 use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\classes\dto\run\RunStateDto;
+use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\helpers\OptionsHelper;
+use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\interfaces\ITodoList;
 use NeuronAI\Chat\Enums\MessageRole;
@@ -150,11 +154,16 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
      * При передаче SkillProducer в список инструментов агента добавляются навыки из опции "skills".
      * Используется клон конфигурации агента, чтобы не менять основной состав инструментов.
      *
-     * @param ConfigurationAgent         $agentCfg     Конфигурация агента-исполнителя.
-     * @param MessageRole                $role         Роль сообщений.
-     * @param AttachmentDto[]            $attachments  Дополнительные вложения, передаваемые с каждым заданием.
-     * @param array<string,mixed>|null   $params       Параметры, передаваемые в {@see ITodo::getTodo()}.
-     * @param SkillProducer|null         $skillProducer Producer навыков для разрешения имён из getNeedSkills().
+     * При включённой истории чата создаётся и обновляется чекпоинт состояния run в .store;
+     * после каждого успешно завершённого todo записывается last_completed_todo_index и
+     * history_message_count для возможности resume с откатом истории.
+     *
+     * @param ConfigurationAgent         $agentCfg           Конфигурация агента-исполнителя.
+     * @param MessageRole                $role               Роль сообщений.
+     * @param AttachmentDto[]            $attachments        Дополнительные вложения, передаваемые с каждым заданием.
+     * @param array<string,mixed>|null   $params             Параметры, передаваемые в {@see ITodo::getTodo()}.
+     * @param SkillProducer|null         $skillProducer      Producer навыков для разрешения имён из getNeedSkills().
+     * @param int                        $startFromTodoIndex Индекс первого todo для выполнения (0 = с начала); предыдущие пропускаются (для resume).
      *
      * @return Future<ChatHistoryInterface> Завершается копией истории сообщений агента после выполнения всех заданий.
      */
@@ -163,9 +172,10 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
         MessageRole $role = MessageRole::USER,
         array $attachments = [],
         ?array $params = null,
-        ?SkillProducer $skillProducer = null
+        ?SkillProducer $skillProducer = null,
+        int $startFromTodoIndex = 0
     ): Future {
-        return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $skillProducer): ChatHistoryInterface {
+        return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $skillProducer, $startFromTodoIndex): ChatHistoryInterface {
             $logger      = $agentCfg->getLoggerWithContext();
             $baseContext = ['todolist' => $this->getName()];
             $logger->info('TodoList started', $baseContext);
@@ -185,18 +195,48 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                 }
             }
 
+            $runStateDto = null;
+            $sessionKey  = $sessionCfg->getSessionKey();
+            $agentName   = $sessionCfg->getAgentName();
+            if ($sessionCfg->enableChatHistory && $sessionKey !== null && $sessionKey !== '') {
+                $runStateDto = (new RunStateDto())
+                    ->setSessionKey($sessionKey)
+                    ->setAgentName($agentName)
+                    ->setRunId($sessionCfg->getSessionKeyWithAgent())
+                    ->setTodolistName($this->getName())
+                    ->setStartedAt((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+                    ->setLastCompletedTodoIndex(-1)
+                    ->setHistoryMessageCount(null)
+                    ->setFinished(false);
+                RunStateCheckpointHelper::write($runStateDto);
+            }
+
             $todos = $this->getTodos();
             foreach ($todos as $todoIndex => $todo) {
+                if ($todoIndex < $startFromTodoIndex) {
+                    continue;
+                }
                 $todoText = $todo->getTodo($params);
                 $logger->info('Todo started', array_merge($baseContext, ['todo_index' => $todoIndex, 'todo' => $todoText]));
                 try {
                     $message = new NeuronMessage($role, $todoText);
                     $sessionCfg->sendMessageWithAttachments($message, $attachments);
+                    if ($runStateDto !== null) {
+                        $runStateDto->setLastCompletedTodoIndex($todoIndex);
+                        $runStateDto->setHistoryMessageCount(
+                            ChatHistoryTruncateHelper::getMessageCount($sessionCfg->getChatHistory())
+                        );
+                        RunStateCheckpointHelper::write($runStateDto);
+                    }
                     $logger->info('Todo completed', array_merge($baseContext, ['todo_index' => $todoIndex]));
                 } catch (\Throwable $e) {
                     $logger->error('Ошибка выполнения todo', array_merge($baseContext, ['todo_index' => $todoIndex, 'exception' => $e]));
                     throw $e;
                 }
+            }
+
+            if ($runStateDto !== null) {
+                RunStateCheckpointHelper::delete($sessionKey, $agentName);
             }
 
             $logger->info('TodoList completed', $baseContext);

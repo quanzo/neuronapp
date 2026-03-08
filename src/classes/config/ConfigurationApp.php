@@ -226,6 +226,34 @@ class ConfigurationApp
     }
 
     /**
+     * Возвращает короткое имя директории хранилища состояния run (чекпоинты).
+     *
+     * @return string Имя поддиректории (например, .store).
+     */
+    public static function getStoreDirName(): string
+    {
+        return '.store';
+    }
+
+    /**
+     * Возвращает полный путь к директории хранилища состояния run (чекпоинты).
+     *
+     * Путь формируется через {@see DirPriority::resolveDir()} для {@see getStoreDirName()}.
+     * Директория создаётся при старте приложения в bin/console.php.
+     *
+     * @return string Абсолютный путь к папке .store.
+     * @throws RuntimeException Если директория не найдена.
+     */
+    public function getStoreDir(): string
+    {
+        $path = $this->dirPriority->resolveDir(self::getStoreDirName());
+        if ($path === null || $path === '') {
+            throw new RuntimeException('Директория хранилища чекпоинтов (.store) не найдена.');
+        }
+        return $path;
+    }
+
+    /**
      * Проверяет, существует ли файл сессии для заданного ключа и агента.
      *
      * Использует тот же формат имени файла, что и {@see \NeuronAI\Chat\History\FileChatHistory}
