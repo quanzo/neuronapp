@@ -23,7 +23,9 @@ use NeuronAI\Providers\AIProviderInterface;
 use NeuronAI\RAG\Embeddings\EmbeddingsProviderInterface;
 use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\classes\dto\run\RunStateDto;
 use app\modules\neuron\classes\logger\ContextualLogger;
+use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use app\modules\neuron\tools\ATool;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
@@ -494,6 +496,39 @@ class ConfigurationAgent {
      */
     public function getAgentName(): string {
         return $this->agentName ?: 'unknown';
+    }
+
+    /**
+     * Возвращает чистое состояние исполнения todolist для агента.
+     *
+     * @return RunStateDto
+     */
+    public function getBlankRunStateDto(): RunStateDto {
+        $runStateDto = (new RunStateDto())
+            ->setSessionKey($this->getSessionKey())
+            ->setAgentName($this->getAgentName())
+            ->setRunId($this->getSessionKeyWithAgent())
+            ->setStartedAt((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setLastCompletedTodoIndex(-1)
+            ->setHistoryMessageCount(null)
+            ->setFinished(false);
+        return $runStateDto;
+    }
+
+    /**
+     * Возвращает состояние исполнения todolist для агента.
+     * 
+     * Если исполнение предыдущего задания не завершено, то это будет видно в RunStateDto
+     *
+     * @return RunStateDto|null
+     */
+    public function getExistRunStateDto(): ?RunStateDto {
+        $unfinishedCheckpoint = RunStateCheckpointHelper::read($this->getSessionKey(), $this->getAgentName());
+        if ($unfinishedCheckpoint) {
+            // есть не завершенный чекпоинт
+            return $unfinishedCheckpoint;
+        }
+        return null;
     }
 
     /**

@@ -40,7 +40,7 @@ use Symfony\Component\Console\Question\ChoiceQuestion;
  *   php bin/console todolist --todolist code-review --agent default --session_id 20250301-143022-123456 --resume
  *   php bin/console todolist --agent default --session_id 20250301-143022-123456 --abort
  */
-class TodolistCommand extends Command
+class TodolistCommand extends AbstractAgentCommand
 {
     /** Имя команды в консоли. */
     protected static $defaultName = 'todolist';
@@ -102,18 +102,40 @@ class TodolistCommand extends Command
             return Command::FAILURE;
         }
 
-        if ($abort) {
-            if ($sessionId === null || $sessionId === '') {
-                $output->writeln('<error>Для --abort необходимо указать --session_id.</error>');
-                return Command::FAILURE;
-            }
+        $configApp = ConfigurationApp::getInstance();
+        if ($sessionId !== null && $sessionId !== '') { // если сессия задана вручную
             if (!ConfigurationApp::isValidSessionKey($sessionId)) {
-                $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u.</error>');
+                $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u (например, 20250301-143022-123456).</error>');
                 return Command::FAILURE;
             }
-            RunStateCheckpointHelper::delete($sessionId, $agentName);
-            $output->writeln(sprintf('Состояние незавершённого run для сессии "%s" и агента "%s" сброшено.', $sessionId, $agentName));
-            return Command::SUCCESS;
+
+            if (!ConfigurationApp::getInstance()->sessionExists($sessionId, $agentName)) {
+                $output->writeln(sprintf('<error>Сессия с session_id "%s" для агента "%s" не найдена.</error>', $sessionId, $agentName));
+                return Command::FAILURE;
+            }
+            $configApp->setSessionKey($sessionId);
+        }
+        
+        // установим логгер
+        $this->resolveFileLogger($configApp);
+
+        $agentCfg = $configApp->getAgent($agentName);
+
+        if ($agentCfg === null) {
+            $output->writeln(sprintf('<error>Агент "%s" не найден.</error>', $agentName));
+            return Command::FAILURE;
+        }
+
+        if ($abort) {
+            $runStateDto = $agentCfg->getExistRunStateDto();
+            if ($runStateDto) {
+                $runStateDto->delete();
+                $output->writeln(sprintf('Состояние незавершённого run для сессии "%s" и агента "%s" сброшено.', $sessionId, $agentName));
+                return Command::SUCCESS;
+            } else {
+                $output->writeln('<error>Для --abort необходимо наличие незавершенной сессии. Команда в сессии завершена или неправильно задан --session_id.</error>');
+                return Command::FAILURE;
+            }
         }
 
         if ($todolistName === null || $todolistName === '') {
@@ -139,7 +161,6 @@ class TodolistCommand extends Command
             }
         }
 
-        $configApp = ConfigurationApp::getInstance();
         $todoList = $configApp->getTodoList($todolistName);
 
         if ($todoList === null) {
@@ -147,96 +168,51 @@ class TodolistCommand extends Command
             return Command::FAILURE;
         }
 
-        $agentCfg = $configApp->getAgent($agentName);
-
-        if ($agentCfg === null) {
-            $output->writeln(sprintf('<error>Агент "%s" не найден.</error>', $agentName));
-            return Command::FAILURE;
-        }
-
-        if ($sessionId !== null && $sessionId !== '') {
-            if (!ConfigurationApp::isValidSessionKey($sessionId)) {
-                $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u (например, 20250301-143022-123456).</error>');
-                return Command::FAILURE;
-            }
-
-            if (!ConfigurationApp::getInstance()->sessionExists($sessionId, $agentName)) {
-                $output->writeln(sprintf('<error>Сессия с session_id "%s" для агента "%s" не найдена.</error>', $sessionId, $agentName));
-                return Command::FAILURE;
-            }
-
-            $agentCfg->setSessionKey($sessionId);
-        }
-
         $startFromTodoIndex = 0;
 
         // При обычном запуске с session_id проверяем незавершённый run и при необходимости спрашиваем пользователя.
         if (!$resume && !$abort && $sessionId !== null && $sessionId !== '') {
-            $unfinishedCheckpoint = RunStateCheckpointHelper::read($sessionId, $agentName);
-            if ($unfinishedCheckpoint !== null && !$unfinishedCheckpoint->isFinished()) {
-                if (!$input->isInteractive()) {
-                    $output->writeln(sprintf(
-                        '<error>В сессии обнаружено незавершённое выполнение списка "%s". Укажите --resume для продолжения или --abort для сброса.</error>',
-                        $unfinishedCheckpoint->getTodolistName()
-                    ));
-                    return Command::FAILURE;
-                }
+            $runStateDto = $agentCfg->getExistRunStateDto();
+            if ($runStateDto) {
                 $output->writeln(sprintf(
-                    'В этой сессии есть незавершённое выполнение списка "%s" (завершено заданий до индекса %d).',
-                    $unfinishedCheckpoint->getTodolistName(),
-                    $unfinishedCheckpoint->getLastCompletedTodoIndex()
+                    '<error>В сессии обнаружено незавершённое выполнение списка "%s". Укажите --resume для продолжения или --abort для сброса.</error>',
+                    $runStateDto->getTodolistName()
                 ));
-                /** @var QuestionHelper $questionHelper */
-                $questionHelper = $this->getHelper('question');
-                $question = new ChoiceQuestion(
-                    'Продолжить выполнение или прервать?',
-                    ['Продолжить выполнение', 'Прервать и сбросить состояние'],
-                    0
-                );
-                $choice = $questionHelper->ask($input, $output, $question);
-                if ($choice === 'Прервать и сбросить состояние') {
-                    RunStateCheckpointHelper::delete($sessionId, $agentName);
-                    $output->writeln('Состояние сброшено.');
-                } else {
-                    $resume = true;
-                }
+                return Command::FAILURE;
             }
         }
 
         if ($resume) {
-            if ($sessionId === null || $sessionId === '') {
-                $output->writeln('<error>Для --resume необходимо указать --session_id.</error>');
-                return Command::FAILURE;
-            }
-            $checkpoint = RunStateCheckpointHelper::read($sessionId, $agentName);
-            if ($checkpoint === null) {
+            $runStateDto = $agentCfg->getExistRunStateDto();
+            if ($runStateDto) {
+                if ($runStateDto->isFinished()) {
+                    $output->writeln('<error>Выполнение списка уже завершено; продолжение недоступно.</error>');
+                    return Command::FAILURE;
+                } elseif ($runStateDto->getTodolistName() !== $todolistName) {
+                    $output->writeln(sprintf(
+                        '<error>Продолжить можно только тот же список: в чекпоинте "%s", указан "%s".</error>',
+                        $runStateDto->getTodolistName(),
+                        $todolistName
+                    ));
+                    return Command::FAILURE;
+                } else {
+                    $historyMessageCount = $runStateDto->getHistoryMessageCount();
+                    if ($historyMessageCount !== null) {
+                        $agentCfg->resetChatHistory();
+                        $history = $agentCfg->getChatHistory();
+                        ChatHistoryTruncateHelper::truncateToMessageCount($history, $historyMessageCount);
+                    } else {
+                        $logger = $agentCfg->getLogger();
+                        if ($logger !== null) {
+                            $logger->warning('Откат истории невозможен: в чекпоинте нет history_message_count (возможен дубликат сообщения при сбое).');
+                        }
+                    }
+                    $startFromTodoIndex = $runStateDto->getLastCompletedTodoIndex() + 1;
+                }
+            } else {
                 $output->writeln('<error>Нет сохранённого состояния для продолжения (чекпоинт не найден).</error>');
                 return Command::FAILURE;
             }
-            if ($checkpoint->isFinished()) {
-                $output->writeln('<error>Выполнение списка уже завершено; продолжение недоступно.</error>');
-                return Command::FAILURE;
-            }
-            if ($checkpoint->getTodolistName() !== $todolistName) {
-                $output->writeln(sprintf(
-                    '<error>Продолжить можно только тот же список: в чекпоинте "%s", указан "%s".</error>',
-                    $checkpoint->getTodolistName(),
-                    $todolistName
-                ));
-                return Command::FAILURE;
-            }
-            $historyMessageCount = $checkpoint->getHistoryMessageCount();
-            if ($historyMessageCount !== null) {
-                $agentCfg->resetChatHistory();
-                $history = $agentCfg->getChatHistory();
-                ChatHistoryTruncateHelper::truncateToMessageCount($history, $historyMessageCount);
-            } else {
-                $logger = $agentCfg->getLogger();
-                if ($logger !== null) {
-                    $logger->warning('Откат истории невозможен: в чекпоинте нет history_message_count (возможен дубликат сообщения при сбое).');
-                }
-            }
-            $startFromTodoIndex = $checkpoint->getLastCompletedTodoIndex() + 1;
         }
 
         $skillProducer = $configApp->getSkillProducer();

@@ -86,13 +86,6 @@ $dirPriority = new DirPriority($arDirs);
 
 try {
     ConfigurationApp::init($dirPriority);
-
-    // установим логгер
-    $appCfg = ConfigurationApp::getInstance();
-    $logDir = $appCfg->getLogDir();
-    $fn     = $appCfg->getSessionKey() . '.log';
-    $logger = new FileLogger($logDir . DIRECTORY_SEPARATOR . $fn);
-    $appCfg->setLogger($logger);
 } catch (\Throwable $e) {
     fwrite(STDERR, "[CONFIG ERROR] " . $e->getMessage() . "\n");
     exit(1);

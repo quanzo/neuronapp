@@ -199,16 +199,9 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             $sessionKey  = $sessionCfg->getSessionKey();
             $agentName   = $sessionCfg->getAgentName();
             if ($sessionCfg->enableChatHistory && $sessionKey !== null && $sessionKey !== '') {
-                $runStateDto = (new RunStateDto())
-                    ->setSessionKey($sessionKey)
-                    ->setAgentName($agentName)
-                    ->setRunId($sessionCfg->getSessionKeyWithAgent())
-                    ->setTodolistName($this->getName())
-                    ->setStartedAt((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
-                    ->setLastCompletedTodoIndex(-1)
-                    ->setHistoryMessageCount(null)
-                    ->setFinished(false);
-                RunStateCheckpointHelper::write($runStateDto);
+                $runStateDto = $sessionCfg->getBlankRunStateDto();
+                $runStateDto->setTodolistName($this->getName());
+                $runStateDto->write();
             }
 
             $todos = $this->getTodos();
@@ -226,7 +219,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                         $runStateDto->setHistoryMessageCount(
                             ChatHistoryTruncateHelper::getMessageCount($sessionCfg->getChatHistory())
                         );
-                        RunStateCheckpointHelper::write($runStateDto);
+                        $runStateDto->write();
                     }
                     $logger->info('Todo completed', array_merge($baseContext, ['todo_index' => $todoIndex]));
                 } catch (\Throwable $e) {
@@ -236,7 +229,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             }
 
             if ($runStateDto !== null) {
-                RunStateCheckpointHelper::delete($sessionKey, $agentName);
+                $runStateDto->delete();
             }
 
             $logger->info('TodoList completed', $baseContext);

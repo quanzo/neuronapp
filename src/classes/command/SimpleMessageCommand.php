@@ -32,7 +32,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  *   php bin/console simplemessage --agent default --message "Привет!"
  *   php bin/console simplemessage --agent default --message "Продолжи" --session_id 20250301-143022-123456
  */
-class SimpleMessageCommand extends Command
+class SimpleMessageCommand extends AbstractAgentCommand
 {
     /** Имя команды в консоли (например, php bin/console simplemessage). */
     protected static $defaultName = 'simplemessage';
@@ -87,10 +87,10 @@ class SimpleMessageCommand extends Command
             'json',
             'txt'
         ];
-        $agentName = $input->getOption('agent');
+        $agentName   = $input->getOption('agent');
         $messageText = $input->getOption('message');
-        $sessionId = $input->getOption('session_id');
-        $formatOut = $input->getOption('format');
+        $sessionId   = $input->getOption('session_id');
+        $formatOut   = $input->getOption('format');
         $fileOptions = $input->getOption('file');
 
         // Проверка обязательных опций
@@ -124,10 +124,40 @@ class SimpleMessageCommand extends Command
 
         // Получение конфигурации приложения и конфига агента по имени
         $configApp = ConfigurationApp::getInstance();
+
+        // Если передан session_id — проверяем формат и существование сессии, затем подставляем ключ
+        if ($sessionId !== null && $sessionId !== '') {
+            if (!ConfigurationApp::isValidSessionKey($sessionId)) {
+                $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u (например, 20250301-143022-123456).</error>');
+                return Command::FAILURE;
+            }
+
+            if (!ConfigurationApp::getInstance()->sessionExists($sessionId, $agentName)) {
+                $output->writeln(sprintf('<error>Сессия с session_id "%s" для агента "%s" не найдена.</error>', $sessionId, $agentName));
+                return Command::FAILURE;
+            }
+            $configApp->setSessionKey($sessionId);
+        }
+
+        // установим логгер
+        $this->resolveFileLogger($configApp);
+
         $agentCfg = $configApp->getAgent($agentName);
 
         if ($agentCfg === null) {
             $output->writeln(sprintf('<error>Агент "%s" не найден.</error>', $agentName));
+            return Command::FAILURE;
+        }
+        
+        // проверим а завершено ли предыдущее сообщение
+        $runStateDto = $agentCfg->getExistRunStateDto();
+        if ($runStateDto) {
+            $output->writeln(
+                sprintf(
+                    '<error>В сессии обнаружено незавершённое выполнение списка "%s".</error>',
+                    $runStateDto->getTodolistName()
+                )
+            );
             return Command::FAILURE;
         }
 
@@ -144,6 +174,16 @@ class SimpleMessageCommand extends Command
             }
 
             $agentCfg->setSessionKey($sessionId);
+
+            // если задана сессия, то проверим а завершено ли предыдущее сообщение
+            $runStateDto = $agentCfg->getExistRunStateDto();
+            if ($runStateDto) {
+                $output->writeln(sprintf(
+                    '<error>В сессии обнаружено незавершённое выполнение списка "%s".</error>',
+                    $runStateDto->getTodolistName()
+                ));
+                return Command::FAILURE;
+            }
         }
 
         // Список из одного задания (текст сообщения) и producer навыков для возможных skills в todo

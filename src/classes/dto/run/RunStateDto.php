@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\run;
 
+use app\modules\neuron\helpers\RunStateCheckpointHelper;
+
 /**
  * DTO состояния выполнения run (чекпоинт) списка заданий TodoList в рамках сессии.
  *
@@ -180,6 +182,24 @@ final class RunStateDto
     {
         $this->finished = $finished;
         return $this;
+    }
+
+    /**
+     * Записать состояние
+     *
+     * @return void
+     */
+    public function write(): void {
+        RunStateCheckpointHelper::write($this);
+    }
+
+    /**
+     * Убрать запись состояния. Это делаем когда исполнение успешно завершено.
+     *
+     * @return void
+     */
+    public function delete(): void {
+        RunStateCheckpointHelper::delete($this->getSessionKey(), $this->getAgentName());
     }
 
     /**
