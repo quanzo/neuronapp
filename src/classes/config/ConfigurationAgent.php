@@ -29,6 +29,8 @@ use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use app\modules\neuron\tools\ATool;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
+use NeuronAI\RAG\PostProcessor\PostProcessorInterface;
+use NeuronAI\RAG\PreProcessor\PreProcessorInterface;
 use NeuronAI\Tools\ProviderToolInterface;
 use NeuronAI\Tools\ToolInterface;
 use NeuronAI\Tools\Toolkits\ToolkitInterface;
@@ -182,6 +184,24 @@ class ConfigurationAgent {
     public $vectorStore = null;
 
     /**
+     * препроцессоры
+     * 
+     * !В конфиге конфигурируем через CallableWrapper
+     *
+     * @var PreProcessorInterface[]
+     */
+    public array $preProcessors = [];
+
+    /**
+     * постобработка
+     * 
+     * !В конфиге конфигурируем через CallableWrapper
+     *
+     * @var PostProcessorInterface[]
+     */
+    public array $postProcessors = [];
+
+    /**
      * Отправить сообщение в LLM без дополнительных вложений.
      *
      * Для передачи вложений (картинок, текстовых файлов и т.п.) используйте
@@ -268,6 +288,19 @@ class ConfigurationAgent {
         return $response;
     }
 
+    protected function makeListObjects($arCfg) {
+        $res = [];
+        if (!empty($arCfg)) {
+            foreach ($arCfg as $el) {
+                if (is_array($el) && CallableWrapper::isCallable($el)) {
+                    $res[] = CallableWrapper::call($el);
+                } elseif (is_object($el)) {
+                    $res[] = $el;
+                }
+            }
+        }
+        return $res;
+    }
 
     /**
      * Агент для отправки сообщений в LLM.
@@ -282,10 +315,15 @@ class ConfigurationAgent {
         if ($this->_agent === null) {
             if (!empty($this->embeddingProvider) && !empty($this->vectorStore)) {
                 $this->_agent = RAG::make();
+
+                // препроцессоры и постпроцессоры
+                $this->_agent->setPreProcessors($this->makeListObjects($this->preProcessors));
+                $this->_agent->setPostProcessors($this->makeListObjects($this->postProcessors));
+
             } else {
                 $this->_agent = Agent::make();
-                $this->_agent->toolMaxTries($this->toolMaxTries);
             }
+            $this->_agent->toolMaxTries($this->toolMaxTries);
             $this->_agent->config = $this;
         }
         return $this->_agent;
