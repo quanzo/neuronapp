@@ -425,7 +425,7 @@ class TodoListTest extends TestCase
     public function testGetAgentNameDefault(): void
     {
         $list = new TodoList("1. Task");
-        $this->assertSame('default', $list->getAgentName());
+        $this->assertNull($list->getAgentName());
     }
 
     // ══════════════════════════════════════════════════════════════

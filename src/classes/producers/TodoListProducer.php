@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\producers;
 
 use app\modules\neuron\classes\AProducer;
+use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\todo\TodoList;
+use app\modules\neuron\classes\dir\DirPriority;
 
 /**
  * Фабрика списков заданий Todo по имени.
@@ -16,6 +18,19 @@ use app\modules\neuron\classes\todo\TodoList;
  */
 class TodoListProducer extends AProducer
 {
+    /**
+     * Глобальная конфигурация приложения.
+     */
+    private ConfigurationApp $configApp;
+
+    /**
+     * @param ConfigurationApp $configApp  Экземпляр конфигурации приложения.
+     */
+    public function __construct(DirPriority $dirPriority, ConfigurationApp $configApp)
+    {
+        parent::__construct($dirPriority);
+        $this->configApp = $configApp;
+    }
     /**
      * @inheritDoc
      */
@@ -45,7 +60,7 @@ class TodoListProducer extends AProducer
             return null;
         }
 
-        return new TodoList($contents, $name);
+        return new TodoList($contents, $name, $this->configApp);
     }
 
     /**

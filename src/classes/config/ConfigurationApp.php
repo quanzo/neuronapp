@@ -166,7 +166,7 @@ class ConfigurationApp
     public function getTodoListProducer(): TodoListProducer
     {
         if ($this->todoListProducer === null) {
-            $this->todoListProducer = new TodoListProducer($this->dirPriority);
+            $this->todoListProducer = new TodoListProducer($this->dirPriority, $this);
         }
 
         return $this->todoListProducer;
@@ -178,7 +178,7 @@ class ConfigurationApp
     public function getSkillProducer(): SkillProducer
     {
         if ($this->skillProducer === null) {
-            $this->skillProducer = new SkillProducer($this->dirPriority);
+            $this->skillProducer = new SkillProducer($this->dirPriority, $this);
         }
 
         return $this->skillProducer;

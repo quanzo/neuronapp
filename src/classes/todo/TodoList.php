@@ -6,7 +6,6 @@ namespace app\modules\neuron\classes\todo;
 
 use Amp\Future;
 use app\modules\neuron\classes\AbstractPromptWithParams;
-use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
@@ -51,13 +50,16 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
      *  - только блок опций (без заданий);
      *  - быть пустым (без опций и заданий).
      *
-     * @param string $input Полный текст описания списка.
+     * @param string               $input     Полный текст описания списка.
+     * @param string               $name      Имя списка заданий.
+     * @param ConfigurationApp|null $configApp Экземпляр конфигурации приложения для разрешения зависимостей.
      */
-    public function __construct(string $input, string $name = '')
+    public function __construct(string $input, string $name = '', ?ConfigurationApp $configApp = null)
     {
         parent::__construct($input);
         $this->body = CommentsHelper::stripComments($this->body);
         $this->name = $name;
+        $this->setConfigurationApp($configApp);
         $this->initTodos();
     }
 
@@ -151,46 +153,41 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
     /**
      * Выполняет все задания списка через переданную конфигурацию агента.
      *
-     * При передаче SkillProducer в список инструментов агента добавляются навыки из опции "skills".
-     * Используется клон конфигурации агента, чтобы не менять основной состав инструментов.
-     *
      * При включённой истории чата создаётся и обновляется чекпоинт состояния run в .store;
      * после каждого успешно завершённого todo записывается last_completed_todo_index и
      * history_message_count для возможности resume с откатом истории.
      *
-     * @param ConfigurationAgent         $agentCfg           Конфигурация агента-исполнителя.
-     * @param MessageRole                $role               Роль сообщений.
-     * @param AttachmentDto[]            $attachments        Дополнительные вложения, передаваемые с каждым заданием.
-     * @param array<string,mixed>|null   $params             Параметры, передаваемые в {@see ITodo::getTodo()}.
-     * @param SkillProducer|null         $skillProducer      Producer навыков для разрешения имён из getNeedSkills().
-     * @param int                        $startFromTodoIndex Индекс первого todo для выполнения (0 = с начала); предыдущие пропускаются (для resume).
+     * @param MessageRole              $role               Роль сообщений.
+     * @param AttachmentDto[]          $attachments        Дополнительные вложения, передаваемые с каждым заданием.
+     * @param array<string,mixed>|null $params             Параметры, передаваемые в {@see ITodo::getTodo()}.
+     * @param int                      $startFromTodoIndex Индекс первого todo для выполнения (0 = с начала); предыдущие пропускаются (для resume).
      *
      * @return Future<ChatHistoryInterface> Завершается копией истории сообщений агента после выполнения всех заданий.
      */
-    public function executeFromAgent(
-        ConfigurationAgent $agentCfg,
+    public function execute(
         MessageRole $role = MessageRole::USER,
         array $attachments = [],
         ?array $params = null,
-        ?SkillProducer $skillProducer = null,
         int $startFromTodoIndex = 0
     ): Future {
-        // настройках элемента может быть уже задано имя агента, который лучше всего исполнит
-        $customAgentName = $this->getAgentName();
+        $agentCfg = $this->getConfigurationAgent();
         
-        return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $skillProducer, $startFromTodoIndex): ChatHistoryInterface {
+        return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $startFromTodoIndex): ChatHistoryInterface {
             $logger      = $agentCfg->getLoggerWithContext();
             $baseContext = ['todolist' => $this->getName()];
             $logger->info('TodoList started', $baseContext);
 
             $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession() : $agentCfg;
 
-            if ($skillProducer !== null && $this->getNeedSkills() !== []) {
+            $configApp = $this->getConfigurationApp();
+
+            if ($configApp !== null && $this->getNeedSkills() !== []) {
                 $skillTools = [];
                 foreach ($this->getNeedSkills() as $skillName) {
-                    $skill = $skillProducer->get($skillName);
+                    $skill = $configApp->getSkill($skillName);
                     if ($skill !== null) {
-                        $skillTools[] = $skill->getTool($sessionCfg, $role);
+                        $skill->setDefaultConfigurationAgent($sessionCfg);
+                        $skillTools[] = $skill->getTool($role);
                     }
                 }
                 if ($skillTools !== []) {

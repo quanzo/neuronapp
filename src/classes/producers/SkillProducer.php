@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\producers;
 
 use app\modules\neuron\classes\AProducer;
+use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\skill\Skill;
+use app\modules\neuron\classes\dir\DirPriority;
 
 /**
  * Фабрика навыков (Skill) по имени.
@@ -16,6 +18,19 @@ use app\modules\neuron\classes\skill\Skill;
  */
 class SkillProducer extends AProducer
 {
+    /**
+     * Глобальная конфигурация приложения.
+     */
+    private ConfigurationApp $configApp;
+
+    /**
+     * @param ConfigurationApp $configApp  Экземпляр конфигурации приложения.
+     */
+    public function __construct(DirPriority $dirPriority, ConfigurationApp $configApp)
+    {
+        parent::__construct($dirPriority);
+        $this->configApp = $configApp;
+    }
     /**
      * @inheritDoc
      */
@@ -45,7 +60,7 @@ class SkillProducer extends AProducer
             return null;
         }
 
-        return new Skill($contents, $name);
+        return new Skill($contents, $name, $this->configApp);
     }
 
     /**

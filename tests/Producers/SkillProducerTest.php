@@ -73,7 +73,7 @@ class SkillProducerTest extends TestCase
     public function testExistReturnsFalseForMissing(): void
     {
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new SkillProducer($dp);
+        $producer = new SkillProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
         $this->assertFalse($producer->exist('nonexistent'));
     }
 
@@ -84,7 +84,7 @@ class SkillProducerTest extends TestCase
     {
         file_put_contents($this->tmpDir . '/skills/search.txt', 'Search for $query');
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new SkillProducer($dp);
+        $producer = new SkillProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
         $this->assertTrue($producer->exist('search'));
     }
 
@@ -95,7 +95,7 @@ class SkillProducerTest extends TestCase
     {
         file_put_contents($this->tmpDir . '/skills/search.md', 'Search for $query');
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new SkillProducer($dp);
+        $producer = new SkillProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
         $this->assertTrue($producer->exist('search'));
     }
 
@@ -105,7 +105,7 @@ class SkillProducerTest extends TestCase
     public function testGetReturnsNullForMissing(): void
     {
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new SkillProducer($dp);
+        $producer = new SkillProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
         $this->assertNull($producer->get('missing'));
     }
 
@@ -117,7 +117,7 @@ class SkillProducerTest extends TestCase
     {
         file_put_contents($this->tmpDir . '/skills/translate.txt', 'Translate $text to $lang');
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new SkillProducer($dp);
+        $producer = new SkillProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
 
         $skill = $producer->get('translate');
         $this->assertInstanceOf(Skill::class, $skill);
@@ -131,7 +131,7 @@ class SkillProducerTest extends TestCase
     {
         file_put_contents($this->tmpDir . '/skills/cached.txt', 'body');
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new SkillProducer($dp);
+        $producer = new SkillProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
 
         $first = $producer->get('cached');
         $second = $producer->get('cached');
@@ -146,7 +146,7 @@ class SkillProducerTest extends TestCase
         file_put_contents($this->tmpDir . '/skills/dual.txt', 'TXT content');
         file_put_contents($this->tmpDir . '/skills/dual.md', 'MD content');
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new SkillProducer($dp);
+        $producer = new SkillProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
 
         $skill = $producer->get('dual');
         $this->assertSame('TXT content', $skill->getSkill());
@@ -160,7 +160,7 @@ class SkillProducerTest extends TestCase
         mkdir($this->tmpDir . '/skills/sub', 0777, true);
         file_put_contents($this->tmpDir . '/skills/sub/deep.txt', 'Deep skill');
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new SkillProducer($dp);
+        $producer = new SkillProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
 
         $skill = $producer->get('sub/deep');
         $this->assertInstanceOf(Skill::class, $skill);
@@ -175,7 +175,7 @@ class SkillProducerTest extends TestCase
         $content = "---\ndescription: Translate text\nparams: {\"text\": \"string\"}\n---\nTranslate \$text";
         file_put_contents($this->tmpDir . '/skills/opts.txt', $content);
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new SkillProducer($dp);
+        $producer = new SkillProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
 
         $skill = $producer->get('opts');
         $this->assertSame('Translate text', $skill->getOptions()['description']);
@@ -192,7 +192,7 @@ class SkillProducerTest extends TestCase
         file_put_contents($dir2 . '/skills/shared.txt', 'From secondary');
 
         $dp = new DirPriority([$this->tmpDir, $dir2]);
-        $producer = new SkillProducer($dp);
+        $producer = new SkillProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
 
         $skill = $producer->get('shared');
         $this->assertSame('From primary', $skill->getSkill());

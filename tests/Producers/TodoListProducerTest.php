@@ -73,7 +73,7 @@ class TodoListProducerTest extends TestCase
     public function testExistReturnsFalseForMissing(): void
     {
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new TodoListProducer($dp);
+        $producer = new TodoListProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
         $this->assertFalse($producer->exist('nonexistent'));
     }
 
@@ -84,7 +84,7 @@ class TodoListProducerTest extends TestCase
     {
         file_put_contents($this->tmpDir . '/todos/tasks.txt', '1. Do stuff');
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new TodoListProducer($dp);
+        $producer = new TodoListProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
         $this->assertTrue($producer->exist('tasks'));
     }
 
@@ -95,7 +95,7 @@ class TodoListProducerTest extends TestCase
     {
         file_put_contents($this->tmpDir . '/todos/tasks.md', '1. Do stuff');
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new TodoListProducer($dp);
+        $producer = new TodoListProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
         $this->assertTrue($producer->exist('tasks'));
     }
 
@@ -105,7 +105,7 @@ class TodoListProducerTest extends TestCase
     public function testGetReturnsNullForMissing(): void
     {
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new TodoListProducer($dp);
+        $producer = new TodoListProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
         $this->assertNull($producer->get('missing'));
     }
 
@@ -117,7 +117,7 @@ class TodoListProducerTest extends TestCase
     {
         file_put_contents($this->tmpDir . '/todos/mylist.txt', "1. Task one\n2. Task two");
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new TodoListProducer($dp);
+        $producer = new TodoListProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
 
         $list = $producer->get('mylist');
         $this->assertInstanceOf(TodoList::class, $list);
@@ -132,7 +132,7 @@ class TodoListProducerTest extends TestCase
     {
         file_put_contents($this->tmpDir . '/todos/cached.txt', '1. Task');
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new TodoListProducer($dp);
+        $producer = new TodoListProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
 
         $first = $producer->get('cached');
         $second = $producer->get('cached');
@@ -147,7 +147,7 @@ class TodoListProducerTest extends TestCase
         file_put_contents($this->tmpDir . '/todos/dual.txt', '1. From TXT');
         file_put_contents($this->tmpDir . '/todos/dual.md', '1. From MD');
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new TodoListProducer($dp);
+        $producer = new TodoListProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
 
         $list = $producer->get('dual');
         $this->assertSame('From TXT', $list->getTodos()[0]->getTodo());
@@ -161,7 +161,7 @@ class TodoListProducerTest extends TestCase
         $content = "---\nagent: myAgent\n---\n1. Task one";
         file_put_contents($this->tmpDir . '/todos/opts.txt', $content);
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new TodoListProducer($dp);
+        $producer = new TodoListProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
 
         $list = $producer->get('opts');
         $this->assertSame('myAgent', $list->getOptions()['agent']);
@@ -179,7 +179,7 @@ class TodoListProducerTest extends TestCase
         file_put_contents($dir2 . '/todos/shared.txt', '1. From secondary');
 
         $dp = new DirPriority([$this->tmpDir, $dir2]);
-        $producer = new TodoListProducer($dp);
+        $producer = new TodoListProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
 
         $list = $producer->get('shared');
         $this->assertSame('From primary', $list->getTodos()[0]->getTodo());
@@ -193,7 +193,7 @@ class TodoListProducerTest extends TestCase
         mkdir($this->tmpDir . '/todos/sub', 0777, true);
         file_put_contents($this->tmpDir . '/todos/sub/deep.txt', '1. Deep task');
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new TodoListProducer($dp);
+        $producer = new TodoListProducer($dp, $this->createMock(\app\modules\neuron\classes\config\ConfigurationApp::class));
 
         $list = $producer->get('sub/deep');
         $this->assertInstanceOf(TodoList::class, $list);

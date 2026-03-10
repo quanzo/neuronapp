@@ -33,6 +33,7 @@ class TodolistCommandUnfinishedCheckpointTest extends TestCase
         mkdir($this->tmpDir, 0777, true);
         mkdir($this->tmpDir . '/.store', 0777, true);
         mkdir($this->tmpDir . '/.sessions', 0777, true);
+        mkdir($this->tmpDir . '/.logs', 0777, true);
         mkdir($this->tmpDir . '/agents', 0777, true);
         mkdir($this->tmpDir . '/todos', 0777, true);
 
@@ -49,7 +50,7 @@ class TodolistCommandUnfinishedCheckpointTest extends TestCase
 
         $dto = (new RunStateDto())
             ->setSessionKey($sessionKey)
-            ->setAgentName('default')
+            ->setAgentName(RunStateDto::DEF_AGENT_NAME)
             ->setRunId('run-1')
             ->setTodolistName('list1')
             ->setStartedAt('2025-01-01T12:00:00+00:00')

@@ -25,7 +25,7 @@ use Symfony\Component\Console\Question\ChoiceQuestion;
  *
  * По имени загружает список из папки todos/ (через {@see ConfigurationApp::getTodoList()}),
  * исполняет его с помощью агента из опции {@see --agent} через
- * {@see TodoList::executeFromAgent()}, выводит итоговый ответ агента и
+ * {@see TodoList::execute()}, выводит итоговый ответ агента и
  * {@see sessionKey} для продолжения сессии.
  *
  * Исполнитель — всегда агент из опции --agent; в файле TodoList агент не задаётся.
@@ -215,19 +215,19 @@ class TodolistCommand extends AbstractAgentCommand
             }
         }
 
-        $skillProducer = $configApp->getSkillProducer();
+        if ($todoList !== null) {
+            $todoList->setDefaultConfigurationAgent($agentCfg);
+        }
 
         $history = null;
         $error = null;
 
-        EventLoop::queue(static function () use ($todoList, $agentCfg, $skillProducer, $attachments, $startFromTodoIndex, &$history, &$error): void {
+        EventLoop::queue(static function () use ($todoList, $attachments, $startFromTodoIndex, &$history, &$error): void {
             try {
-                $history = $todoList->executeFromAgent(
-                    $agentCfg,
+                $history = $todoList->execute(
                     MessageRole::USER,
                     $attachments,
                     null,
-                    $skillProducer,
                     $startFromTodoIndex
                 )->await();
             } catch (\Throwable $e) {

@@ -398,7 +398,7 @@ class SkillTest extends TestCase
     public function testGetAgentNameDefault(): void
     {
         $skill = new Skill('Body', 'myskill');
-        $this->assertSame('default', $skill->getAgentName());
+        $this->assertNull($skill->getAgentName());
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -415,8 +415,7 @@ class SkillTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
 
-        $agentCfg = new \app\modules\neuron\classes\config\ConfigurationAgent();
-        $skill->getTool($agentCfg);
+        $skill->getTool();
     }
 
     /**
@@ -430,8 +429,7 @@ class SkillTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
 
-        $agentCfg = new \app\modules\neuron\classes\config\ConfigurationAgent();
-        $skill->getTool($agentCfg);
+        $skill->getTool();
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -510,14 +508,14 @@ class SkillTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════
-    //  executeFromAgent — возвращает Future
+    //  execute — возвращает Future
     // ══════════════════════════════════════════════════════════════
 
     /**
-     * executeFromAgent() возвращает Future (без await, чтобы не требовать реальный бэкенд).
+     * execute() возвращает Future (без await, чтобы не требовать реальный бэкенд).
      * Конфиг с мок-агентом, чтобы при выполнении Future не вызывался реальный getProvider().
      */
-    public function testExecuteFromAgentReturnsFuture(): void
+    public function testExecuteReturnsFuture(): void
     {
         $skill = new Skill('Hello', 'myskill');
         $handler = $this->createMock(AgentHandler::class);
@@ -536,7 +534,8 @@ class SkillTest extends TestCase
             }
         };
 
-        $future = $skill->executeFromAgent($agentCfg);
+        $skill->setDefaultConfigurationAgent($agentCfg);
+        $future = $skill->execute();
         $this->assertInstanceOf(Future::class, $future);
         $future->ignore();
     }

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes;
 
 use app\modules\neuron\classes\dto\params\ParamListDto;
+use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\helpers\PlaceholderHelper;
+use RuntimeException;
 
 /**
  * Базовый компонент для промптов с параметрами и опцией skills.
@@ -18,6 +21,16 @@ use app\modules\neuron\helpers\PlaceholderHelper;
  */
 abstract class AbstractPromptWithParams extends APromptComponent
 {
+    /**
+     * Глобальная конфигурация приложения, используемая для разрешения агентов и зависимостей.
+     */
+    private ?ConfigurationApp $configApp = null;
+
+    /**
+     * Конфигурация агента по умолчанию, которая может быть переопределена опцией "agent".
+     */
+    private ?ConfigurationAgent $defaultAgentCfg = null;
+
     private ?ParamListDto $paramListCache = null;
     private bool $paramListCacheInitialized = false;
 
@@ -25,6 +38,100 @@ abstract class AbstractPromptWithParams extends APromptComponent
      * Имя компонента, используемое, например, для проверки самоссылок в skills.
      */
     abstract protected function getComponentName(): string;
+
+    /**
+     * Устанавливает конфигурацию приложения для компонента.
+     *
+     * @param ConfigurationApp|null $configApp Экземпляр конфигурации приложения или null.
+     *
+     * @return static
+     */
+    public function setConfigurationApp(?ConfigurationApp $configApp): static
+    {
+        $this->configApp = $configApp;
+
+        return $this;
+    }
+
+    /**
+     * Возвращает конфигурацию приложения, если она была установлена.
+     */
+    public function getConfigurationApp(): ?ConfigurationApp
+    {
+        return $this->configApp;
+    }
+
+    /**
+     * Устанавливает конфигурацию агента по умолчанию для компонента.
+     *
+     * @return static
+     */
+    public function setDefaultConfigurationAgent(?ConfigurationAgent $agentCfg): static
+    {
+        $this->defaultAgentCfg = $agentCfg;
+
+        return $this;
+    }
+
+    /**
+     * Возвращает конфигурацию агента для выполнения компонента.
+     *
+     * Если в опциях компонента задано имя агента (опция "agent"), то агент берётся
+     * по этому имени через ConfigurationApp. В противном случае возвращается
+     * агент, переданный в аргументе метода.
+     *
+     * @param ConfigurationAgent|null $agentCfg Агент по умолчанию, если имя агента в опциях не задано.
+     *
+     * @return ConfigurationAgent Конфигурация агента для исполнения компонента.
+     *
+     * @throws RuntimeException Если имя агента задано, но ConfigurationApp не установлен
+     *                          или агент с таким именем не найден, либо не передан агент по умолчанию.
+     */
+    public function getConfigurationAgent(?ConfigurationAgent $agentCfg = null): ConfigurationAgent
+    {
+        if ($agentCfg === null) {
+            $agentCfg = $this->defaultAgentCfg;
+        }
+
+        $agentName = $this->getAgentName();
+
+        if ($agentName !== null) {
+            $configApp = $this->getConfigurationApp();
+            if ($configApp === null) {
+                throw new RuntimeException(
+                    sprintf(
+                        'ConfigurationApp не установлен для компонента "%s", не удалось разрешить агента "%s".',
+                        $this->getComponentName(),
+                        $agentName
+                    )
+                );
+            }
+
+            $resolved = $configApp->getAgent($agentName);
+            if ($resolved === null) {
+                throw new RuntimeException(
+                    sprintf(
+                        'Агент "%s" не найден в ConfigurationApp для компонента "%s".',
+                        $agentName,
+                        $this->getComponentName()
+                    )
+                );
+            }
+
+            $agentCfg = $resolved;
+        }
+
+        if ($agentCfg === null) {
+            throw new RuntimeException(
+                sprintf(
+                    'Не удалось определить конфигурацию агента для компонента "%s": имя агента не задано и агент по умолчанию не передан.',
+                    $this->getComponentName()
+                )
+            );
+        }
+
+        return $agentCfg;
+    }
 
     /**
      * Возвращает список параметров (опция params) в виде DTO.

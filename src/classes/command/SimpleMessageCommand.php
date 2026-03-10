@@ -25,7 +25,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  *
  * Исполнение реализовано через {@see TodoList} с одним заданием: сообщение
  * пользователя передаётся как тело списка заданий, после чего вызывается
- * {@see TodoList::executeFromAgent()}. Ожидание асинхронного результата
+ * {@see TodoList::execute()}. Ожидание асинхронного результата
  * выполняется через {@see \Revolt\EventLoop}.
  *
  * Примеры вызова:
@@ -72,7 +72,7 @@ class SimpleMessageCommand extends AbstractAgentCommand
      * 3. При переданном session_id — проверка формата и существования сессии,
      *    затем установка ключа на конфиге агента.
      * 4. Создание TodoList с одним заданием (текст сообщения) и вызов
-     *    executeFromAgent() в очереди событийного цикла с ожиданием Future.
+     *    execute() в очереди событийного цикла с ожиданием Future.
      * 5. Вывод последнего сообщения из истории чата и sessionKey.
      *
      * @param InputInterface  $input  Ввод (опции команды).
@@ -186,22 +186,20 @@ class SimpleMessageCommand extends AbstractAgentCommand
             }
         }
 
-        // Список из одного задания (текст сообщения) и producer навыков для возможных skills в todo
-        $todoList = new TodoList($messageText, 'inline_message');
-        $skillProducer = $configApp->getSkillProducer();
+        // Список из одного задания (текст сообщения), использующий глобальную конфигурацию приложения
+        $todoList = new TodoList($messageText, 'inline_message', $configApp);
+        $todoList->setDefaultConfigurationAgent($agentCfg);
 
         // Запуск асинхронного выполнения в очереди событийного цикла и ожидание результата
         $history = null;
         $error = null;
 
-        EventLoop::queue(static function () use ($todoList, $agentCfg, $skillProducer, $attachments, &$history, &$error): void {
+        EventLoop::queue(static function () use ($todoList, $attachments, &$history, &$error): void {
             try {
-                $history = $todoList->executeFromAgent(
-                    $agentCfg,
+                $history = $todoList->execute(
                     MessageRole::USER,
                     $attachments,
-                    null,
-                    $skillProducer
+                    null
                 )->await();
             } catch (\Throwable $e) {
                 $error = $e;

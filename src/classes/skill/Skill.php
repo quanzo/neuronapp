@@ -6,12 +6,12 @@ namespace app\modules\neuron\classes\skill;
 
 use Amp\Future;
 use app\modules\neuron\classes\AbstractPromptWithParams;
+use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\params\ParamListDto;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\PlaceholderHelper;
 use app\modules\neuron\classes\config\ConfigurationAgent;
-use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ISkill;
@@ -40,15 +40,17 @@ class Skill extends AbstractPromptWithParams implements ISkill
      *  - блок опций и тело, разделенные линиями из '-';
      *  - только блок опций (без тела);
      *  - быть пустым (без опций и тела).
-     *
-     * @param string $input Полный текст описания навыка.
-     * @param string $name  Имя навыка (имя файла с поддиректорией, если есть).
+     * 
+     * @param string               $input     Полный текст описания навыка.
+     * @param string               $name      Имя навыка (имя файла с поддиректорией, если есть).
+     * @param ConfigurationApp|null $configApp Экземпляр конфигурации приложения для разрешения зависимостей.
      */
-    public function __construct(string $input, string $name = '')
+    public function __construct(string $input, string $name = '', ?ConfigurationApp $configApp = null)
     {
         parent::__construct($input);
         $this->body = CommentsHelper::stripComments($this->body);
         $this->name = $name;
+        $this->setConfigurationApp($configApp);
     }
 
     public function getName(): string
@@ -135,10 +137,9 @@ class Skill extends AbstractPromptWithParams implements ISkill
      *  - строка (тип, напр. "string") или
      *  - объект {"type": "...", "description": "...", "required": true/false}.
      *
-     * @param ConfigurationAgent $agentCfg Конфигурация агента-исполнителя.
-     * @param MessageRole        $role     Роль сообщения, отправляемого агенту.
+     * @param MessageRole $role Роль сообщения, отправляемого агенту.
      */
-    public function getTool(ConfigurationAgent $agentCfg, MessageRole $role = MessageRole::USER): Tool
+    public function getTool(MessageRole $role = MessageRole::USER): Tool
     {
         // Критичные ошибки конфигурации skill считаем поводом не строить инструмент и явно сообщить об этом.
         $errors = $this->checkErrors();
@@ -177,15 +178,14 @@ class Skill extends AbstractPromptWithParams implements ISkill
         }
 
         $skillName = $this->getName();
-        $tool->setCallable(function (mixed ...$args) use ($agentCfg, $role, $skillName): mixed {
+        $tool->setCallable(function (mixed ...$args) use ($role, $skillName): mixed {
+            $agentCfg = $this->getConfigurationAgent();
             $logger  = $agentCfg->getLoggerWithContext();
             $context = ['skill' => $skillName];
             $logger->info('Skill вызван', $context);
             try {
-                $text    = $this->getSkill($args);
-                $message = new NeuronMessage($role, $text);
-                $result  = $agentCfg->sendMessage($message);
-                $logger->info('Skill завершён', $context);
+                $future = $this->execute($role, [], $args);
+                $result = $future->await();
                 return $result;
             } catch (\Throwable $e) {
                 $logger->error('Ошибка выполнения skill', array_merge($context, ['exception' => $e]));
@@ -200,39 +200,38 @@ class Skill extends AbstractPromptWithParams implements ISkill
      * Выполняет навык, отправляя сгенерированный текст и дополнительные вложения в LLM.
      *
      * При isPureContext() используется клон конфигурации агента (чистый контекст).
-     * При переданном SkillProducer подключаются инструменты навыков из опции "skills".
      *
-     * @param ConfigurationAgent         $agentCfg       Конфигурация агента-исполнителя.
-     * @param MessageRole                $role           Роль сообщения.
-     * @param AttachmentDto[]            $attachments    Дополнительные вложения, передаваемые вместе с текстом навыка.
-     * @param array<string,mixed>|null   $params         Параметры для подстановки в шаблон навыка.
-     * @param SkillProducer|null         $skillProducer  Producer навыков для разрешения имён из getNeedSkills().
+     * @param MessageRole              $role        Роль сообщения.
+     * @param AttachmentDto[]          $attachments Дополнительные вложения, передаваемые вместе с текстом навыка.
+     * @param array<string,mixed>|null $params      Параметры для подстановки в шаблон навыка.
      *
      * @return Future<mixed> Результат выполнения запроса к LLM.
      */
-    public function executeFromAgent(
-        ConfigurationAgent $agentCfg,
+    public function execute(
         MessageRole $role = MessageRole::USER,
         array $attachments = [],
-        ?array $params = null,
-        ?SkillProducer $skillProducer = null
+        ?array $params = null
     ): Future {
-        $logger = $agentCfg->getLogger();
-        $context = array_merge($agentCfg->getLogContext(), ['skill' => $this->getName()]);
+        $agentCfg = $this->getConfigurationAgent();
+        $logger   = $agentCfg->getLogger();
+        $context  = array_merge($agentCfg->getLogContext(), ['skill' => $this->getName()]);
         $logger->info('Skill started', $context);
 
         $text = $this->getSkill($params ?? []);
 
-        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments, $skillProducer): mixed {
+        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments): mixed {
 
             $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) : $agentCfg->cloneForSession(ChatHistoryCloneMode::COPY_CONTEXT);
 
-            if ($skillProducer !== null && $this->getNeedSkills() !== []) {
+            $configApp = $this->getConfigurationApp();
+
+            if ($configApp !== null && $this->getNeedSkills() !== []) {
                 $skillTools = [];
                 foreach ($this->getNeedSkills() as $skillName) {
-                    $skill = $skillProducer->get($skillName);
+                    $skill = $configApp->getSkill($skillName);
                     if ($skill !== null) {
-                        $skillTools[] = $skill->getTool($sessionCfg, $role);
+                        $skill->setDefaultConfigurationAgent($sessionCfg);
+                        $skillTools[] = $skill->getTool($role);
                     }
                 }
                 if ($skillTools !== []) {
