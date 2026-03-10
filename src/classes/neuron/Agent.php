@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace app\modules\neuron\classes\neuron;
@@ -9,6 +10,7 @@ use NeuronAI\Agent\Agent as NeuronAIAgent;
 /**
  * Агент частично настраиваемый через модуль
  */
-class Agent extends NeuronAIAgent {
+class Agent extends NeuronAIAgent
+{
     use AgentUseModuleTrait;
 }

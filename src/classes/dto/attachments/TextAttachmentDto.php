@@ -89,4 +89,3 @@ final class TextAttachmentDto extends AttachmentDto
         return $block;
     }
 }
-

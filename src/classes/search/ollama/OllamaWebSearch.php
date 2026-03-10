@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/search/ollama/OllamaWebSearch.php
 
 namespace app\modules\neuron\classes\search\ollama;
@@ -99,4 +100,3 @@ class OllamaWebSearch
         return $prepResult;
     }
 }
-

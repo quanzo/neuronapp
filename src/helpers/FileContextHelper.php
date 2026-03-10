@@ -118,4 +118,3 @@ final class FileContextHelper
         return ['attachments' => $attachments, 'totalSize' => $totalSize];
     }
 }
-

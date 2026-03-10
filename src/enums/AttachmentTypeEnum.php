@@ -32,4 +32,3 @@ enum AttachmentTypeEnum: string
      */
     case IMAGE_FILE = 'image_file';
 }
-

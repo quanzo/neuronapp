@@ -148,7 +148,7 @@ class SimpleMessageCommand extends AbstractAgentCommand
             $output->writeln(sprintf('<error>Агент "%s" не найден.</error>', $agentName));
             return Command::FAILURE;
         }
-        
+
         // проверим а завершено ли предыдущее сообщение
         $runStateDto = $agentCfg->getExistRunStateDto();
         if ($runStateDto) {
@@ -227,5 +227,4 @@ class SimpleMessageCommand extends AbstractAgentCommand
 
         return Command::SUCCESS;
     }
-
 }

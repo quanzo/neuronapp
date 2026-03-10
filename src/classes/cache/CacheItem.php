@@ -5,7 +5,6 @@ namespace app\modules\neuron\classes\cache;
 use Psr\Cache\CacheItemInterface;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 
-
 /**
  * Элемент кеша, соответствующий PSR-6 CacheItemInterface.
  * Хранит одно значение в кеше с метаданными (время истечения, теги и т.д.).
@@ -17,25 +16,25 @@ class CacheItem implements CacheItemInterface
      * @var string
      */
     private string $key;
-    
+
     /**
      * Значение элемента кеша
      * @var mixed
      */
     private $value;
-    
+
     /**
      * Флаг, указывающий, является ли элемент попаданием в кеш
      * @var bool
      */
     private bool $isHit = false;
-    
+
     /**
      * Время истечения срока действия элемента кеша (timestamp)
      * @var int|null
      */
     private ?int $expiresAt = null;
-    
+
     /**
      * Конструктор элемента кеша.
      *
@@ -67,16 +66,22 @@ class CacheItem implements CacheItemInterface
         if (!$this->isHit()) {
             return null;
         }
-        
+
         // Обработка ArticleContentDto для корректного восстановления Enum
         if ($this->value instanceof ArticleContentDto) {
             return $this->value;
         }
-        
+
         // Обработка массива, который может быть результатом toArray() ArticleContentDto
-        if (is_array($this->value) && 
-            isset($this->value['content'], $this->value['title'], 
-                   $this->value['sourceUrl'], $this->value['sourceType'])) {
+        if (
+            is_array($this->value) &&
+            isset(
+                $this->value['content'],
+                $this->value['title'],
+                $this->value['sourceUrl'],
+                $this->value['sourceType']
+            )
+        ) {
             try {
                 return ArticleContentDto::fromArray($this->value);
             } catch (\InvalidArgumentException $e) {
@@ -84,7 +89,7 @@ class CacheItem implements CacheItemInterface
                 return $this->value;
             }
         }
-        
+
         return $this->value;
     }
 
@@ -103,7 +108,7 @@ class CacheItem implements CacheItemInterface
         } else {
             $this->value = $value;
         }
-        
+
         $this->isHit = true;
         return $this;
     }
@@ -118,13 +123,13 @@ class CacheItem implements CacheItemInterface
         if (!$this->isHit) {
             return false;
         }
-        
+
         // Проверяем срок действия
         if ($this->expiresAt !== null && time() > $this->expiresAt) {
             $this->isHit = false;
             return false;
         }
-        
+
         return true;
     }
 
@@ -155,10 +160,10 @@ class CacheItem implements CacheItemInterface
         } elseif ($time instanceof \DateInterval) {
             $this->expiresAt = (new \DateTime())->add($time)->getTimestamp();
         }
-        
+
         return $this;
     }
-    
+
     /**
      * Устанавливает флаг isHit.
      *
@@ -170,7 +175,7 @@ class CacheItem implements CacheItemInterface
         $this->isHit = $isHit;
         return $this;
     }
-    
+
     /**
      * Возвращает время истечения срока действия.
      *

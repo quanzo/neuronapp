@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/search/wiki/RuWikiArticleSearcher.php
 
 namespace app\modules\neuron\classes\search\wiki;
@@ -218,4 +219,3 @@ class RuWikiArticleSearcher extends ArticleSearcherAbstract
         });
     }
 }
-

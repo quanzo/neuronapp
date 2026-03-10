@@ -98,4 +98,3 @@ final class RuWikiSearchToolTest extends TestCase
         $this->assertSame('ruwiki-content-query', $data['articles'][0]['content']);
     }
 }
-

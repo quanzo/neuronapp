@@ -100,14 +100,14 @@ class BashTool extends ATool
      * @param string                 $description      Описание инструмента
      */
     public function __construct(
-        int    $defaultTimeout   = 30,
-        int    $maxOutputSize    = 102400,
+        int $defaultTimeout = 30,
+        int $maxOutputSize = 102400,
         string $workingDirectory = '',
-        array  $allowedPatterns  = [],
-        array  $blockedPatterns  = [],
-        array  $env              = [],
-        string $name             = 'bash',
-        string $description      = 'Выполнение shell-команды в терминале. Возвращает stdout, stderr и код завершения.',
+        array $allowedPatterns = [],
+        array $blockedPatterns = [],
+        array $env = [],
+        string $name = 'bash',
+        string $description = 'Выполнение shell-команды в терминале. Возвращает stdout, stderr и код завершения.',
     ) {
         parent::__construct(name: $name, description: $description);
 

@@ -42,11 +42,11 @@ use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Stringable;
 
-
 /**
  * Конфигурация агента для работы с LLM через Neuron PHP
  */
-class ConfigurationAgent {
+class ConfigurationAgent
+{
     use LoggerAwareTrait;
     use LoggerAwareContextualTrait;
 
@@ -68,7 +68,7 @@ class ConfigurationAgent {
 
     /**
      * Размер контекста для LLM
-     * 
+     *
      * ! Например, gpt-oss = 128к; devstral-small-2 = 384к
      * ! Надо учесть, что история обрезается до размеров контеста LLM. Иными словами, хранится только размер контекста!
      *
@@ -99,7 +99,7 @@ class ConfigurationAgent {
      * @var array|callable
      */
     public $provider = [];
-    
+
     /**
      * Кешированный провайдер LLM.
      *
@@ -140,7 +140,7 @@ class ConfigurationAgent {
 
     /**
      * Дополнительные инструменты, которые может использовать LLM
-     * 
+     *
      * @see vendor/neuron-core/neuron-ai/src/Tools/Toolkits/Calculator/DivideTool.php
      * @var array<ToolInterface|ToolkitInterface|ProviderToolInterface>|array<callable>|callable - поддержка CallableWrapper
      */
@@ -153,14 +153,14 @@ class ConfigurationAgent {
 
     /**
      * MCP серверы.
-     * 
+     *
      * Здесь надо сконфигурировать NeuronAI\MCP\McpConnector. Дальше инструменты от MCP сервера будут добавлены в список инструментов.
      */
     public $mcp = [];
 
     /**
      * Сервис который будет рассчитывать вектора текста
-     * 
+     *
      *
      * @var EmbeddingsProviderInterface|null|callable - поддержка CallableWrapper
      */
@@ -170,17 +170,17 @@ class ConfigurationAgent {
      * Размер чанка для формирования векторного представления. Он зависит от используемой embedding модели.
      * ! Здесь размер в символах, а не в токенах.
      * ! Надо понимать, что это значение надо использовать, когда сам будешь разбивать текст на куски и считать вектора. Но можно использовать и любое свое, исходя из необходимости
-     * 
+     *
      * @var integer
      */
     public $embeddingChunkSize = 1500;
 
     /**
      * Векторное хранилище
-     * 
+     *
      * Например, у embeddinggemma размер вектора = 768. Соответственно, размер вектора в хранилище должен быть таким же.
      * Если размерность не будет правильной, то может быть ошибка.
-     * 
+     *
      * ! драйверы векторных харнилищ есть в библиотеке neuron-ai
      *
      * @var VectorStoreInterface|null|callable
@@ -189,7 +189,7 @@ class ConfigurationAgent {
 
     /**
      * препроцессоры
-     * 
+     *
      * !В конфиге конфигурируем через CallableWrapper
      *
      * @var PreProcessorInterface[]
@@ -198,7 +198,7 @@ class ConfigurationAgent {
 
     /**
      * постобработка
-     * 
+     *
      * !В конфиге конфигурируем через CallableWrapper
      *
      * @var PostProcessorInterface[]
@@ -215,7 +215,8 @@ class ConfigurationAgent {
      * @return null|NeuronMessage|object null — сообщение не отправлено, либо объект сообщения-ответа,
      *                                   либо DTO, если ответ структурирован.
      */
-    public function sendMessage(NeuronMessage $message): mixed {
+    public function sendMessage(NeuronMessage $message): mixed
+    {
         return $this->sendMessageWithAttachments($message, []);
     }
 
@@ -233,7 +234,8 @@ class ConfigurationAgent {
      * @return null|NeuronMessage|object null — сообщение не отправлено, либо объект сообщения-ответа,
      *                                   либо DTO, если ответ структурирован.
      */
-    public function sendMessageWithAttachments(NeuronMessage $message, array $attachments = []): mixed {
+    public function sendMessageWithAttachments(NeuronMessage $message, array $attachments = []): mixed
+    {
         $attachments = AttachmentHelper::deduplicateAttachments($attachments);
         $agent       = $this->getAgent();
 
@@ -293,7 +295,8 @@ class ConfigurationAgent {
         return $response;
     }
 
-    protected function makeListObjects($arCfg) {
+    protected function makeListObjects($arCfg)
+    {
         $res = [];
         if (!empty($arCfg)) {
             foreach ($arCfg as $el) {
@@ -316,7 +319,8 @@ class ConfigurationAgent {
      *
      * @return AgentInterface Экземпляр агента, сконфигурированный текущими настройками.
      */
-    public function getAgent(): AgentInterface {
+    public function getAgent(): AgentInterface
+    {
         if ($this->_agent === null) {
             if (!empty($this->embeddingProvider) && !empty($this->vectorStore)) {
                 $this->_agent = RAG::make();
@@ -324,7 +328,6 @@ class ConfigurationAgent {
                 // препроцессоры и постпроцессоры
                 $this->_agent->setPreProcessors($this->makeListObjects($this->preProcessors));
                 $this->_agent->setPostProcessors($this->makeListObjects($this->postProcessors));
-
             } else {
                 $this->_agent = Agent::make();
             }
@@ -369,10 +372,11 @@ class ConfigurationAgent {
     /**
      * Провайдер для конфигурирования агента
      * ! не использовать впрямую - использовать методы агента
-     * 
+     *
      * @return AIProviderInterface
      */
-    public function getProvider(): AIProviderInterface {
+    public function getProvider(): AIProviderInterface
+    {
         if ($this->provider instanceof AIProviderInterface) {
             return $this->provider;
         }
@@ -385,7 +389,8 @@ class ConfigurationAgent {
     /**
      * Инструкция для LLM
      */
-    public function getInstructions() {
+    public function getInstructions()
+    {
         if (CallableWrapper::isCallable($this->instructions)) {
             return CallableWrapper::call($this->instructions);
         }
@@ -398,7 +403,8 @@ class ConfigurationAgent {
      *
      * @return array<ToolInterface|ToolkitInterface|ProviderToolInterface>
      */
-    public function getTools(): array {
+    public function getTools(): array
+    {
         $tools = [];
         if (CallableWrapper::isCallable($this->tools)) {
             $tools = CallableWrapper::call($this->tools);
@@ -479,7 +485,8 @@ class ConfigurationAgent {
      *
      * @return ChatHistoryInterface Экземпляр истории чата для текущего агента.
      */
-    public function getChatHistory(): ChatHistoryInterface {
+    public function getChatHistory(): ChatHistoryInterface
+    {
         if ($this->_chatHistory !== null) {
             return $this->_chatHistory;
         }
@@ -508,7 +515,8 @@ class ConfigurationAgent {
      *
      * @return void
      */
-    public function setChatHistory(ChatHistoryInterface $history): void {
+    public function setChatHistory(ChatHistoryInterface $history): void
+    {
         $this->_chatHistory = $history;
     }
 
@@ -520,21 +528,24 @@ class ConfigurationAgent {
      *
      * @return void
      */
-    public function resetChatHistory(): void {
+    public function resetChatHistory(): void
+    {
         $this->_chatHistory = null;
     }
 
     /**
      * Возвращает базовый ключ сессии (без имени агента).
      */
-    public function getSessionKey(): ?string {
+    public function getSessionKey(): ?string
+    {
         return $this->sessionKey;
     }
 
     /**
      * Устанавливает базовый ключ сессии и сбрасывает кешированную историю чата.
      */
-    public function setSessionKey(?string $sessionKey): void {
+    public function setSessionKey(?string $sessionKey): void
+    {
         $this->sessionKey = $sessionKey;
         $this->resetChatHistory();
     }
@@ -544,7 +555,8 @@ class ConfigurationAgent {
      *
      * @return string
      */
-    public function getAgentName(): string {
+    public function getAgentName(): string
+    {
         return $this->agentName ?: 'unknown';
     }
 
@@ -553,7 +565,8 @@ class ConfigurationAgent {
      *
      * @return RunStateDto
      */
-    public function getBlankRunStateDto(): RunStateDto {
+    public function getBlankRunStateDto(): RunStateDto
+    {
         $runStateDto = (new RunStateDto())
             ->setSessionKey($this->getSessionKey())
             /*
@@ -570,12 +583,13 @@ class ConfigurationAgent {
 
     /**
      * Возвращает состояние исполнения todolist для агента.
-     * 
+     *
      * Если исполнение предыдущего задания не завершено, то это будет видно в RunStateDto
      *
      * @return RunStateDto|null
      */
-    public function getExistRunStateDto(): ?RunStateDto {
+    public function getExistRunStateDto(): ?RunStateDto
+    {
         /*
         $unfinishedCheckpoint = RunStateCheckpointHelper::read($this->getSessionKey(), $this->getAgentName());
         */
@@ -591,7 +605,8 @@ class ConfigurationAgent {
      * Провайдер для создания эмбеддингов
      * ! для агента
      */
-    public function getEmbeddingProvider() {
+    public function getEmbeddingProvider()
+    {
         if (CallableWrapper::isCallable($this->embeddingProvider)) {
             return CallableWrapper::call($this->embeddingProvider);
         }
@@ -602,7 +617,8 @@ class ConfigurationAgent {
      * Векторная база данных.
      * ! Для инициалиции RAG
      */
-    public function getVectorStore() {
+    public function getVectorStore()
+    {
         if (CallableWrapper::isCallable($this->vectorStore)) {
             return CallableWrapper::call($this->vectorStore);
         }
@@ -636,7 +652,8 @@ class ConfigurationAgent {
      *
      * @return ConfigurationAgent|null Экземпляр конфигурации или null при пустом массиве.
      */
-    public static function makeFromArray(array $cfg, ?string $sessionKey = null): ?ConfigurationAgent {
+    public static function makeFromArray(array $cfg, ?string $sessionKey = null): ?ConfigurationAgent
+    {
         if ($cfg === []) {
             return null;
         }
@@ -722,7 +739,8 @@ class ConfigurationAgent {
      * @return ConfigurationAgent|null Экземпляр конфигурации или null, если файл не найден
      *                                 или не удалось корректно разобрать его содержимое.
      */
-    public static function makeFromFile(string $filename, ?string $sessionKey = null): ?ConfigurationAgent {
+    public static function makeFromFile(string $filename, ?string $sessionKey = null): ?ConfigurationAgent
+    {
         if ($filename === '' || !is_file($filename)) {
             return null;
         }

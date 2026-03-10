@@ -88,4 +88,3 @@ final class UniSearchToolTest extends TestCase
         $this->assertCount(0, $data['articles']);
     }
 }
-

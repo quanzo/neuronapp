@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/loader/wiki/RuWikiLoader.php
 
 namespace app\modules\neuron\classes\loader\wiki;
@@ -189,4 +190,3 @@ class RuWikiLoader implements ContentLoaderInterface
         return null;
     }
 }
-

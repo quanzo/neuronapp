@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace app\modules\neuron\enums;
@@ -27,4 +28,3 @@ enum ChatHistoryCloneMode: string
      */
     case COPY_CONTEXT = 'copy_context';
 }
-

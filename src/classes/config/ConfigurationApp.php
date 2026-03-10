@@ -28,7 +28,7 @@ class ConfigurationApp
 {
     use LoggerAwareTrait;
     use LoggerAwareContextualTrait;
-    
+
     /**
      * Регулярное выражение для проверки формата sessionKey.
      *
@@ -36,7 +36,7 @@ class ConfigurationApp
      * (дата 8 цифр, дефис, время 6 цифр, дефис, микросекунды).
      */
     const SESSION_KEY_PATTERN = '/^\d{8}-\d{6}-\d+$/';
-    
+
     /**
      * Единственный экземпляр конфигурации.
      */
@@ -199,7 +199,8 @@ class ConfigurationApp
      *
      * @return string
      */
-    public static function getLogDirName(): string {
+    public static function getLogDirName(): string
+    {
         return '.logs';
     }
 
@@ -320,7 +321,8 @@ class ConfigurationApp
      * @param string $sessionKey
      * @return boolean
      */
-    public static function isValidSessionKey(string $sessionKey): bool {
+    public static function isValidSessionKey(string $sessionKey): bool
+    {
         if (preg_match(self::SESSION_KEY_PATTERN, $sessionKey) !== 1) {
             return false;
         }
@@ -453,4 +455,3 @@ class ConfigurationApp
         $this->config = $decoded;
     }
 }
-

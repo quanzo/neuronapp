@@ -22,7 +22,7 @@ use app\modules\neuron\traits\LoggerAwareTrait;
 class AgentProducer extends AProducer
 {
     use LoggerAwareTrait;
-    
+
     /**
      * Базовый ключ сессии, передаваемый создаваемым агентам.
      */

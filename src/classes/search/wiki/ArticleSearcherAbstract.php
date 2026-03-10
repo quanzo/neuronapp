@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/search/wiki/ArticleSearcherAbstract.php
 
 namespace app\modules\neuron\classes\search\wiki;
@@ -79,4 +80,3 @@ abstract class ArticleSearcherAbstract implements ArticleSearcherInterface
      */
     abstract protected function getSourceType(): ContentSourceType;
 }
-

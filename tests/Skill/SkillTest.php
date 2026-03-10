@@ -523,7 +523,7 @@ class SkillTest extends TestCase
         $agent = $this->createMock(AgentInterface::class);
         $agent->method('chat')->willReturn($handler);
 
-        $agentCfg = new class($agent) extends ConfigurationAgent {
+        $agentCfg = new class ($agent) extends ConfigurationAgent {
             public function __construct(private readonly AgentInterface $agent)
             {
             }

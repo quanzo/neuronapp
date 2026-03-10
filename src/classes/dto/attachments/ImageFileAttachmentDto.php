@@ -155,4 +155,3 @@ final class ImageFileAttachmentDto extends AttachmentDto implements IAttachmentF
         return is_string($mime) && $mime !== '' ? $mime : null;
     }
 }
-

@@ -101,4 +101,3 @@ class PlaceholderHelper
         return $errors;
     }
 }
-

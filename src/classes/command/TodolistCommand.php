@@ -115,7 +115,7 @@ class TodolistCommand extends AbstractAgentCommand
             }
             $configApp->setSessionKey($sessionId);
         }
-        
+
         // установим логгер
         $this->resolveFileLogger($configApp);
 
@@ -263,5 +263,4 @@ class TodolistCommand extends AbstractAgentCommand
 
         return Command::SUCCESS;
     }
-
 }

@@ -242,4 +242,3 @@ abstract class APromptComponent
         ?array $params = null
     ): Future;
 }
-

@@ -1,9 +1,10 @@
 <?php
+
 namespace app\modules\neuron\classes\convert;
 
 /**
  * HTML <--> MARKDOWN
- * 
+ *
  * @see https://github.com/shengkung/mdify
  */
 class Mdify
@@ -257,7 +258,9 @@ class Mdify
 
         // Find the end position of the start tag
         $iTagEnd = strpos($sContent, '>', $iStartPos);
-        if ($iTagEnd === false) return false;
+        if ($iTagEnd === false) {
+            return false;
+        }
 
         $iPos = $iTagEnd + 1;
         $iLevel = 1;
@@ -267,7 +270,9 @@ class Mdify
             $iNextStart = strpos($sContent, $sStartTag, $iPos);
             $iNextEnd = strpos($sContent, $sEndTag, $iPos);
 
-            if ($iNextEnd === false) break;
+            if ($iNextEnd === false) {
+                break;
+            }
 
             if ($iNextStart !== false && $iNextStart < $iNextEnd) {
                 // Found another start tag
@@ -307,11 +312,15 @@ class Mdify
         while ($iPos < $iLength) {
             // Find next <li> tag
             $iLiStart = strpos($sListContent, '<li', $iPos);
-            if ($iLiStart === false) break;
+            if ($iLiStart === false) {
+                break;
+            }
 
             // Find end position of <li> tag
             $iLiTagEnd = strpos($sListContent, '>', $iLiStart);
-            if ($iLiTagEnd === false) break;
+            if ($iLiTagEnd === false) {
+                break;
+            }
 
             // Find corresponding </li> tag
             $iPos = $iLiTagEnd + 1;
@@ -321,7 +330,9 @@ class Mdify
                 $iNextLiStart = strpos($sListContent, '<li', $iPos);
                 $iNextLiEnd = strpos($sListContent, '</li>', $iPos);
 
-                if ($iNextLiEnd === false) break;
+                if ($iNextLiEnd === false) {
+                    break;
+                }
 
                 if ($iNextLiStart !== false && $iNextLiStart < $iNextLiEnd) {
                     // Found nested <li>
@@ -767,7 +778,9 @@ class Mdify
                 $aDataLines = array_filter(explode("\n", $sDataRows));
                 foreach ($aDataLines as $sDataLine) {
                     $sDataLine = trim($sDataLine);
-                    if (empty($sDataLine)) continue;
+                    if (empty($sDataLine)) {
+                        continue;
+                    }
 
                     $aCells = array_map('trim', explode('|', trim($sDataLine, '|')));
                     $sTableHtml .= '<tr>';

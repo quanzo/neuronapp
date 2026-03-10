@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\neuron\reranker;
 
 use NeuronAI\Chat\Enums\MessageRole;
+
 use function Amp\ParallelFunctions\parallelMap;
+
 use NeuronAI\Chat\Messages\Message;
 use NeuronAI\RAG\Document;
 use NeuronAI\RAG\PostProcessor\PostProcessorInterface;
@@ -354,4 +356,3 @@ PROMPT;
         return $raw;
     }
 }
-

@@ -164,4 +164,3 @@ final class WikiCommandsOptionsTest extends TestCase
         $this->assertStringNotContainsString('<b>', $display);
     }
 }
-

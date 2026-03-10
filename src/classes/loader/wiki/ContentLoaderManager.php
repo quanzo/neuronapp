@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/loader/wiki/ContentLoaderManager.php
 
 namespace app\modules\neuron\classes\loader\wiki;
@@ -335,4 +336,3 @@ class ContentLoaderManager
         return $this->loaders;
     }
 }
-

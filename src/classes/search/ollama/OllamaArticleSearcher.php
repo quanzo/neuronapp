@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/search/ollama/OllamaArticleSearcher.php
 
 namespace app\modules\neuron\classes\search\ollama;
@@ -149,4 +150,3 @@ class OllamaArticleSearcher extends ArticleSearcherAbstract
         return mb_substr($content, 0, $length) . '...';
     }
 }
-

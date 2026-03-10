@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/traits/tools/wiki/CoordinateExtractorTrait.php
 
 namespace app\modules\neuron\traits\tools\wiki;
@@ -169,4 +170,3 @@ trait CoordinateExtractorTrait
         return null;
     }
 }
-

@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/loader/web/GenericWebLoader.php
 
 namespace app\modules\neuron\classes\loader\web;
@@ -11,7 +12,6 @@ use app\modules\neuron\classes\convert\Mdify;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\enums\ContentSourceType;
 use app\modules\neuron\interfaces\ContentLoaderInterface;
-
 use Html2Text\Html2Text;
 
 /**
@@ -224,4 +224,3 @@ class GenericWebLoader implements ContentLoaderInterface
         return $cleaned;
     }
 }
-

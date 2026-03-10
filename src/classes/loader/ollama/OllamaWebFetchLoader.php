@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/loader/ollama/OllamaWebFetchLoader.php
 
 namespace app\modules\neuron\classes\loader\ollama;
@@ -99,4 +100,3 @@ class OllamaWebFetchLoader implements ContentLoaderInterface
         return 'Web Article';
     }
 }
-

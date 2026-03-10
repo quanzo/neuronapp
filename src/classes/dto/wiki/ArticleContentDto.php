@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/dto/wiki/ArticleContentDto.php
 
 namespace app\modules\neuron\classes\dto\wiki;
@@ -16,19 +17,19 @@ final class ArticleContentDto
      * @var string
      */
     public readonly string $content;
-    
+
     /**
      * Заголовок статьи
      * @var string
      */
     public readonly string $title;
-    
+
     /**
      * URL исходной статьи
      * @var string
      */
     public readonly string $sourceUrl;
-    
+
     /**
      * Тип источника данных (enum)
      * @var ContentSourceType
@@ -63,7 +64,7 @@ final class ArticleContentDto
         $this->sourceType = $sourceType;
         $this->metadata = $metadata;
     }
-    
+
     /**
      * Создает DTO из массива данных.
      * Удобно для десериализации из кеша или базы данных.
@@ -77,16 +78,16 @@ final class ArticleContentDto
         if (!isset($data['content'], $data['title'], $data['sourceUrl'], $data['sourceType'])) {
             throw new \InvalidArgumentException('Не все обязательные поля присутствуют в данных');
         }
-        
+
         // Преобразуем строковое значение sourceType в enum
         $sourceType = ContentSourceType::tryFrom($data['sourceType']);
-        
+
         if (!$sourceType) {
             throw new \InvalidArgumentException(
                 sprintf('Некорректный тип источника: %s', $data['sourceType'])
             );
         }
-        
+
         return new self(
             content   : $data['content'],
             title     : $data['title'],
@@ -95,7 +96,7 @@ final class ArticleContentDto
             metadata  : $data['metadata'] ?? []
         );
     }
-    
+
     /**
      * Преобразует DTO в массив.
      * Удобно для сериализации в кеш или базу данных.
@@ -112,7 +113,7 @@ final class ArticleContentDto
             'metadata'   => $this->metadata,
         ];
     }
-    
+
     /**
      * Проверяет, является ли источник вики-энциклопедией.
      *
@@ -122,7 +123,7 @@ final class ArticleContentDto
     {
         return $this->sourceType->isWiki();
     }
-    
+
     /**
      * Проверяет, является ли источник специализированным.
      * Специализированные источники имеют собственные загрузчики.
@@ -133,7 +134,7 @@ final class ArticleContentDto
     {
         return $this->sourceType->isSpecialized();
     }
-    
+
     /**
      * Возвращает читаемое название типа источника.
      *
@@ -143,7 +144,7 @@ final class ArticleContentDto
     {
         return $this->sourceType->getLabel();
     }
-    
+
     /**
      * Возвращает базовый URL источника.
      *
@@ -153,7 +154,7 @@ final class ArticleContentDto
     {
         return $this->sourceType->getBaseUrl();
     }
-    
+
     /**
      * Получает значение из метаданных по ключу.
      *
@@ -165,7 +166,7 @@ final class ArticleContentDto
     {
         return $this->metadata[$key] ?? $default;
     }
-    
+
     /**
      * Проверяет наличие ключа в метаданных.
      *
@@ -176,7 +177,7 @@ final class ArticleContentDto
     {
         return isset($this->metadata[$key]);
     }
-    
+
     /**
      * Возвращает все метаданные.
      *
@@ -186,7 +187,7 @@ final class ArticleContentDto
     {
         return $this->metadata;
     }
-    
+
     /**
      * Проверяет, является ли статья загруженной через Ollama.
      *
@@ -224,14 +225,14 @@ final class ArticleContentDto
             if ($originalType && ContentSourceType::isValid($originalType)) {
                 return ContentSourceType::from($originalType);
             }
-            
+
             // Пытаемся определить по URL
             return ContentSourceType::fromUrl($this->sourceUrl);
         }
-        
+
         return $this->sourceType;
     }
-    
+
     /**
      * Получает информацию о поисковой системе SearXNG, если статья найдена через неё.
      *
@@ -242,7 +243,7 @@ final class ArticleContentDto
         if (!$this->isSearxngSource()) {
             return null;
         }
-        
+
         return [
             'score' => $this->getMetadata('searxng_score'),
             'snippet' => $this->getMetadata('searxng_snippet'),

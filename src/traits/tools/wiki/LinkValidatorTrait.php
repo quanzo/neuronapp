@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/traits/tools/wiki/LinkValidatorTrait.php
 
 namespace app\modules\neuron\traits\tools\wiki;
@@ -92,4 +93,3 @@ trait LinkValidatorTrait
         return $this->linkValidationTimeout;
     }
 }
-

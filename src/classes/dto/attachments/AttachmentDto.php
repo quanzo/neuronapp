@@ -46,4 +46,3 @@ abstract class AttachmentDto
      */
     abstract public function getContentBlock(): ContentBlockInterface;
 }
-

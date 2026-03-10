@@ -81,12 +81,12 @@ class EditTool extends ATool
      * @param string $description      Описание инструмента
      */
     public function __construct(
-        string $basePath          = '',
-        bool   $createBackup      = true,
-        bool   $createIfNotExists = false,
-        int    $maxFileSize       = 1048576,
-        string $name              = 'edit',
-        string $description       = 'Редактирование файла: находит указанный фрагмент текста и заменяет его. Фрагмент для замены должен быть уникальным в файле.',
+        string $basePath = '',
+        bool $createBackup = true,
+        bool $createIfNotExists = false,
+        int $maxFileSize = 1048576,
+        string $name = 'edit',
+        string $description = 'Редактирование файла: находит указанный фрагмент текста и заменяет его. Фрагмент для замены должен быть уникальным в файле.',
     ) {
         parent::__construct(name: $name, description: $description);
 

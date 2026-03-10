@@ -32,4 +32,3 @@ interface ISkill
      */
     public function getOptions(): array;
 }
-

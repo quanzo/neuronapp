@@ -74,13 +74,13 @@ class GlobTool extends ATool
      * @param string      $description     Описание инструмента
      */
     public function __construct(
-        string $basePath         = '',
-        int    $maxResults       = 1000,
-        array  $excludePatterns  = ['.git', 'node_modules', 'vendor'],
-        bool   $followSymlinks   = false,
-        bool   $respectGitignore = false,
-        string $name             = 'glob',
-        string $description      = 'Поиск файлов и директорий по glob-шаблону. Поддерживает рекурсивный обход с помощью **, подстановочные символы * и ?.',
+        string $basePath = '',
+        int $maxResults = 1000,
+        array $excludePatterns = ['.git', 'node_modules', 'vendor'],
+        bool $followSymlinks = false,
+        bool $respectGitignore = false,
+        string $name = 'glob',
+        string $description = 'Поиск файлов и директорий по glob-шаблону. Поддерживает рекурсивный обход с помощью **, подстановочные символы * и ?.',
     ) {
         parent::__construct(name: $name, description: $description);
 

@@ -95,4 +95,3 @@ final class WikiSearchToolTest extends TestCase
         $this->assertContainsOnlyInstancesOf(ArticleSearcherInterface::class, $searchers);
     }
 }
-

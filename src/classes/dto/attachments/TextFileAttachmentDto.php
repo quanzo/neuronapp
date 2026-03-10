@@ -166,4 +166,3 @@ final class TextFileAttachmentDto extends AttachmentDto implements IAttachmentFi
         return is_string($mime) && $mime !== '' ? $mime : null;
     }
 }
-

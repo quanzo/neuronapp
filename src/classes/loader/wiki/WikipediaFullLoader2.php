@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/loader/wiki/WikipediaFullLoader2.php
 
 namespace app\modules\neuron\classes\loader\wiki;
@@ -54,4 +55,3 @@ class WikipediaFullLoader2 extends WikipediaLoader
         return '';
     }
 }
-

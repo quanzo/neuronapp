@@ -1,10 +1,12 @@
 <?php
+
 namespace app\modules\neuron\traits;
 
 use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Providers\AIProviderInterface;
 
-trait AgentUseModuleTrait {
+trait AgentUseModuleTrait
+{
     public $config;
 
     public function instructions(): string

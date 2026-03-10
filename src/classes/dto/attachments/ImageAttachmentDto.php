@@ -125,4 +125,3 @@ final class ImageAttachmentDto extends AttachmentDto
         );
     }
 }
-

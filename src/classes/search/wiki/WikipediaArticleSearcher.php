@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/search/wiki/WikipediaArticleSearcher.php
 
 namespace app\modules\neuron\classes\search\wiki;
@@ -229,4 +230,3 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
         });
     }
 }
-

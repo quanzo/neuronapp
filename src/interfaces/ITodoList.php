@@ -40,4 +40,3 @@ interface ITodoList
      */
     public function getOptions(): array;
 }
-

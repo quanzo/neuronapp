@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/search/wiki/ArticleSearchFactory.php
 
 namespace app\modules\neuron\classes\search\wiki;
@@ -146,4 +147,3 @@ class ArticleSearchFactory
         return new ArticleSearchManager($searchers);
     }
 }
-

@@ -202,4 +202,3 @@ final class HistoryCompactTrimmerTest extends TestCase
         }
     }
 }
-

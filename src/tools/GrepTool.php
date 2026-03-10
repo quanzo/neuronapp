@@ -81,13 +81,13 @@ class GrepTool extends ATool
      * @param string   $description     Описание инструмента
      */
     public function __construct(
-        string $basePath        = '',
-        int    $maxMatches      = 50,
-        int    $maxFileSize     = 1048576,
-        array  $excludePatterns = ['.git', 'node_modules', 'vendor'],
-        int    $contextLines    = 0,
-        string $name            = 'grep',
-        string $description     = 'Поиск текста или регулярного выражения внутри файлов. Возвращает совпадения с указанием файла и номера строки.',
+        string $basePath = '',
+        int $maxMatches = 50,
+        int $maxFileSize = 1048576,
+        array $excludePatterns = ['.git', 'node_modules', 'vendor'],
+        int $contextLines = 0,
+        string $name = 'grep',
+        string $description = 'Поиск текста или регулярного выражения внутри файлов. Возвращает совпадения с указанием файла и номера строки.',
     ) {
         parent::__construct(name: $name, description: $description);
 

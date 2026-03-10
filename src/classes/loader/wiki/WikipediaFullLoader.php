@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/loader/wiki/WikipediaFullLoader.php
 
 namespace app\modules\neuron\classes\loader\wiki;
@@ -282,4 +283,3 @@ class WikipediaFullLoader implements ContentLoaderInterface
         return null;
     }
 }
-

@@ -538,4 +538,3 @@ final class HistoryCompactTrimmer implements HistoryTrimmerInterface
         return mb_strtolower($normalized);
     }
 }
-

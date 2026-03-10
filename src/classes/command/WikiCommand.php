@@ -185,4 +185,3 @@ class WikiCommand extends Command
         return trim($stripped);
     }
 }
-

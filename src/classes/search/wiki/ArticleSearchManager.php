@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/search/wiki/ArticleSearchManager.php
 
 namespace app\modules\neuron\classes\search\wiki;
@@ -109,11 +110,15 @@ class ArticleSearchManager
 
             // Фильтруем поисковики по типам источников
             foreach ($this->searchers as $searcher) {
-                if ($searcher instanceof WikipediaArticleSearcher &&
-                    in_array(ContentSourceType::WIKIPEDIA, $sourceTypes, true)) {
+                if (
+                    $searcher instanceof WikipediaArticleSearcher &&
+                    in_array(ContentSourceType::WIKIPEDIA, $sourceTypes, true)
+                ) {
                     $futures[] = $searcher->search($query, $limitPerSource);
-                } elseif ($searcher instanceof RuWikiArticleSearcher &&
-                    in_array(ContentSourceType::RUWIKI, $sourceTypes, true)) {
+                } elseif (
+                    $searcher instanceof RuWikiArticleSearcher &&
+                    in_array(ContentSourceType::RUWIKI, $sourceTypes, true)
+                ) {
                     $futures[] = $searcher->search($query, $limitPerSource);
                 }
             }
@@ -183,4 +188,3 @@ class ArticleSearchManager
         return count($this->searchers);
     }
 }
-

@@ -172,7 +172,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
         int $startFromTodoIndex = 0
     ): Future {
         $agentCfg = $this->getConfigurationAgent();
-        
+
         return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $startFromTodoIndex): ChatHistoryInterface {
             $logger      = $agentCfg->getLoggerWithContext();
             $baseContext = ['todolist' => $this->getName()];
@@ -317,6 +317,4 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
 
         $this->pushTodo(Todo::fromString($text));
     }
-
 }
-

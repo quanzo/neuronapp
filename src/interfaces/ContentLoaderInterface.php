@@ -43,4 +43,3 @@ interface ContentLoaderInterface
      */
     public function load(string $url): Future;
 }
-

@@ -1,11 +1,12 @@
 <?php
+
 namespace app\modules\neuron\traits;
 
 use NeuronAI\RAG\Embeddings\EmbeddingsProviderInterface;
 use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 
-trait RagUseModuleTrait {
-
+trait RagUseModuleTrait
+{
     protected function embeddings(): EmbeddingsProviderInterface
     {
         return $this->config->getEmbeddingProvider();

@@ -78,4 +78,3 @@ final class CommandAttachmentsOptionTest extends TestCase
         $this->assertStringContainsString('не найден или недоступен', $display);
     }
 }
-

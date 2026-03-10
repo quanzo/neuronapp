@@ -58,4 +58,3 @@ class Todo implements ITodo
         return PlaceholderHelper::renderWithParams($this->text, $params);
     }
 }
-

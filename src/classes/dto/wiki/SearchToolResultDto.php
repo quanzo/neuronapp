@@ -59,4 +59,3 @@ final class SearchToolResultDto
         return $result;
     }
 }
-

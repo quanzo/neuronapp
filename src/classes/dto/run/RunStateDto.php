@@ -16,7 +16,7 @@ use app\modules\neuron\helpers\RunStateCheckpointHelper;
 final class RunStateDto
 {
     const DEF_AGENT_NAME = 'session';
-    
+
     private string $sessionKey = '';
     private string $agentName = '';
     private string $runId = '';
@@ -191,7 +191,8 @@ final class RunStateDto
      *
      * @return void
      */
-    public function write(): void {
+    public function write(): void
+    {
         RunStateCheckpointHelper::write($this);
     }
 
@@ -200,7 +201,8 @@ final class RunStateDto
      *
      * @return void
      */
-    public function delete(): void {
+    public function delete(): void
+    {
         RunStateCheckpointHelper::delete($this->getSessionKey(), $this->getAgentName());
     }
 

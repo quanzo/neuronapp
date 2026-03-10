@@ -17,25 +17,25 @@ class ArrayCache implements CacheItemPoolInterface
      * @var CacheItem[]
      */
     private array $items = [];
-    
+
     /**
      * Массив для отслеживания порядка использования элементов (LRU)
      * @var string[]
      */
     private array $usageOrder = [];
-    
+
     /**
      * Максимальное количество элементов в кеше
      * @var int
      */
     private int $limit;
-    
+
     /**
      * Элементы, ожидающие сохранения (отложенное сохранение)
      * @var CacheItem[]
      */
     private array $deferred = [];
-    
+
     /**
      * Конструктор кеша на основе массива.
      *
@@ -56,13 +56,13 @@ class ArrayCache implements CacheItemPoolInterface
     public function getItem(string $key): CacheItemInterface
     {
         $this->validateKey($key);
-        
+
         // Обновляем порядок использования для LRU
         $this->updateUsageOrder($key);
-        
+
         if (isset($this->items[$key])) {
             $item = $this->items[$key];
-            
+
             // Проверяем, не истек ли срок действия
             if ($item->isHit()) {
                 return clone $item; // Возвращаем клон для безопасности
@@ -71,11 +71,11 @@ class ArrayCache implements CacheItemPoolInterface
                 unset($this->items[$key]);
             }
         }
-        
+
         // Создаем новый элемент (не найден в кеше)
         $item = new CacheItem($key);
         $item->setIsHit(false);
-        
+
         return $item;
     }
 
@@ -89,11 +89,11 @@ class ArrayCache implements CacheItemPoolInterface
     public function getItems(array $keys = []): iterable
     {
         $items = [];
-        
+
         foreach ($keys as $key) {
             $items[$key] = $this->getItem($key);
         }
-        
+
         return $items;
     }
 
@@ -119,7 +119,7 @@ class ArrayCache implements CacheItemPoolInterface
         $this->items = [];
         $this->usageOrder = [];
         $this->deferred = [];
-        
+
         return true;
     }
 
@@ -133,22 +133,22 @@ class ArrayCache implements CacheItemPoolInterface
     public function deleteItem(string $key): bool
     {
         $this->validateKey($key);
-        
+
         if (isset($this->items[$key])) {
             unset($this->items[$key]);
         }
-        
+
         // Удаляем из порядка использования
         $index = array_search($key, $this->usageOrder, true);
         if ($index !== false) {
             array_splice($this->usageOrder, $index, 1);
         }
-        
+
         // Удаляем из отложенных элементов
         if (isset($this->deferred[$key])) {
             unset($this->deferred[$key]);
         }
-        
+
         return true;
     }
 
@@ -162,13 +162,13 @@ class ArrayCache implements CacheItemPoolInterface
     public function deleteItems(array $keys): bool
     {
         $allDeleted = true;
-        
+
         foreach ($keys as $key) {
             if (!$this->deleteItem($key)) {
                 $allDeleted = false;
             }
         }
-        
+
         return $allDeleted;
     }
 
@@ -183,18 +183,18 @@ class ArrayCache implements CacheItemPoolInterface
         if (!$item instanceof CacheItem) {
             return false;
         }
-        
+
         $key = $item->getKey();
-        
+
         // Обновляем элемент в кеше
         $this->items[$key] = clone $item;
-        
+
         // Обновляем порядок использования
         $this->updateUsageOrder($key);
-        
+
         // Обеспечиваем соблюдение лимита
         $this->enforceLimit();
-        
+
         return true;
     }
 
@@ -210,7 +210,7 @@ class ArrayCache implements CacheItemPoolInterface
             $key = $item->getKey();
             $this->deferred[$key] = clone $item;
         }
-        
+
         return true;
     }
 
@@ -222,16 +222,16 @@ class ArrayCache implements CacheItemPoolInterface
     public function commit(): bool
     {
         $allSaved = true;
-        
+
         foreach ($this->deferred as $item) {
             if (!$this->save($item)) {
                 $allSaved = false;
             }
         }
-        
+
         // Очищаем очередь отложенных элементов
         $this->deferred = [];
-        
+
         return $allSaved;
     }
 
@@ -246,7 +246,7 @@ class ArrayCache implements CacheItemPoolInterface
         if ($key === '') {
             throw new \InvalidArgumentException('Ключ кеша должен быть непустой строкой');
         }
-        
+
         // Проверяем на недопустимые символы (по PSR-6)
         if (preg_match('/[{}()\/\\\\@:]/', $key)) {
             throw new \InvalidArgumentException('Ключ кеша содержит недопустимые символы: {}()/\\@:');
@@ -266,7 +266,7 @@ class ArrayCache implements CacheItemPoolInterface
         if ($index !== false) {
             array_splice($this->usageOrder, $index, 1);
         }
-        
+
         // Добавляем ключ в конец (самый недавно использованный)
         $this->usageOrder[] = $key;
     }
@@ -323,7 +323,7 @@ class ArrayCache implements CacheItemPoolInterface
                 $totalSize += strlen($value);
             }
         }
-        
+
         return [
             'items_count' => count($this->items),
             'limit' => $this->limit,

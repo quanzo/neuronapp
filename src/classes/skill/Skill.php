@@ -41,7 +41,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
      *  - блок опций и тело, разделенные линиями из '-';
      *  - только блок опций (без тела);
      *  - быть пустым (без опций и тела).
-     * 
+     *
      * @param string               $input     Полный текст описания навыка.
      * @param string               $name      Имя навыка (имя файла с поддиректорией, если есть).
      * @param ConfigurationApp|null $configApp Экземпляр конфигурации приложения для разрешения зависимостей.

@@ -1,6 +1,7 @@
 <?php
 
 namespace app\modules\neuron\classes\status;
+
 use app\modules\neuron\interfaces\StatusInterface;
 
 /**

@@ -16,4 +16,3 @@ interface ITodo
      */
     public function getTodo(?array $params = null): string;
 }
-

@@ -42,7 +42,7 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
             }))
             ->willReturn($handler);
 
-        $cfg = new class($agent) extends ConfigurationAgent {
+        $cfg = new class ($agent) extends ConfigurationAgent {
             public function __construct(private AgentInterface $agent)
             {
             }
@@ -89,7 +89,7 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
             }), 'SomeClass', 2)
             ->willReturn((object) ['value' => 'structured-ok']);
 
-        $cfg = new class($agent) extends ConfigurationAgent {
+        $cfg = new class ($agent) extends ConfigurationAgent {
             public function __construct(private AgentInterface $agent)
             {
             }
@@ -114,4 +114,3 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
         $this->assertSame('from-dto', $captured->getContentBlocks()[1]->content);
     }
 }
-

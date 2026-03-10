@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/traits/tools/wiki/HtmlToPlainTextConverterTrait.php
 
 namespace app\modules\neuron\traits\tools\wiki;
@@ -381,7 +382,8 @@ trait HtmlToPlainTextConverterTrait
         }
 
         // Проверяем, является ли ссылка на Викисклад или Wikimedia Commons
-        if (strpos($href, 'commons.wikimedia.org') !== false
+        if (
+            strpos($href, 'commons.wikimedia.org') !== false
             || strpos($href, 'wikimedia.org') !== false
             || strpos($href, 'wikimediafoundation.org') !== false
         ) {
@@ -593,5 +595,3 @@ trait HtmlToPlainTextConverterTrait
         return trim($text);
     }
 }
-
-

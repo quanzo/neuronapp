@@ -166,4 +166,3 @@ class RuwikiCommand extends Command
         return trim($stripped);
     }
 }
-

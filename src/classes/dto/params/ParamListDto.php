@@ -168,4 +168,3 @@ final class ParamListDto
         return [new self($itemsByName), $errors];
     }
 }
-

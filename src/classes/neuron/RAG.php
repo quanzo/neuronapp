@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace app\modules\neuron\classes\neuron;
@@ -10,7 +11,8 @@ use NeuronAI\RAG\RAG as NeuronRAG;
 /**
  * Агент частично настраиваемый через модуль. Со знаниями в векторном хранилище.
  */
-class RAG extends NeuronRAG {
+class RAG extends NeuronRAG
+{
     use AgentUseModuleTrait;
     use RagUseModuleTrait;
 }

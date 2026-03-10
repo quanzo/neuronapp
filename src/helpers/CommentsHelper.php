@@ -50,4 +50,3 @@ class CommentsHelper
         return rtrim($cleaned, "\n");
     }
 }
-

@@ -1,4 +1,5 @@
 <?php
+
 namespace app\modules\neuron\classes\dto\ollama;
 
 /**

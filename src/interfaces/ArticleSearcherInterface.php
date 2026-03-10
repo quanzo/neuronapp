@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/interfaces/wiki/search/ArticleSearcherInterface.php
 
 namespace app\modules\neuron\interfaces;
@@ -23,4 +24,3 @@ interface ArticleSearcherInterface
      */
     public function search(string $query, int $limit = 10, int $offset = 0): Future;
 }
-

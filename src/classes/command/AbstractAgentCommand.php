@@ -16,7 +16,6 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-
 class AbstractAgentCommand extends Command
 {
     /**
@@ -25,12 +24,12 @@ class AbstractAgentCommand extends Command
      * @param ConfigurationApp $appCfg
      * @return void
      */
-    public function resolveFileLogger(ConfigurationApp $appCfg) {
+    public function resolveFileLogger(ConfigurationApp $appCfg)
+    {
         $appCfg = ConfigurationApp::getInstance();
         $logDir = $appCfg->getLogDir();
         $fn     = $appCfg->getSessionKey() . '.log';
         $logger = new FileLogger($logDir . DIRECTORY_SEPARATOR . $fn);
         $appCfg->setLogger($logger);
     }
-
 }

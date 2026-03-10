@@ -1,4 +1,5 @@
 <?php
+
 // src/app/modules/neuron/classes/loader/wiki/ContentLoaderFactory.php
 
 namespace app\modules\neuron\classes\loader\wiki;
@@ -139,4 +140,3 @@ class ContentLoaderFactory
         ], new ArrayCache($cacheLimit));
     }
 }
-
