@@ -65,7 +65,7 @@ final class RunStateCheckpointHelper
      * @param string $agentName  Имя агента.
      * @return RunStateDto|null DTO состояния или null, если файла нет или JSON невалиден.
      */
-    public static function read(string $sessionKey, string $agentName): ?RunStateDto
+    public static function read(string $sessionKey, string $agentName = RunStateDto::DEF_AGENT_NAME): ?RunStateDto
     {
         $path = self::filePath($sessionKey, $agentName);
         if (!file_exists($path)) {

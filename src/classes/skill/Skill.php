@@ -12,6 +12,7 @@ use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\PlaceholderHelper;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\producers\SkillProducer;
+use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ISkill;
 use NeuronAI\Chat\Enums\MessageRole;
@@ -177,7 +178,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
 
         $skillName = $this->getName();
         $tool->setCallable(function (mixed ...$args) use ($agentCfg, $role, $skillName): mixed {
-            $logger = $agentCfg->getLoggerWithContext();
+            $logger  = $agentCfg->getLoggerWithContext();
             $context = ['skill' => $skillName];
             $logger->info('Skill вызван', $context);
             try {
@@ -221,8 +222,10 @@ class Skill extends AbstractPromptWithParams implements ISkill
         $logger->info('Skill started', $context);
 
         $text = $this->getSkill($params ?? []);
+
         return \Amp\async(function () use ($agentCfg, $text, $role, $attachments, $skillProducer): mixed {
-            $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession() : $agentCfg;
+
+            $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) : $agentCfg->cloneForSession(ChatHistoryCloneMode::COPY_CONTEXT);
 
             if ($skillProducer !== null && $this->getNeedSkills() !== []) {
                 $skillTools = [];

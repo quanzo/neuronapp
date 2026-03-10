@@ -175,6 +175,9 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
         ?SkillProducer $skillProducer = null,
         int $startFromTodoIndex = 0
     ): Future {
+        // настройках элемента может быть уже задано имя агента, который лучше всего исполнит
+        $customAgentName = $this->getAgentName();
+        
         return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $skillProducer, $startFromTodoIndex): ChatHistoryInterface {
             $logger      = $agentCfg->getLoggerWithContext();
             $baseContext = ['todolist' => $this->getName()];
@@ -197,7 +200,6 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
 
             $runStateDto = null;
             $sessionKey  = $sessionCfg->getSessionKey();
-            $agentName   = $sessionCfg->getAgentName();
             if ($sessionCfg->enableChatHistory && $sessionKey !== null && $sessionKey !== '') {
                 $runStateDto = $sessionCfg->getBlankRunStateDto();
                 $runStateDto->setTodolistName($this->getName());

@@ -7,8 +7,10 @@ use app\modules\neuron\classes\neuron\Agent;
 use app\modules\neuron\classes\ChatHistory;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\neuron\RAG;
+use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\events\Event;
 use app\modules\neuron\helpers\CallableWrapper;
+use app\modules\neuron\helpers\ChatHistoryCopyHelper;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\models\Message;
 use NeuronAI\Agent\AgentInterface;
@@ -330,16 +332,32 @@ class ConfigurationAgent {
     }
 
     /**
-     * Возвращает клон конфигурации с сброшенным кешем агента.
-     * Используется для исполнения с дополнительными инструментами (например, skills)
-     * без изменения основного состояния агента.
+     * Возвращает клон конфигурации с сброшенным кешем агента и новой in-memory историей чата.
      *
-     * @return self
+     * Используется для исполнения с дополнительными инструментами (например, skills) без изменения
+     * основного состояния агента. Поведение истории чата управляется режимом клонирования:
+     * - {@see ChatHistoryCloneMode::RESET_EMPTY} — создать новую пустую {@see InMemoryChatHistory};
+     * - {@see ChatHistoryCloneMode::COPY_CONTEXT} — создать новую {@see InMemoryChatHistory} и
+     *   перенести в неё все сообщения из текущей истории (файловой или in-memory).
+     *
+     * @param ChatHistoryCloneMode $mode Режим клонирования истории чата.
+     *
+     * @return self Клон конфигурации агента для отдельной сессии.
      */
-    public function cloneForSession(): self
+    public function cloneForSession(ChatHistoryCloneMode $mode = ChatHistoryCloneMode::RESET_EMPTY): self
     {
         $clone = clone $this;
         $clone->_agent = null;
+
+        $targetHistory = new InMemoryChatHistory($this->contextWindow);
+
+        if ($mode === ChatHistoryCloneMode::COPY_CONTEXT) {
+            $sourceHistory = $this->_chatHistory ?? $this->getChatHistory();
+            ChatHistoryCopyHelper::copy($sourceHistory, $targetHistory);
+        }
+
+        $clone->setChatHistory($targetHistory);
+
         return $clone;
     }
 
@@ -466,7 +484,7 @@ class ConfigurationAgent {
         if ($this->enableChatHistory) {
             $this->_chatHistory = new FileChatHistory(
                 ConfigurationApp::getInstance()->getSessionDir(),
-                $this->getSessionKeyWithAgent(),
+                $this->getSessionKey(), // контекст теперь для всей сессии, а не для агента в сессии
                 $this->contextWindow
             );
         } else {
@@ -519,15 +537,6 @@ class ConfigurationAgent {
     }
 
     /**
-     * Имя сессии вместе с имененм агента
-     *
-     * @return string|null
-     */
-    public function getSessionKeyWithAgent(): ?string {
-        return $this->getSessionKey() . '-' . $this->getAgentName();
-    }
-
-    /**
      * Имя агента
      *
      * @return string
@@ -544,8 +553,11 @@ class ConfigurationAgent {
     public function getBlankRunStateDto(): RunStateDto {
         $runStateDto = (new RunStateDto())
             ->setSessionKey($this->getSessionKey())
+            /*
             ->setAgentName($this->getAgentName())
-            ->setRunId($this->getSessionKeyWithAgent())
+            */
+            ->setAgentName(RunStateDto::DEF_AGENT_NAME) // делаем так, чтобы состояние теперь было на всю сессию. для обесепечения работы разных агентов в одной сессии
+            ->setRunId($this->getSessionKey())
             ->setStartedAt((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
             ->setLastCompletedTodoIndex(-1)
             ->setHistoryMessageCount(null)
@@ -561,7 +573,10 @@ class ConfigurationAgent {
      * @return RunStateDto|null
      */
     public function getExistRunStateDto(): ?RunStateDto {
+        /*
         $unfinishedCheckpoint = RunStateCheckpointHelper::read($this->getSessionKey(), $this->getAgentName());
+        */
+        $unfinishedCheckpoint = RunStateCheckpointHelper::read($this->getSessionKey()); // статус запуска на всю сессию теперь будет
         if ($unfinishedCheckpoint) {
             // есть не завершенный чекпоинт
             return $unfinishedCheckpoint;

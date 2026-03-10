@@ -15,6 +15,8 @@ use app\modules\neuron\helpers\RunStateCheckpointHelper;
  */
 final class RunStateDto
 {
+    const DEF_AGENT_NAME = 'session';
+    
     private string $sessionKey = '';
     private string $agentName = '';
     private string $runId = '';

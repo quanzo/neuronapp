@@ -210,15 +210,18 @@ abstract class APromptComponent
     /**
      * Возвращает имя агента-исполнителя.
      *
-     * Берётся из опции "agent", если задана и не пуста; иначе — имя агента по умолчанию.
+     * Берётся из опции "agent", если задана и не пуста; иначе — null
      */
-    public function getAgentName(): string
+    public function getAgentName(): ?string
     {
         $agent = $this->options['agent'] ?? null;
         if (is_string($agent) && $agent !== '') {
             return $agent;
         }
+        return null;
+        /*
         return AgentProducer::getDefaultAgentName();
+        */
     }
 
     /**
