@@ -14,6 +14,7 @@ use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\RunStateCheckpointHelper;
+use app\modules\neuron\helpers\FileContextHelper;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\interfaces\ITodoList;
 use NeuronAI\Chat\Enums\MessageRole;
@@ -212,7 +213,14 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                 $logger->info('Todo started', array_merge($baseContext, ['todo_index' => $todoIndex, 'todo' => $todoText]));
                 try {
                     $message = new NeuronMessage($role, $todoText);
-                    $sessionCfg->sendMessageWithAttachments($message, $attachments);
+                    $todoAttachments = $attachments;
+                    if ($configApp !== null) {
+                        $contextFiles = FileContextHelper::buildContextAttachments($todoText, $configApp);
+                        if ($contextFiles['attachments'] !== []) {
+                            $todoAttachments = array_merge($todoAttachments, $contextFiles['attachments']);
+                        }
+                    }
+                    $sessionCfg->sendMessageWithAttachments($message, $todoAttachments);
                     if ($runStateDto !== null) {
                         $runStateDto->setLastCompletedTodoIndex($todoIndex);
                         $runStateDto->setHistoryMessageCount(

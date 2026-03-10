@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\dto\attachments;
 
 use app\modules\neuron\enums\AttachmentTypeEnum;
+use app\modules\neuron\interfaces\IAttachmentFile;
 use NeuronAI\Chat\Enums\SourceType;
 use NeuronAI\Chat\Messages\ContentBlocks\ContentBlockInterface;
 use NeuronAI\Chat\Messages\ContentBlocks\ImageContent;
@@ -15,7 +16,7 @@ use NeuronAI\Chat\Messages\ContentBlocks\ImageContent;
  * Содержит путь к файлу или идентификатор ресурса с изображением. Адаптер
  * NeuronAI сам решает, как читать и интерпретировать этот ресурс.
  */
-final class ImageFileAttachmentDto extends AttachmentDto
+final class ImageFileAttachmentDto extends AttachmentDto implements IAttachmentFile
 {
     /**
      * Создаёт DTO вложения с файлом изображения.

@@ -387,6 +387,21 @@ class ConfigurationApp
             return $this->config[$key];
         }
 
+        if (str_contains($key, '.')) {
+            $parts = explode('.', $key);
+            $value = $this->config;
+
+            foreach ($parts as $segment) {
+                if (!is_array($value) || !array_key_exists($segment, $value)) {
+                    return $default;
+                }
+
+                $value = $value[$segment];
+            }
+
+            return $value;
+        }
+
         return $default;
     }
 

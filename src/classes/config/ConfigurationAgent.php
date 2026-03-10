@@ -27,7 +27,9 @@ use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\run\RunStateDto;
 use app\modules\neuron\classes\logger\ContextualLogger;
+use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\RunStateCheckpointHelper;
+use app\modules\neuron\interfaces\IAttachmentFile;
 use app\modules\neuron\tools\ATool;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
@@ -232,7 +234,8 @@ class ConfigurationAgent {
      *                                   либо DTO, если ответ структурирован.
      */
     public function sendMessageWithAttachments(NeuronMessage $message, array $attachments = []): mixed {
-        $agent = $this->getAgent();
+        $attachments = AttachmentHelper::deduplicateAttachments($attachments);
+        $agent       = $this->getAgent();
 
         /**
          * @var Agent|RAG $agent

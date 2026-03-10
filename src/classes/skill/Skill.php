@@ -9,6 +9,7 @@ use app\modules\neuron\classes\AbstractPromptWithParams;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\params\ParamListDto;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\helpers\FileContextHelper;
 use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\PlaceholderHelper;
 use app\modules\neuron\classes\config\ConfigurationAgent;
@@ -218,6 +219,14 @@ class Skill extends AbstractPromptWithParams implements ISkill
         $logger->info('Skill started', $context);
 
         $text = $this->getSkill($params ?? []);
+
+        $configApp = $this->getConfigurationApp();
+        if ($configApp !== null) {
+            $contextFiles = FileContextHelper::buildContextAttachments($this->getBody(), $configApp);
+            if ($contextFiles['attachments'] !== []) {
+                $attachments = array_merge($attachments, $contextFiles['attachments']);
+            }
+        }
 
         return \Amp\async(function () use ($agentCfg, $text, $role, $attachments): mixed {
 

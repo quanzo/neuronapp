@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="NeuronApp Coding Standard">
+    <description>Base PHPCS ruleset for NeuronApp project using PSR-12.</description>
+
+    <!-- Directories to scan -->
+    <file>src</file>
+    <file>tests</file>
+
+    <!-- Exclude vendor and temporary/system folders -->
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/temp/*</exclude-pattern>
+    <exclude-pattern>*/.git/*</exclude-pattern>
+    <exclude-pattern>*/.idea/*</exclude-pattern>
+    <exclude-pattern>*/.cursor/*</exclude-pattern>
+
+    <!-- Base coding standard -->
+    <rule ref="PSR12" />
+
+    <!-- Global settings -->
+    <arg name="encoding" value="utf-8"/>
+    <arg name="tab-width" value="4"/>
+    <arg name="basepath" value="."/>
+</ruleset>
+

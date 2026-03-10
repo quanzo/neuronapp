@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\dto\attachments;
 
 use app\modules\neuron\enums\AttachmentTypeEnum;
+use app\modules\neuron\interfaces\IAttachmentFile;
 use NeuronAI\Chat\Enums\SourceType;
 use NeuronAI\Chat\Messages\ContentBlocks\ContentBlockInterface;
 use NeuronAI\Chat\Messages\ContentBlocks\FileContent;
@@ -16,7 +17,7 @@ use NeuronAI\Chat\Messages\ContentBlocks\FileContent;
  * адаптер NeuronAI может использовать для чтения содержимого и передачи
  * его в LLM.
  */
-final class TextFileAttachmentDto extends AttachmentDto
+final class TextFileAttachmentDto extends AttachmentDto implements IAttachmentFile
 {
     /**
      * Создаёт DTO вложения с текстовым файлом.
