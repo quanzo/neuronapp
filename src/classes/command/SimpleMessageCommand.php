@@ -132,8 +132,8 @@ class SimpleMessageCommand extends AbstractAgentCommand
                 return Command::FAILURE;
             }
 
-            if (!ConfigurationApp::getInstance()->sessionExists($sessionId, $agentName)) {
-                $output->writeln(sprintf('<error>Сессия с session_id "%s" для агента "%s" не найдена.</error>', $sessionId, $agentName));
+            if (!ConfigurationApp::getInstance()->sessionExists($sessionId)) {
+                $output->writeln(sprintf('<error>Сессия с session_id "%s" не найдена.</error>', $sessionId));
                 return Command::FAILURE;
             }
             $configApp->setSessionKey($sessionId);
@@ -159,31 +159,6 @@ class SimpleMessageCommand extends AbstractAgentCommand
                 )
             );
             return Command::FAILURE;
-        }
-
-        // Если передан session_id — проверяем формат и существование сессии, затем подставляем ключ
-        if ($sessionId !== null && $sessionId !== '') {
-            if (!ConfigurationApp::isValidSessionKey($sessionId)) {
-                $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u (например, 20250301-143022-123456).</error>');
-                return Command::FAILURE;
-            }
-
-            if (!ConfigurationApp::getInstance()->sessionExists($sessionId, $agentName)) {
-                $output->writeln(sprintf('<error>Сессия с session_id "%s" для агента "%s" не найдена.</error>', $sessionId, $agentName));
-                return Command::FAILURE;
-            }
-
-            $agentCfg->setSessionKey($sessionId);
-
-            // если задана сессия, то проверим а завершено ли предыдущее сообщение
-            $runStateDto = $agentCfg->getExistRunStateDto();
-            if ($runStateDto) {
-                $output->writeln(sprintf(
-                    '<error>В сессии обнаружено незавершённое выполнение списка "%s".</error>',
-                    $runStateDto->getTodolistName()
-                ));
-                return Command::FAILURE;
-            }
         }
 
         // Список из одного задания (текст сообщения), использующий глобальную конфигурацию приложения

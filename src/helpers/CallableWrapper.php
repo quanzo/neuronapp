@@ -49,7 +49,41 @@ class CallableWrapper
      */
     public static function createObject(string $class, ...$params)
     {
+        /*
         return new $class(...$params);
+        */
+        $args = $params;
+        foreach ($args as $name => &$val) {
+            if (static::isCallableWrapper($val) && is_array($val)) {
+                $val = static::call($val);
+            }
+        }
+        return new $class(...$args);
+    }
+
+    /**
+     * Создать объект из класса. В отличии от createObject разворачивает замыкания в аргументах
+     *
+     * @param string $class
+     * @param mixed ...$params
+     * @return mixed
+     */
+    public static function createObjectExt(string $class, ...$params)
+    {
+        $args = $params;
+        foreach ($args as $name => &$val) {
+            if (static::isCallable($val) && is_array($val)) {
+                $val = static::call($val);
+            }
+        }
+        return new $class(...$args);
+    }
+
+    public static function isCallableWrapper($call): bool {
+        if (is_array($call) && sizeof($call) >= 2) {
+            return $call[0] == self::class;
+        }
+        return false;
     }
 
     /**

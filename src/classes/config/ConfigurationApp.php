@@ -261,13 +261,13 @@ class ConfigurationApp
      * (префикс neuron_, расширение .chat).
      *
      * @param string $sessionKey Базовый ключ сессии (формат buildSessionKey()).
-     * @param string $agentName  Имя агента.
+     * @param string|null $agentName  Имя агента.
      *
      * @return bool true, если файл сессии существует.
      */
-    public function sessionExists(string $sessionKey, string $agentName): bool
+    public function sessionExists(string $sessionKey, ?string $agentName = null): bool
     {
-        $key = $sessionKey . '-' . ($agentName ?: 'unknown');
+        $key = $sessionKey . (is_null($agentName) ? '' : '-' . ($agentName ?: 'unknown'));
         $path = $this->dirPriority->resolveFile($this->getSessionDirName() . DIRECTORY_SEPARATOR . 'neuron_' . $key . '.chat');
         if ($path) {
             return true;
