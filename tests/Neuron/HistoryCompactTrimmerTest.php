@@ -201,4 +201,62 @@ final class HistoryCompactTrimmerTest extends TestCase
             $this->assertLessThanOrEqual(25, $bulletCount);
         }
     }
+
+    public function testTailLargerThanContextStillKeepsLastMessage(): void
+    {
+        $messages = [];
+
+        // Длинная голова, чтобы гарантированно сработала компактизация.
+        for ($i = 0; $i < 20; $i++) {
+            $messages[] = new Message(MessageRole::USER, "Head question {$i}");
+            $messages[] = new Message(MessageRole::ASSISTANT, "Head answer {$i}");
+        }
+
+        // Очень короткое окно: хвост гарантированно будет "слишком большим".
+        $messages[] = new Message(MessageRole::USER, 'Tail question');
+        $messages[] = new Message(MessageRole::ASSISTANT, 'Tail answer');
+
+        $trimmer = new HistoryCompactTrimmer(new TokenCounter(), 0.5);
+        $result = $trimmer->trim($messages, 1);
+
+        $this->assertNotEmpty($result);
+        $last = $result[count($result) - 1];
+        $this->assertSame('Tail answer', $last->getContent());
+    }
+
+    public function testTailHardTrimPreservesToolCallAndResultPairOnTinyWindow(): void
+    {
+        $messages = [];
+
+        // Длинная голова.
+        for ($i = 0; $i < 10; $i++) {
+            $messages[] = new Message(MessageRole::USER, "Head question {$i}");
+            $messages[] = new Message(MessageRole::ASSISTANT, "Head answer {$i}");
+        }
+
+        // Хвост: tool-пара + пользовательский шаг, чтобы была типичная структура.
+        $messages[] = new Message(MessageRole::USER, 'Before tool');
+        $messages[] = new Message(MessageRole::ASSISTANT, 'Before tool answer');
+
+        $toolCall = new ToolCallMessage(null, []);
+        $toolResult = new ToolResultMessage([]);
+        $messages[] = $toolCall;
+        $messages[] = $toolResult;
+
+        $messages[] = new Message(MessageRole::USER, 'After tool');
+        $messages[] = new Message(MessageRole::ASSISTANT, 'After tool answer');
+
+        $trimmer = new HistoryCompactTrimmer(new TokenCounter(), 0.5);
+        $result = $trimmer->trim($messages, 1);
+
+        $hasPair = false;
+        for ($i = 0; $i < count($result) - 1; $i++) {
+            if ($result[$i] instanceof ToolCallMessage && $result[$i + 1] instanceof ToolResultMessage) {
+                $hasPair = true;
+                break;
+            }
+        }
+
+        $this->assertTrue($hasPair, 'При жёстком срезе хвоста tool-пара не должна разрываться даже при маленьком окне');
+    }
 }

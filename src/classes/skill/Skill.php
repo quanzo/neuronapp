@@ -222,6 +222,11 @@ class Skill extends AbstractPromptWithParams implements ISkill
 
         $configApp = $this->getConfigurationApp();
         if ($configApp !== null) {
+            /**
+             * Здесь находим в тексте skill указание, на подключение в контекст выполнения, файлов
+             * Это конструкции вида: @relative/path/to/file.txt
+             * {@see FileContextHelper::buildContextAttachments}
+             */
             $contextFiles = FileContextHelper::buildContextAttachments($this->getBody(), $configApp);
             if ($contextFiles['attachments'] !== []) {
                 $attachments = array_merge($attachments, $contextFiles['attachments']);
@@ -230,15 +235,19 @@ class Skill extends AbstractPromptWithParams implements ISkill
 
         return \Amp\async(function () use ($agentCfg, $text, $role, $attachments): mixed {
 
-            $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) : $agentCfg->cloneForSession(ChatHistoryCloneMode::COPY_CONTEXT);
+            $sessionCfg = $this->isPureContext()
+                ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) // здесь агент без истории сообщений
+                : $agentCfg->cloneForSession(ChatHistoryCloneMode::COPY_CONTEXT); // здесь агент с копией, которая не влияет на сессию
 
             $configApp = $this->getConfigurationApp();
 
             if ($configApp !== null && $this->getNeedSkills() !== []) {
+                // здесь передаем в skill другие навыки, которые указаны в его параметрах
                 $skillTools = [];
                 foreach ($this->getNeedSkills() as $skillName) {
                     $skill = $configApp->getSkill($skillName);
                     if ($skill !== null) {
+                        // если в блоке настроек skill не указан используемый агент, то берется $sessionCfg
                         $skill->setDefaultConfigurationAgent($sessionCfg);
                         $skillTools[] = $skill->getTool($role);
                     }

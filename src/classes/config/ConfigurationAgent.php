@@ -27,6 +27,8 @@ use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\run\RunStateDto;
 use app\modules\neuron\classes\logger\ContextualLogger;
+use app\modules\neuron\classes\neuron\history\FileFullChatHistory;
+use app\modules\neuron\classes\neuron\trimmers\FluidContextWindowTrimmer;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use app\modules\neuron\interfaces\IAttachmentFile;
@@ -474,14 +476,13 @@ class ConfigurationAgent
      * Возвращает объект истории чата для текущей конфигурации агента.
      *
      * При включенной истории (`enableChatHistory === true`) используется файловое
-     * хранилище {@see FileChatHistory}, сохраняющее сообщения в директории
+     * хранилище {@see FileFullChatHistory}, сохраняющее сообщения в директории
      * {@see ConfigurationApp::getSessionDir()}.
      *
      * При отключенной истории (`enableChatHistory === false`) используется
      * оперативное хранилище {@see InMemoryChatHistory}, не сохраняющее сообщения
      * между запусками приложения.
      *
-     * Созданный объект кешируется и переиспользуется при последующих вызовах.
      *
      * @return ChatHistoryInterface Экземпляр истории чата для текущего агента.
      */
@@ -492,11 +493,24 @@ class ConfigurationAgent
         }
 
         if ($this->enableChatHistory) {
+            /**
+             * Агенты могут быть на разных моделях, с разным размером контекстного окна. Но они используют одну историю сессии. И они не должны образать историю сообщений из-за своего размера контекстного окна.
+             */
+            $this->_chatHistory = new FileFullChatHistory(
+                ConfigurationApp::getInstance()->getSessionDir(),
+                $this->getSessionKey(), // контекст теперь для всей сессии, а не для агента в сессии
+                $this->contextWindow,
+                'neuron_',
+                '.chat',
+                new FluidContextWindowTrimmer()
+            );
+            /*
             $this->_chatHistory = new FileChatHistory(
                 ConfigurationApp::getInstance()->getSessionDir(),
                 $this->getSessionKey(), // контекст теперь для всей сессии, а не для агента в сессии
                 $this->contextWindow
             );
+            */
         } else {
             $this->_chatHistory = new InMemoryChatHistory($this->contextWindow);
         }

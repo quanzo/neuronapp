@@ -296,7 +296,7 @@ final class FluidContextWindowTrimmer implements HistoryTrimmerInterface
 
         $sliceStart = $firstUserIndex;
         if ($firstUserIndex > 0) {
-            for ($i = $firstUserIndex - 1; $i > 0; $i--) {
+            for ($i = $firstUserIndex; $i > 0; $i--) {
                 if ($messages[$i] instanceof ToolResultMessage && $messages[$i - 1] instanceof ToolCallMessage) {
                     $sliceStart = $i - 1;
                     break;

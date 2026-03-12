@@ -85,7 +85,8 @@ final class HistoryCompactTrimmer implements HistoryTrimmerInterface
      * Алгоритм:
      * 1. Если история пуста — вернуть пустой массив.
      * 2. Оценить общее число токенов; если оно умещается в contextWindow — вернуть историю как есть.
-     * 3. Выделить хвост (tail), двигаясь от конца истории назад, пока его размер не достигнет tailRatio * contextWindow.
+     * 3. Выделить хвост (tail), двигаясь от конца истории назад, пока его размер
+     *    не достигнет tailRatio * contextWindow.
      *    При этом не разрывать пары ToolCall/ToolResult.
      * 4. Голову (head) до хвоста свернуть в одно суммаризирующее сообщение с ролью DEVELOPER,
      *    содержащее компактное резюме предыдущего диалога.
@@ -115,8 +116,39 @@ final class HistoryCompactTrimmer implements HistoryTrimmerInterface
 
         // 2. Выбираем хвост, который нужно сохранить целиком.
         $tailStart = $this->selectTailStartIndex($messages, $contextWindow);
+
+        // Всегда стараемся включить в хвост самую свежую пару ToolCall/ToolResult, даже если
+        // базовая эвристика хвоста выбрала слишком короткий срез (например, при маленьком окне).
+        for ($i = count($messages) - 2; $i >= 0; $i--) {
+            if ($messages[$i] instanceof ToolCallMessage && $messages[$i + 1] instanceof ToolResultMessage) {
+                if ($i < $tailStart) {
+                    $tailStart = $i;
+                }
+                break;
+            }
+        }
+
+        // Защита от потери последней пары ToolCall/ToolResult перед первым пользовательским сообщением хвоста.
+        // Если хвост начинается с USER/DEVELOPER, а прямо перед ним в истории находится пара ToolCall/ToolResult,
+        // считаем её частью хвоста.
+        if (
+            $tailStart >= 2
+            && (
+                $messages[$tailStart]->getRole() === MessageRole::USER->value
+                || $messages[$tailStart]->getRole() === MessageRole::DEVELOPER->value
+            )
+            && $messages[$tailStart - 2] instanceof ToolCallMessage
+            && $messages[$tailStart - 1] instanceof ToolResultMessage
+        ) {
+            $tailStart -= 2;
+        }
+
         $head = array_slice($messages, 0, $tailStart);
         $tail = array_slice($messages, $tailStart);
+
+        // Приводим хвост к валидной структуре диалога. Summary-добавка не должна ломать
+        // чередование ролей внутри хвоста, поэтому нормализуем именно хвостовую часть.
+        $tail = $this->ensureValidMessageSequence($tail);
 
         // 3. Строим суммаризирующее сообщение по голове, если она не пуста.
         $summaryMessages = [];
@@ -135,19 +167,55 @@ final class HistoryCompactTrimmer implements HistoryTrimmerInterface
             $compact = $this->shrinkHeadIfNeeded($compact, $contextWindow);
         }
 
-        // 5. Гарантируем валидную структуру диалога, не разрывая ToolCall/ToolResult.
-        // Если в сжатой истории есть пара ToolCall/ToolResult подряд, оставляем её как есть
-        // и не применяем строгую валидацию последовательности, чтобы не потерять пару.
-        $hasToolPair = false;
-        for ($i = 0, $n = count($compact) - 1; $i < $n; $i++) {
-            if ($compact[$i] instanceof ToolCallMessage && $compact[$i + 1] instanceof ToolResultMessage) {
-                $hasToolPair = true;
-                break;
-            }
-        }
+        $this->totalTokens = $this->computeTotalTokens($compact);
 
-        if (!$hasToolPair) {
-            $compact = $this->ensureValidMessageSequence($compact);
+        // 5. Финальный «жёсткий» доводчик размера: если даже после удаления summary
+        // окно всё ещё не влезает, обрезаем хвост по токенам (как в FluidContextWindowTrimmer),
+        // не разрывая пары ToolCall/ToolResult. Summary добавляем только если оно влезает.
+        if ($this->totalTokens > $contextWindow) {
+            $tailWindow = (new FluidContextWindowTrimmer($this->tokenCounter))->trim($tail, $contextWindow);
+
+            // При очень маленьком окне триммер «от хвоста» может оставить только последнее сообщение
+            // и полностью выкинуть недавнюю tool-пару. Если в хвосте есть tool-пара, но в окне её нет,
+            // пробуем построить окно вокруг последнего ToolResult (чтобы захватить ToolCall/ToolResult вместе).
+            $tailHasToolPair = false;
+            $tailWindowHasToolPair = false;
+            $lastToolResultIndex = null;
+
+            for ($i = count($tail) - 2; $i >= 0; $i--) {
+                if ($tail[$i] instanceof ToolCallMessage && $tail[$i + 1] instanceof ToolResultMessage) {
+                    $tailHasToolPair = true;
+                    $lastToolResultIndex = $i + 1;
+                    break;
+                }
+            }
+
+            for ($i = 0, $n = count($tailWindow) - 1; $i < $n; $i++) {
+                if ($tailWindow[$i] instanceof ToolCallMessage && $tailWindow[$i + 1] instanceof ToolResultMessage) {
+                    $tailWindowHasToolPair = true;
+                    break;
+                }
+            }
+
+            if ($tailHasToolPair && !$tailWindowHasToolPair && $lastToolResultIndex !== null) {
+                $tailWindow = (new FluidContextWindowTrimmer($this->tokenCounter))
+                    ->withAnchorIndex($lastToolResultIndex)
+                    ->trim($tail, $contextWindow);
+            }
+
+            if ($tailWindow === []) {
+                $tailWindow = $this->ensureValidMessageSequence($tail);
+            }
+
+            $candidate = $tailWindow;
+            if ($summaryMessages !== []) {
+                $withSummary = array_merge($summaryMessages, $tailWindow);
+                if ($this->computeTotalTokens($withSummary) <= $contextWindow) {
+                    $candidate = $withSummary;
+                }
+            }
+
+            $compact = $candidate;
         }
 
         $this->totalTokens = $this->computeTotalTokens($compact);
@@ -243,7 +311,7 @@ final class HistoryCompactTrimmer implements HistoryTrimmerInterface
     /**
      * Строит одно суммаризирующее сообщение по старой части истории.
      *
-     * Здесь используется простая эвристика:\n
+     * Здесь используется простая эвристика:
      * - собираем краткий перечень вопросов пользователя и основных ответов ассистента;
      * - формируем одно сообщение с ролью DEVELOPER, которое описывает контекст.
      *
@@ -312,7 +380,11 @@ final class HistoryCompactTrimmer implements HistoryTrimmerInterface
                 }
 
                 $candidateLine = '- ' . trim($content);
-                $trialText = $currentSummaryText . "\n\n" . 'Основные вопросы и запросы пользователя:' . "\n" . implode("\n", [...$userPoints, $candidateLine]);
+                $trialText = $currentSummaryText
+                    . "\n\n"
+                    . 'Основные вопросы и запросы пользователя:'
+                    . "\n"
+                    . implode("\n", [...$userPoints, $candidateLine]);
                 $trialTokens = $this->tokenCounter->count(new Message(MessageRole::DEVELOPER, $trialText));
 
                 if ($trialTokens > $summaryBudget) {
@@ -334,9 +406,16 @@ final class HistoryCompactTrimmer implements HistoryTrimmerInterface
                 // Пробуем добавить как часть блока \"ответов ассистента\".
                 $baseText = $currentSummaryText;
                 if ($userPoints !== []) {
-                    $baseText .= "\n\n" . 'Основные вопросы и запросы пользователя:' . "\n" . implode("\n", $userPoints);
+                    $baseText .= "\n\n"
+                        . 'Основные вопросы и запросы пользователя:'
+                        . "\n"
+                        . implode("\n", $userPoints);
                 }
-                $trialText = $baseText . "\n\n" . 'Ключевые ответы и выводы ассистента:' . "\n" . implode("\n", [...$assistantPoints, $candidateLine]);
+                $trialText = $baseText
+                    . "\n\n"
+                    . 'Ключевые ответы и выводы ассистента:'
+                    . "\n"
+                    . implode("\n", [...$assistantPoints, $candidateLine]);
                 $trialTokens = $this->tokenCounter->count(new Message(MessageRole::DEVELOPER, $trialText));
 
                 if ($trialTokens > $summaryBudget) {
@@ -448,13 +527,22 @@ final class HistoryCompactTrimmer implements HistoryTrimmerInterface
         }
 
         if ($firstUserIndex === null) {
-            return [];
+            // Если в окне нет пользовательских сообщений, всё равно возвращаем валидный минимум:
+            // - по возможности сохраняем последнюю пару ToolCall/ToolResult;
+            // - иначе возвращаем последнее сообщение.
+            for ($i = count($messages) - 2; $i >= 0; $i--) {
+                if ($messages[$i] instanceof ToolCallMessage && $messages[$i + 1] instanceof ToolResultMessage) {
+                    return [$messages[$i], $messages[$i + 1]];
+                }
+            }
+
+            return [array_slice($messages, -1)[0]];
         }
         // Пытаемся сохранить последнюю пару ToolCall/ToolResult перед первым пользовательским
         // сообщением, если она есть, чтобы не терять важный контекст инструментов.
         $sliceStart = $firstUserIndex;
         if ($firstUserIndex > 0) {
-            for ($i = $firstUserIndex - 1; $i > 0; $i--) {
+            for ($i = $firstUserIndex; $i > 0; $i--) {
                 if ($messages[$i] instanceof ToolResultMessage && $messages[$i - 1] instanceof ToolCallMessage) {
                     $sliceStart = $i - 1;
                     break;

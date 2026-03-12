@@ -137,7 +137,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
      */
     public function isPureContext(): bool
     {
-        $value = $this->getOptions()['pure_context'] ?? true;
+        $value = $this->getOptions()['pure_context'] ?? false;
         return OptionsHelper::toBool($value);
     }
 
@@ -215,6 +215,9 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                     $message = new NeuronMessage($role, $todoText);
                     $todoAttachments = $attachments;
                     if ($configApp !== null) {
+                        /**
+                         * В тексте каждого элемента списка ищем указание на файл для его подключения в контекст исполнени именно этого todo
+                         */
                         $contextFiles = FileContextHelper::buildContextAttachments($todoText, $configApp);
                         if ($contextFiles['attachments'] !== []) {
                             $todoAttachments = array_merge($todoAttachments, $contextFiles['attachments']);
