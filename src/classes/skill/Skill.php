@@ -14,6 +14,7 @@ use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\PlaceholderHelper;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
+use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ISkill;
 use NeuronAI\Chat\Enums\MessageRole;
@@ -225,9 +226,9 @@ class Skill extends AbstractPromptWithParams implements ISkill
             /**
              * Здесь находим в тексте skill указание, на подключение в контекст выполнения, файлов
              * Это конструкции вида: @relative/path/to/file.txt
-             * {@see FileContextHelper::buildContextAttachments}
+             * {@see AttachmentHelper::buildContextAttachments}
              */
-            $contextFiles = FileContextHelper::buildContextAttachments($this->getBody(), $configApp);
+            $contextFiles = AttachmentHelper::buildContextAttachments($this->getBody(), $configApp);
             if ($contextFiles['attachments'] !== []) {
                 $attachments = array_merge($attachments, $contextFiles['attachments']);
             }

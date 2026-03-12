@@ -10,6 +10,8 @@ use app\modules\neuron\classes\dto\attachments\TextFileAttachmentDto;
 use app\modules\neuron\interfaces\IAttachmentFile;
 use NeuronAI\Chat\Messages\ContentBlocks\ContentBlockInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use app\modules\neuron\classes\config\ConfigurationApp;
+
 
 /**
  * Хелпер для построения DTO вложений (attachments) из путей к файлам.
@@ -162,5 +164,68 @@ final class AttachmentHelper
         }
 
         return $unique;
+    }
+
+    /**
+     * Строит вложения по @-ссылкам в тексте с учётом настроек ConfigurationApp.
+     *
+     * Управляющие настройки читаются из config.jsonc через {@see ConfigurationApp::get()}:
+     *  - context_files.enabled (bool, по умолчанию false);
+     *  - context_files.max_total_size (int, байты, по умолчанию 1 MiB).
+     *
+     * Для каждого найденного пути файл ищется через {@see DirPriority::resolveFile()}.
+     * Если файл найден, существует и читается, и суммарный размер не превышает лимит,
+     * создаётся {@see AttachmentDto} через {@see AttachmentHelper::resolveAttachmentDto()}.
+     *
+     * @param string           $body      Текст, из которого извлекаются @-ссылки.
+     * @param ConfigurationApp $configApp Конфигурация приложения с DirPriority и настройками.
+     *
+     * @return array{attachments: list<AttachmentDto>, totalSize: int} Вложения и суммарный размер файлов.
+     */
+    public static function buildContextAttachments(string $body, ConfigurationApp $configApp): array
+    {
+        /** @var bool $enabled */
+        $enabled = (bool) $configApp->get('context_files.enabled', false);
+        if (!$enabled) {
+            return ['attachments' => [], 'totalSize' => 0];
+        }
+
+        /** @var int $limit */
+        $limit = (int) $configApp->get('context_files.max_total_size', 1048576);
+        if ($limit <= 0) {
+            return ['attachments' => [], 'totalSize' => 0];
+        }
+
+        $paths = FileContextHelper::extractFilePathsFromBody($body);
+        if ($paths === []) {
+            return ['attachments' => [], 'totalSize' => 0];
+        }
+
+        $dirPriority = $configApp->getDirPriority();
+
+        $attachments = [];
+        $totalSize   = 0;
+
+        foreach ($paths as $relPath) {
+            $resolved = $dirPriority->resolveFile($relPath);
+            if ($resolved === null || !is_file($resolved) || !is_readable($resolved)) {
+                continue;
+            }
+
+            $size = @filesize($resolved);
+            if (!is_int($size) || $size < 0) {
+                continue;
+            }
+
+            if ($totalSize + $size > $limit) {
+                break;
+            }
+
+            $attachments[] = static::resolveAttachmentDto($resolved);
+            $totalSize += $size;
+        }
+
+        /** @var list<AttachmentDto> $attachments */
+        return ['attachments' => $attachments, 'totalSize' => $totalSize];
     }
 }

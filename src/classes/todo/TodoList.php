@@ -10,6 +10,7 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\run\RunStateDto;
+use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\helpers\OptionsHelper;
@@ -218,7 +219,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                         /**
                          * В тексте каждого элемента списка ищем указание на файл для его подключения в контекст исполнени именно этого todo
                          */
-                        $contextFiles = FileContextHelper::buildContextAttachments($todoText, $configApp);
+                        $contextFiles = AttachmentHelper::buildContextAttachments($todoText, $configApp);
                         if ($contextFiles['attachments'] !== []) {
                             $todoAttachments = array_merge($todoAttachments, $contextFiles['attachments']);
                         }

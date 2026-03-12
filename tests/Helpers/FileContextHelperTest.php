@@ -7,6 +7,7 @@ namespace Tests\Helpers;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\FileContextHelper;
 use PHPUnit\Framework\TestCase;
 
@@ -64,7 +65,7 @@ class FileContextHelperTest extends TestCase
 
             $body = '@context.txt';
 
-            $result = FileContextHelper::buildContextAttachments($body, $configApp);
+            $result = AttachmentHelper::buildContextAttachments($body, $configApp);
 
             $this->assertIsArray($result);
             $this->assertArrayHasKey('attachments', $result);
@@ -102,7 +103,7 @@ class FileContextHelperTest extends TestCase
 
         $body = '@any.txt';
 
-        $result = FileContextHelper::buildContextAttachments($body, $configApp);
+        $result = AttachmentHelper::buildContextAttachments($body, $configApp);
 
         $this->assertSame([], $result['attachments']);
         $this->assertSame(0, $result['totalSize']);

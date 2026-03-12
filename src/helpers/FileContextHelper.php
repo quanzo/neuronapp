@@ -7,11 +7,18 @@ namespace app\modules\neuron\helpers;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\classes\dto\cmd\CmdDto;
 
 /**
- * Хелпер для построения вложений (Attachments) из @-ссылок на файлы в тексте.
+ * Хелпер для анализа текста контекста: извлечения @-ссылок на файлы и @@-команд.
  *
- * Поддерживает следующий синтаксис:
+ * Поддерживает следующий функционал:
+ *  - извлечение путей к файлам по синтаксису с символом '@';
+ *  - построение вложений ({@see AttachmentDto}) по найденным путям с учётом
+ *    настроек {@see ConfigurationApp};
+ *  - извлечение команд с префиксом "@@" и разбор их в объекты {@see CmdDto}.
+ *
+ * Для @-ссылок:
  *  - строка начинается с символа '@' и далее идёт путь к файлу;
  *  - либо перед символом '@' стоит пробел, затем путь к файлу до первого пробела.
  *
@@ -51,70 +58,132 @@ final class FileContextHelper
                 }
             }
         }
-
         return array_values(array_unique($paths));
     }
 
     /**
-     * Строит вложения по @-ссылкам в тексте с учётом настроек ConfigurationApp.
+     * Извлекает командные конструкции с префиксом "@@" из произвольного текста.
      *
-     * Управляющие настройки читаются из config.jsonc через {@see ConfigurationApp::get()}:
-     *  - context_files.enabled (bool, по умолчанию false);
-     *  - context_files.max_total_size (int, байты, по умолчанию 1 MiB).
+     * Поиск команд выполняется последовательно слева направо и не перекрывает
+     * уже разобранные участки текста. Для каждой найденной подстроки:
+     *  - определяется позиция "@@";
+     *  - читается имя команды (идентификатор [a-zA-Z0-9_]+);
+     *  - при наличии "(", подбирается соответствующая закрывающая скобка с
+     *    учётом строк и вложенности;
+     *  - сформированный фрагмент передаётся в {@see CmdDto::fromString()}.
      *
-     * Для каждого найденного пути файл ищется через {@see DirPriority::resolveFile()}.
-     * Если файл найден, существует и читается, и суммарный размер не превышает лимит,
-     * создаётся {@see AttachmentDto} через {@see AttachmentHelper::resolveAttachmentDto()}.
+     * В результирующий список включаются только команды с непустым именем.
+     * Сломанный синтаксис (например, "@@" без имени или незавершённые скобки)
+     * приводит к пропуску конкретного фрагмента без выброса исключений.
      *
-     * @param string           $body      Текст, из которого извлекаются @-ссылки.
-     * @param ConfigurationApp $configApp Конфигурация приложения с DirPriority и настройками.
+     * @param string $body Текст, в котором ищутся команды.
      *
-     * @return array{attachments: list<AttachmentDto>, totalSize: int} Вложения и суммарный размер файлов.
+     * @return list<CmdDto> Список DTO-команд в порядке появления в тексте.
      */
-    public static function buildContextAttachments(string $body, ConfigurationApp $configApp): array
+    public static function extractCmdFromBody(string $body): array
     {
-        /** @var bool $enabled */
-        $enabled = (bool) $configApp->get('context_files.enabled', false);
-        if (!$enabled) {
-            return ['attachments' => [], 'totalSize' => 0];
+        if ($body === '') {
+            return [];
         }
 
-        /** @var int $limit */
-        $limit = (int) $configApp->get('context_files.max_total_size', 1048576);
-        if ($limit <= 0) {
-            return ['attachments' => [], 'totalSize' => 0];
-        }
+        $length = strlen($body);
+        $result = [];
+        $offset = 0;
 
-        $paths = self::extractFilePathsFromBody($body);
-        if ($paths === []) {
-            return ['attachments' => [], 'totalSize' => 0];
-        }
-
-        $dirPriority = $configApp->getDirPriority();
-
-        $attachments = [];
-        $totalSize   = 0;
-
-        foreach ($paths as $relPath) {
-            $resolved = $dirPriority->resolveFile($relPath);
-            if ($resolved === null || !is_file($resolved) || !is_readable($resolved)) {
-                continue;
-            }
-
-            $size = @filesize($resolved);
-            if (!is_int($size) || $size < 0) {
-                continue;
-            }
-
-            if ($totalSize + $size > $limit) {
+        while ($offset < $length) {
+            $pos = strpos($body, '@@', $offset);
+            if ($pos === false) {
                 break;
             }
 
-            $attachments[] = AttachmentHelper::resolveAttachmentDto($resolved);
-            $totalSize += $size;
+            $start = $pos;
+            $i     = $pos + 2;
+
+            // Читаем имя команды.
+            $name = '';
+            while ($i < $length) {
+                $ch = $body[$i];
+                if (
+                    ($ch >= 'a' && $ch <= 'z')
+                    || ($ch >= 'A' && $ch <= 'Z')
+                    || ($ch >= '0' && $ch <= '9')
+                    || $ch === '_'
+                ) {
+                    $name .= $ch;
+                    $i++;
+                    continue;
+                }
+                break;
+            }
+
+            if ($name === '') {
+                $offset = $pos + 2;
+                continue;
+            }
+
+            // Пропускаем пробелы после имени.
+            while ($i < $length && ctype_space($body[$i])) {
+                $i++;
+            }
+
+            $end = $i;
+
+            if ($i < $length && $body[$i] === '(') {
+                // Подбираем закрывающую скобку.
+                $depth       = 0;
+                $inString    = false;
+                $stringQuote = '';
+                $escaped     = false;
+
+                for ($j = $i; $j < $length; $j++) {
+                    $ch = $body[$j];
+
+                    if ($inString) {
+                        if ($escaped) {
+                            $escaped = false;
+                        } elseif ($ch === '\\') {
+                            $escaped = true;
+                        } elseif ($ch === $stringQuote) {
+                            $inString = false;
+                        }
+                        continue;
+                    }
+
+                    if ($ch === '"' || $ch === "'") {
+                        $inString    = true;
+                        $stringQuote = $ch;
+                        continue;
+                    }
+
+                    if ($ch === '(') {
+                        $depth++;
+                        continue;
+                    }
+
+                    if ($ch === ')') {
+                        $depth--;
+                        if ($depth === 0) {
+                            $end = $j + 1;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if ($end <= $start + 2 + strlen($name)) {
+                $end = $start + 2 + strlen($name);
+            }
+
+            $commandText = substr($body, $start, $end - $start);
+            $dto         = CmdDto::fromString($commandText);
+
+            if ($dto->getName() !== '') {
+                $result[] = $dto;
+            }
+
+            $offset = $end;
         }
 
-        /** @var list<AttachmentDto> $attachments */
-        return ['attachments' => $attachments, 'totalSize' => $totalSize];
+        return $result;
     }
 }
