@@ -8,9 +8,17 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\neuron\providers\EchoProvider;
+use app\modules\neuron\classes\neuron\history\FileFullChatHistory;
+use app\modules\neuron\classes\neuron\RAG;
+use app\modules\neuron\enums\ChatHistoryCloneMode;
+use app\modules\neuron\tools\ATool;
 use NeuronAI\Chat\History\InMemoryChatHistory;
+use NeuronAI\MCP\McpConnector;
+use NeuronAI\RAG\Embeddings\EmbeddingsProviderInterface;
+use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 use NeuronAI\Providers\AIProviderInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 
 /**
  * Тесты для {@see ConfigurationAgent}.
@@ -96,7 +104,7 @@ class ConfigurationAgentTest extends TestCase
      */
     public function testMakeFromArrayEmptyReturnsNull(): void
     {
-        $this->assertNull(ConfigurationAgent::makeFromArray([]));
+        $this->assertNull(ConfigurationAgent::makeFromArray([], 'session'));
     }
 
     /**
@@ -158,20 +166,6 @@ class ConfigurationAgentTest extends TestCase
         $this->assertNull($cfg->history_id);
     }
 
-    /**
-     * Если sessionKey не передан (null) — генерируется автоматически
-     * в формате «YYYYMMDD-HHMMSS-μs».
-     */
-    public function testMakeFromArrayGeneratesSessionKeyWhenNull(): void
-    {
-        $cfg = ConfigurationAgent::makeFromArray([
-            'enableChatHistory' => false,
-        ]);
-
-        $this->assertNotNull($cfg->getSessionKey());
-        $this->assertMatchesRegularExpression('/^\d{8}-\d{6}-\d+$/', $cfg->getSessionKey());
-    }
-
     // ══════════════════════════════════════════════════════════════
     //  makeFromFile — создание конфигурации из файла
     // ══════════════════════════════════════════════════════════════
@@ -221,7 +215,7 @@ class ConfigurationAgentTest extends TestCase
      */
     public function testMakeFromFileEmptyPath(): void
     {
-        $this->assertNull(ConfigurationAgent::makeFromFile(''));
+        $this->assertNull(ConfigurationAgent::makeFromFile('', 'session'));
     }
 
     /**
@@ -229,7 +223,7 @@ class ConfigurationAgentTest extends TestCase
      */
     public function testMakeFromFileNonExistent(): void
     {
-        $this->assertNull(ConfigurationAgent::makeFromFile('/nonexistent/path.php'));
+        $this->assertNull(ConfigurationAgent::makeFromFile('/nonexistent/path.php', 'session'));
     }
 
     /**
@@ -240,7 +234,7 @@ class ConfigurationAgentTest extends TestCase
         $filePath = $this->tmpDir . '/agent.yaml';
         file_put_contents($filePath, 'key: value');
 
-        $this->assertNull(ConfigurationAgent::makeFromFile($filePath));
+        $this->assertNull(ConfigurationAgent::makeFromFile($filePath, 'session'));
     }
 
     /**
@@ -251,7 +245,7 @@ class ConfigurationAgentTest extends TestCase
         $filePath = $this->tmpDir . '/bad.jsonc';
         file_put_contents($filePath, '{invalid json}');
 
-        $this->assertNull(ConfigurationAgent::makeFromFile($filePath));
+        $this->assertNull(ConfigurationAgent::makeFromFile($filePath, 'session'));
     }
 
     /**
@@ -262,7 +256,7 @@ class ConfigurationAgentTest extends TestCase
         $filePath = $this->tmpDir . '/bad.php';
         file_put_contents($filePath, '<?php return "not an array";');
 
-        $this->assertNull(ConfigurationAgent::makeFromFile($filePath));
+        $this->assertNull(ConfigurationAgent::makeFromFile($filePath, 'session'));
     }
 
     /**
@@ -325,6 +319,50 @@ JSONC;
         $clone = $cfg->cloneForSession();
         $this->assertSame(12345, $clone->contextWindow);
         $this->assertSame('Keep it', $clone->instructions);
+    }
+
+    /**
+     * cloneForSession(RESET_EMPTY) создаёт клон с новой in-memory историей,
+     * отличной от исходной файловой истории при включённом enableChatHistory.
+     */
+    public function testCloneForSessionResetEmptyUsesInMemoryHistory(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'enableChatHistory' => true,
+            'contextWindow' => 1000,
+        ], 'session');
+
+        $originalHistory = $cfg->getChatHistory();
+        $this->assertInstanceOf(FileFullChatHistory::class, $originalHistory);
+
+        $clone = $cfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY);
+        $this->assertNotSame($cfg, $clone);
+
+        $cloneHistory = $clone->getChatHistory();
+        $this->assertInstanceOf(InMemoryChatHistory::class, $cloneHistory);
+        $this->assertNotSame($originalHistory, $cloneHistory);
+    }
+
+    /**
+     * cloneForSession(COPY_CONTEXT) также создаёт отдельную in-memory историю,
+     * не совпадающую с исходной файловой историей.
+     */
+    public function testCloneForSessionCopyContextUsesSeparateInMemoryHistory(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'enableChatHistory' => true,
+            'contextWindow' => 1000,
+        ], 'session');
+
+        $originalHistory = $cfg->getChatHistory();
+        $this->assertInstanceOf(FileFullChatHistory::class, $originalHistory);
+
+        $clone = $cfg->cloneForSession(ChatHistoryCloneMode::COPY_CONTEXT);
+        $this->assertNotSame($cfg, $clone);
+
+        $cloneHistory = $clone->getChatHistory();
+        $this->assertInstanceOf(InMemoryChatHistory::class, $cloneHistory);
+        $this->assertNotSame($originalHistory, $cloneHistory);
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -413,6 +451,41 @@ JSONC;
         $this->assertSame([], $cfg->getTools());
     }
 
+    /**
+     * getTools() объединяет инструменты из конфигурации и MCP-коннекторов
+     * и проставляет им логгер через setLogger(), если это наследники ATool.
+     */
+    public function testGetToolsMcpAndLoggerInjected(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'tools' => [],
+        ], 'session');
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $cfg->setLogger($logger);
+
+        $directTool = $this->createMock(ATool::class);
+        $directTool->expects($this->once())
+            ->method('setLogger')
+            ->with($this->isInstanceOf(LoggerInterface::class));
+
+        $mcpTool = $this->createMock(ATool::class);
+        $mcpTool->expects($this->once())
+            ->method('setLogger')
+            ->with($this->isInstanceOf(LoggerInterface::class));
+
+        $mcpConnector = $this->createMock(McpConnector::class);
+        $mcpConnector->method('tools')->willReturn([$mcpTool]);
+
+        $cfg->tools = [$directTool];
+        $cfg->mcp = [$mcpConnector];
+
+        $tools = $cfg->getTools();
+
+        $this->assertContains($directTool, $tools);
+        $this->assertContains($mcpTool, $tools);
+    }
+
     // ══════════════════════════════════════════════════════════════
     //  sessionKey — ключ сессии
     // ══════════════════════════════════════════════════════════════
@@ -466,6 +539,19 @@ JSONC;
     }
 
     /**
+     * При enableChatHistory = true используется файловая история FileFullChatHistory.
+     */
+    public function testGetChatHistoryFileFullWhenEnabled(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'enableChatHistory' => true,
+        ], 'session');
+
+        $history = $cfg->getChatHistory();
+        $this->assertInstanceOf(FileFullChatHistory::class, $history);
+    }
+
+    /**
      * Повторный вызов getChatHistory() возвращает тот же экземпляр (кеширование).
      */
     public function testGetChatHistoryCached(): void
@@ -512,6 +598,22 @@ JSONC;
         $this->assertNull($prop->getValue($cfg));
     }
 
+    /**
+     * После смены sessionKey следующая история чата создаётся заново.
+     */
+    public function testGetChatHistoryRecreatedAfterSessionKeyChange(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'enableChatHistory' => false,
+        ], 'session-1');
+
+        $first = $cfg->getChatHistory();
+        $cfg->setSessionKey('session-2');
+        $second = $cfg->getChatHistory();
+
+        $this->assertNotSame($first, $second);
+    }
+
     // ══════════════════════════════════════════════════════════════
     //  getAgent — создание агента
     // ══════════════════════════════════════════════════════════════
@@ -528,6 +630,22 @@ JSONC;
 
         $agent = $cfg->getAgent();
         $this->assertInstanceOf(\NeuronAI\Agent\AgentInterface::class, $agent);
+    }
+
+    /**
+     * При заданных embeddingProvider и vectorStore используется RAG-агент.
+     */
+    public function testGetAgentUsesRagWhenEmbeddingsConfigured(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'enableChatHistory' => false,
+        ], 'session');
+
+        $cfg->embeddingProvider = $this->createMock(EmbeddingsProviderInterface::class);
+        $cfg->vectorStore = $this->createMock(VectorStoreInterface::class);
+
+        $agent = $cfg->getAgent();
+        $this->assertInstanceOf(RAG::class, $agent);
     }
 
     /**
