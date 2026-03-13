@@ -172,6 +172,8 @@ final class AttachmentHelper
      * Управляющие настройки читаются из config.jsonc через {@see ConfigurationApp::get()}:
      *  - context_files.enabled (bool, по умолчанию false);
      *  - context_files.max_total_size (int, байты, по умолчанию 1 MiB).
+     *  - context_files.allowed_paths (array|string, список разрешённых путей/масок);
+     *  - context_files.blocked_paths (array|string, список запрещённых путей/масок).
      *
      * Для каждого найденного пути файл ищется через {@see DirPriority::resolveFile()}.
      * Если файл найден, существует и читается, и суммарный размер не превышает лимит,
@@ -196,6 +198,23 @@ final class AttachmentHelper
             return ['attachments' => [], 'totalSize' => 0];
         }
 
+        $allowedPaths = $configApp->get('context_files.allowed_paths', []);
+        $blockedPaths = $configApp->get('context_files.blocked_paths', []);
+
+        if (is_string($allowedPaths) && $allowedPaths !== '') {
+            $allowedPaths = [$allowedPaths];
+        }
+        if (!is_array($allowedPaths)) {
+            $allowedPaths = [];
+        }
+
+        if (is_string($blockedPaths) && $blockedPaths !== '') {
+            $blockedPaths = [$blockedPaths];
+        }
+        if (!is_array($blockedPaths)) {
+            $blockedPaths = [];
+        }
+
         $paths = FileContextHelper::extractFilePathsFromBody($body);
         if ($paths === []) {
             return ['attachments' => [], 'totalSize' => 0];
@@ -207,6 +226,13 @@ final class AttachmentHelper
         $totalSize   = 0;
 
         foreach ($paths as $relPath) {
+            if ($allowedPaths !== [] && !self::matchesAnyMask($relPath, $allowedPaths)) {
+                continue;
+            }
+            if ($blockedPaths !== [] && self::matchesAnyMask($relPath, $blockedPaths)) {
+                continue;
+            }
+
             $resolved = $dirPriority->resolveFile($relPath);
             if ($resolved === null || !is_file($resolved) || !is_readable($resolved)) {
                 continue;
@@ -227,5 +253,24 @@ final class AttachmentHelper
 
         /** @var list<AttachmentDto> $attachments */
         return ['attachments' => $attachments, 'totalSize' => $totalSize];
+    }
+
+    /**
+     * Проверяет, соответствует ли путь хотя бы одному glob-шаблону.
+     *
+     * @param string        $path  Относительный путь
+     * @param array<int,string> $masks Набор масок (glob)
+     */
+    private static function matchesAnyMask(string $path, array $masks): bool
+    {
+        foreach ($masks as $mask) {
+            if (!is_string($mask) || $mask === '') {
+                continue;
+            }
+            if (fnmatch($mask, $path)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
