@@ -322,7 +322,8 @@ class ConfigurationApp
     public function getSessionKey(): string
     {
         if ($this->sessionKey === null) {
-            $this->sessionKey = $this::buildSessionKey();
+            $uid = $this->getUserId();
+            $this->sessionKey = $this::buildSessionKey() . ($uid ? '-' . $uid : '');
         }
 
         return $this->sessionKey;

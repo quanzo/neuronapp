@@ -661,12 +661,11 @@ class ConfigurationAgent
      *  - vectorStore (VectorStoreInterface|callable|null)
      *
      * @param array<string, mixed> $cfg        Ассоциативный массив с настройками агента.
-     * @param string|null          $sessionKey Базовый ключ сессии (без имени агента).
-     *                                         Если null — генерируется через ConfigurationApp.
+     * @param string               $sessionKey Базовый ключ сессии (без имени агента).
      *
      * @return ConfigurationAgent|null Экземпляр конфигурации или null при пустом массиве.
      */
-    public static function makeFromArray(array $cfg, ?string $sessionKey = null): ?ConfigurationAgent
+    public static function makeFromArray(array $cfg, string $sessionKey): ?ConfigurationAgent
     {
         if ($cfg === []) {
             return null;
@@ -731,7 +730,7 @@ class ConfigurationAgent
             $config->vectorStore = $cfg['vectorStore'];
         }
 
-        $config->setSessionKey($sessionKey ?? ConfigurationApp::buildSessionKey());
+        $config->setSessionKey($sessionKey);
 
         return $config;
     }
@@ -747,13 +746,12 @@ class ConfigurationAgent
      * сам метод просто обрабатывает переданный путь.
      *
      * @param string      $filename   Абсолютный путь к файлу конфигурации агента.
-     * @param string|null $sessionKey Базовый ключ сессии (без имени агента).
-     *                                Если null — генерируется через ConfigurationApp.
+     * @param string      $sessionKey Базовый ключ сессии (без имени агента).
      *
      * @return ConfigurationAgent|null Экземпляр конфигурации или null, если файл не найден
      *                                 или не удалось корректно разобрать его содержимое.
      */
-    public static function makeFromFile(string $filename, ?string $sessionKey = null): ?ConfigurationAgent
+    public static function makeFromFile(string $filename, string $sessionKey): ?ConfigurationAgent
     {
         if ($filename === '' || !is_file($filename)) {
             return null;
