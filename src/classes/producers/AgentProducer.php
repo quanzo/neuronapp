@@ -24,30 +24,9 @@ class AgentProducer extends AProducer
     use LoggerAwareTrait;
 
     /**
-     * Базовый ключ сессии, передаваемый создаваемым агентам.
-     */
-    protected ?string $sessionKey = null;
-
-    /**
      * Имя агента по умолчанию.
      */
     protected static string $defaultAgentName = 'default';
-
-    /**
-     * Возвращает базовый ключ сессии.
-     */
-    public function getSessionKey(): ?string
-    {
-        return $this->sessionKey;
-    }
-
-    /**
-     * Устанавливает базовый ключ сессии.
-     */
-    public function setSessionKey(?string $sessionKey): void
-    {
-        $this->sessionKey = $sessionKey;
-    }
 
     /**
      * Возвращает имя агента по умолчанию.
@@ -80,7 +59,7 @@ class AgentProducer extends AProducer
      */
     protected function createFromFile(string $path, string $name): ?ConfigurationAgent
     {
-        $config = ConfigurationAgent::makeFromFile($path, $this->sessionKey);
+        $config = ConfigurationAgent::makeFromFile($path, $this->getConfigurationApp());
 
         if ($config instanceof ConfigurationAgent) {
             $config->agentName = $name;

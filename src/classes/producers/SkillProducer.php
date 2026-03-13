@@ -19,19 +19,6 @@ use app\modules\neuron\classes\dir\DirPriority;
 class SkillProducer extends AProducer
 {
     /**
-     * Глобальная конфигурация приложения.
-     */
-    private ConfigurationApp $configApp;
-
-    /**
-     * @param ConfigurationApp $configApp  Экземпляр конфигурации приложения.
-     */
-    public function __construct(DirPriority $dirPriority, ConfigurationApp $configApp)
-    {
-        parent::__construct($dirPriority);
-        $this->configApp = $configApp;
-    }
-    /**
      * @inheritDoc
      */
     public static function getStorageDirName(): string
@@ -60,7 +47,7 @@ class SkillProducer extends AProducer
             return null;
         }
 
-        return new Skill($contents, $name, $this->configApp);
+        return new Skill($contents, $name, $this->getConfigurationApp());
     }
 
     /**

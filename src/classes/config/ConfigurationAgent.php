@@ -32,7 +32,9 @@ use app\modules\neuron\classes\neuron\trimmers\FluidContextWindowTrimmer;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use app\modules\neuron\interfaces\IAttachmentFile;
+use app\modules\neuron\interfaces\IDependConfigApp;
 use app\modules\neuron\tools\ATool;
+use app\modules\neuron\traits\DependConfigAppTrait;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
 use NeuronAI\RAG\PostProcessor\PostProcessorInterface;
@@ -47,10 +49,11 @@ use Stringable;
 /**
  * Конфигурация агента для работы с LLM через Neuron PHP
  */
-class ConfigurationAgent
+class ConfigurationAgent implements IDependConfigApp
 {
     use LoggerAwareTrait;
     use LoggerAwareContextualTrait;
+    use DependConfigAppTrait;
 
     /**
      * Имя агента, для которого используется данная конфигурация.
@@ -661,11 +664,11 @@ class ConfigurationAgent
      *  - vectorStore (VectorStoreInterface|callable|null)
      *
      * @param array<string, mixed> $cfg        Ассоциативный массив с настройками агента.
-     * @param string               $sessionKey Базовый ключ сессии (без имени агента).
+     * @param ConfigurationApp     $configApp конфигурация приложения
      *
      * @return ConfigurationAgent|null Экземпляр конфигурации или null при пустом массиве.
      */
-    public static function makeFromArray(array $cfg, string $sessionKey): ?ConfigurationAgent
+    public static function makeFromArray(array $cfg, ConfigurationApp $configApp): ?ConfigurationAgent
     {
         if ($cfg === []) {
             return null;
@@ -730,7 +733,8 @@ class ConfigurationAgent
             $config->vectorStore = $cfg['vectorStore'];
         }
 
-        $config->setSessionKey($sessionKey);
+        $config->setConfigurationApp($configApp);
+        $config->setSessionKey($configApp->getSessionKey());
 
         return $config;
     }
@@ -746,12 +750,12 @@ class ConfigurationAgent
      * сам метод просто обрабатывает переданный путь.
      *
      * @param string      $filename   Абсолютный путь к файлу конфигурации агента.
-     * @param string      $sessionKey Базовый ключ сессии (без имени агента).
+     * @param ConfigurationApp $configApp конфигурация приложения
      *
      * @return ConfigurationAgent|null Экземпляр конфигурации или null, если файл не найден
      *                                 или не удалось корректно разобрать его содержимое.
      */
-    public static function makeFromFile(string $filename, string $sessionKey): ?ConfigurationAgent
+    public static function makeFromFile(string $filename, ConfigurationApp $configApp): ?ConfigurationAgent
     {
         if ($filename === '' || !is_file($filename)) {
             return null;
@@ -790,6 +794,6 @@ class ConfigurationAgent
             return null;
         }
 
-        return self::makeFromArray($configArray, $sessionKey);
+        return self::makeFromArray($configArray, $configApp);
     }
 }

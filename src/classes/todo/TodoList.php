@@ -6,17 +6,12 @@ namespace app\modules\neuron\classes\todo;
 
 use Amp\Future;
 use app\modules\neuron\classes\AbstractPromptWithParams;
-use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
-use app\modules\neuron\classes\dto\run\RunStateDto;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\helpers\CommentsHelper;
-use app\modules\neuron\helpers\OptionsHelper;
-use app\modules\neuron\helpers\RunStateCheckpointHelper;
-use app\modules\neuron\helpers\FileContextHelper;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\interfaces\ITodoList;
 use app\modules\neuron\traits\HasNeedSkillsTrait;
@@ -59,10 +54,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
      */
     public function __construct(string $input, string $name = '', ?ConfigurationApp $configApp = null)
     {
-        parent::__construct($input);
-        $this->body = CommentsHelper::stripComments($this->body);
-        $this->name = $name;
-        $this->setConfigurationApp($configApp);
+        parent::__construct($input, $name, $configApp);
         $this->initTodos();
     }
 

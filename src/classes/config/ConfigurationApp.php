@@ -173,8 +173,7 @@ class ConfigurationApp
     public function getAgentProducer(): AgentProducer
     {
         if ($this->agentProducer === null) {
-            $this->agentProducer = new AgentProducer($this->dirPriority);
-            $this->agentProducer->setSessionKey($this->getSessionKey());
+            $this->agentProducer = new AgentProducer($this->dirPriority, $this);
             $this->agentProducer->logger = $this->getLoggerWithContext();
         }
 

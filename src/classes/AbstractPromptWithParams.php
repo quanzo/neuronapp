@@ -7,8 +7,11 @@ namespace app\modules\neuron\classes;
 use app\modules\neuron\classes\dto\params\ParamListDto;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\PlaceholderHelper;
+use app\modules\neuron\interfaces\IDependConfigApp;
+use app\modules\neuron\traits\DependConfigAppTrait;
 use RuntimeException;
 
 /**
@@ -20,14 +23,11 @@ use RuntimeException;
  *  - валидации и разборки опции skills;
  *  - агрегирования ошибок конфигурации.
  */
-abstract class AbstractPromptWithParams extends APromptComponent
+abstract class AbstractPromptWithParams extends APromptComponent implements IDependConfigApp
 {
-    protected string $name;
+    use DependConfigAppTrait;
 
-    /**
-     * Глобальная конфигурация приложения, используемая для разрешения агентов и зависимостей.
-     */
-    private ?ConfigurationApp $configApp = null;
+    protected string $name;
 
     /**
      * Конфигурация агента по умолчанию, которая может быть переопределена опцией "agent".
@@ -36,6 +36,21 @@ abstract class AbstractPromptWithParams extends APromptComponent
 
     private ?ParamListDto $paramListCache = null;
     private bool $paramListCacheInitialized = false;
+
+    /**
+     * Базовый конструктор элементов
+     *
+     * @param string                $input содержимое
+     * @param string                $name название (чаще всего будет имя файла)
+     * @param ConfigurationApp|null $configApp конфигурация приложения ибо там можно получить связанные элементы
+     */
+    public function __construct(string $input, string $name = '', ?ConfigurationApp $configApp = null)
+    {
+        parent::__construct($input);
+        $this->body = CommentsHelper::stripComments($this->body);
+        $this->name = $name;
+        $this->setConfigurationApp($configApp);
+    }
 
     public function getName(): string
     {
@@ -48,28 +63,6 @@ abstract class AbstractPromptWithParams extends APromptComponent
     protected function getComponentName(): string
     {
         return $this->getName();
-    }
-
-    /**
-     * Устанавливает конфигурацию приложения для компонента.
-     *
-     * @param ConfigurationApp|null $configApp Экземпляр конфигурации приложения или null.
-     *
-     * @return static
-     */
-    public function setConfigurationApp(?ConfigurationApp $configApp): static
-    {
-        $this->configApp = $configApp;
-
-        return $this;
-    }
-
-    /**
-     * Возвращает конфигурацию приложения, если она была установлена.
-     */
-    public function getConfigurationApp(): ?ConfigurationApp
-    {
-        return $this->configApp;
     }
 
     /**

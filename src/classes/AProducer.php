@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes;
 
+use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
+use app\modules\neuron\interfaces\IDependConfigApp;
+use app\modules\neuron\traits\DependConfigAppTrait;
 
 /**
  * Базовый класс производителей сущностей по имени.
@@ -13,8 +16,10 @@ use app\modules\neuron\classes\dir\DirPriority;
  * в приоритетных директориях через {@see DirPriority}, кеширует результат
  * и создаёт объект через {@see createFromFile()}.
  */
-abstract class AProducer
+abstract class AProducer implements IDependConfigApp
 {
+    use DependConfigAppTrait;
+
     /**
      * Приоритетный список директорий для поиска файлов.
      */
@@ -27,9 +32,10 @@ abstract class AProducer
      */
     protected array $cache = [];
 
-    public function __construct(DirPriority $dirPriority)
+    public function __construct(DirPriority $dirPriority, ConfigurationApp $configApp)
     {
         $this->dirPriority = $dirPriority;
+        $this->setConfigurationApp($configApp);
     }
 
     /**

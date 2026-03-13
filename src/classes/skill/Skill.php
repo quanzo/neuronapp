@@ -53,10 +53,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
      */
     public function __construct(string $input, string $name = '', ?ConfigurationApp $configApp = null)
     {
-        parent::__construct($input);
-        $this->body = CommentsHelper::stripComments($this->body);
-        $this->name = $name;
-        $this->setConfigurationApp($configApp);
+        parent::__construct($input, $name, $configApp);
     }
 
     /**
