@@ -1,6 +1,7 @@
 composer.lock
 vendor/*
 temp/*
-testapp/*
+testapp3/*
+testapp2/*
 *.phar
 *.code-workspace
