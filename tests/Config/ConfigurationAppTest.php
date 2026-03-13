@@ -33,6 +33,7 @@ class ConfigurationAppTest extends TestCase
         mkdir($this->tmpDir, 0777, true);
         mkdir($this->tmpDir . '/.sessions', 0777, true);
         mkdir($this->tmpDir . '/.store', 0777, true);
+        mkdir($this->tmpDir . '/.logs', 0777, true);
 
         $this->resetSingleton();
     }
@@ -252,6 +253,29 @@ class ConfigurationAppTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════
+    //  logDir — директория логов
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * Имя директории логов — константная строка «.logs».
+     */
+    public function testGetLogDirName(): void
+    {
+        $this->assertSame('.logs', ConfigurationApp::getLogDirName());
+    }
+
+    /**
+     * getLogDir() возвращает полный путь к директории логов.
+     */
+    public function testGetLogDir(): void
+    {
+        $dp = new DirPriority([$this->tmpDir]);
+        ConfigurationApp::init($dp);
+        $logDir = ConfigurationApp::getInstance()->getLogDir();
+        $this->assertSame($this->tmpDir . '/.logs', $logDir);
+    }
+
+    // ══════════════════════════════════════════════════════════════
     //  sessionKey — ключ сессии
     // ══════════════════════════════════════════════════════════════
 
@@ -281,6 +305,37 @@ class ConfigurationAppTest extends TestCase
 
         $app->setSessionKey('custom-key');
         $this->assertSame('custom-key', $app->getSessionKey());
+    }
+
+    /**
+     * При инициализации с явным userId ключ сессии содержит суффикс -userId,
+     * а getUserId() возвращает это же значение.
+     */
+    public function testGetSessionKeyIncludesUserIdFromInit(): void
+    {
+        $dp = new DirPriority([$this->tmpDir]);
+        ConfigurationApp::init($dp, 'config.jsonc', 123);
+        $app = ConfigurationApp::getInstance();
+
+        $key = $app->getSessionKey();
+        $this->assertMatchesRegularExpression('/^\\d{8}-\\d{6}-\\d+-123$/', $key);
+        $this->assertSame(123, $app->getUserId());
+    }
+
+    /**
+     * Если userId не передан в init(), но указан в config.jsonc,
+     * он подхватывается конструктором и влияет на sessionKey и getUserId().
+     */
+    public function testGetSessionKeyAndUserIdFromConfig(): void
+    {
+        file_put_contents($this->tmpDir . '/config.jsonc', '{"userId": 777}');
+        $dp = new DirPriority([$this->tmpDir]);
+        ConfigurationApp::init($dp, 'config.jsonc');
+        $app = ConfigurationApp::getInstance();
+
+        $this->assertSame(777, $app->getUserId());
+        $key = $app->getSessionKey();
+        $this->assertMatchesRegularExpression('/^\\d{8}-\\d{6}-\\d+-777$/', $key);
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -329,6 +384,25 @@ class ConfigurationAppTest extends TestCase
         ConfigurationApp::init($dp);
         $producer = ConfigurationApp::getInstance()->getSkillProducer();
         $this->assertInstanceOf(\app\modules\neuron\classes\producers\SkillProducer::class, $producer);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  logContext — контекст логирования
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * getLogContext() возвращает массив с текущим sessionKey.
+     */
+    public function testGetLogContextReturnsCurrentSessionKey(): void
+    {
+        $dp = new DirPriority([$this->tmpDir]);
+        ConfigurationApp::init($dp);
+        $app = ConfigurationApp::getInstance();
+
+        $sessionKey = $app->getSessionKey();
+        $context = $app->getLogContext();
+
+        $this->assertSame(['session' => $sessionKey], $context);
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -407,5 +481,45 @@ class ConfigurationAppTest extends TestCase
         } finally {
             rmdir($dirWithoutStore);
         }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  isValidSessionKey — валидация ключа сессии
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * isValidSessionKey() принимает ключ, сгенерированный buildSessionKey().
+     */
+    public function testIsValidSessionKeyAcceptsBaseFormat(): void
+    {
+        $key = ConfigurationApp::buildSessionKey();
+        $this->assertTrue(ConfigurationApp::isValidSessionKey($key));
+    }
+
+    /**
+     * Пустая строка не является валидным ключом сессии.
+     */
+    public function testIsValidSessionKeyRejectsEmptyString(): void
+    {
+        $this->assertFalse(ConfigurationApp::isValidSessionKey(''));
+    }
+
+    /**
+     * Ключ с суффиксом userId (как у getSessionKey()) не проходит валидацию
+     * базового формата buildSessionKey().
+     */
+    public function testIsValidSessionKeyRejectsKeyWithUserIdSuffix(): void
+    {
+        $base = ConfigurationApp::buildSessionKey();
+        $this->assertFalse(ConfigurationApp::isValidSessionKey($base . '-123'));
+    }
+
+    /**
+     * Ключ с неверным форматом (лишние/некорректные символы) отвергается.
+     */
+    public function testIsValidSessionKeyRejectsBadFormat(): void
+    {
+        $this->assertFalse(ConfigurationApp::isValidSessionKey('2024-0101-000000-123456'));
+        $this->assertFalse(ConfigurationApp::isValidSessionKey('abcdefgh-ijklmn-opqr'));
     }
 }
