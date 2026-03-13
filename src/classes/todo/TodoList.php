@@ -19,6 +19,8 @@ use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use app\modules\neuron\helpers\FileContextHelper;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\interfaces\ITodoList;
+use app\modules\neuron\traits\HasNeedSkillsTrait;
+use app\modules\neuron\traits\AttachesSkillToolsTrait;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
@@ -32,6 +34,9 @@ use NeuronAI\Chat\Messages\Message as NeuronMessage;
  */
 class TodoList extends AbstractPromptWithParams implements ITodoList
 {
+    use HasNeedSkillsTrait;
+    use AttachesSkillToolsTrait;
+
     /**
      * Очередь заданий в порядке FIFO.
      *
@@ -101,27 +106,6 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
     }
 
     /**
-     * Возвращает имена навыков (Skill), которые нужно подключить при исполнении списка.
-     * Берутся из опции "skills" — строка с именами через запятую (пробелы обрезаются).
-     *
-     * @return list<string>
-     */
-    public function getNeedSkills(): array
-    {
-        return $this->parseSkills(true);
-    }
-
-    /**
-     * Проверяет корректность конфигурации TodoList и возвращает список найденных проблем.
-     *
-     * @return array<int, array{type:string, message:string, param?:string}>
-     */
-    public function checkErrors(): array
-    {
-        return $this->getErrors();
-    }
-
-    /**
      * Выполняет все задания списка через переданную конфигурацию агента.
      *
      * При включённой истории чата создаётся и обновляется чекпоинт состояния run в .store;
@@ -150,21 +134,10 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
 
             $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) : $agentCfg;
 
-            $configApp = $this->getConfigurationApp();
+            // здесь передаем в конфигурацию сессии навыки, указанные в опции skills
+            $this->attachSkillToolsToSession($sessionCfg, $role);
 
-            if ($configApp !== null && $this->getNeedSkills() !== []) {
-                $skillTools = [];
-                foreach ($this->getNeedSkills() as $skillName) {
-                    $skill = $configApp->getSkill($skillName);
-                    if ($skill !== null) {
-                        $skill->setDefaultConfigurationAgent($sessionCfg);
-                        $skillTools[] = $skill->getTool($role);
-                    }
-                }
-                if ($skillTools !== []) {
-                    $sessionCfg->tools = array_merge($agentCfg->getTools(), $skillTools);
-                }
-            }
+            $configApp = $this->getConfigurationApp();
 
             $runStateDto = null;
             $sessionKey  = $sessionCfg->getSessionKey();
@@ -292,16 +265,14 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
     }
 
     /**
-     * @inheritDoc
+     * Значение по умолчанию для опции pure_context у TodoList.
      *
-     * добавим опции по умолчанию здесь
+     * Для списка заданий по умолчанию используется чистый контекст
+     * агента, поэтому при отсутствии опции pure_context метод
+     * {@see isPureContext()} возвращает true.
      */
-    protected function parseOptions(array $lines): array
+    protected function getDefaultPureContext(): bool
     {
-        $opts = parent::parseOptions($lines);
-        if (!isset($opts['pure_context'])) {
-            $opts['pure_context'] = false;
-        }
-        return $opts;
+        return true;
     }
 }

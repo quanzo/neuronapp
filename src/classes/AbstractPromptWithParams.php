@@ -149,8 +149,10 @@ abstract class AbstractPromptWithParams extends APromptComponent
      *
      * @return string|null
      */
-    public function getDescription(): ?string {
+    public function getDescription(): ?string
+    {
         $options = $this->getOptions();
+
         return $options['description'] ?? null;
     }
 
@@ -188,12 +190,31 @@ abstract class AbstractPromptWithParams extends APromptComponent
      * чтобы не изменять основное состояние агента (историю, кеш).
      * Опция задаётся параметром "pure_context" в блоке опций навыка.
      *
-     * @return bool true, если опция pure_context задана как 1 или 'true'; false — если не задана, 0 или 'false'.
+     * По умолчанию значение берётся из {@see getDefaultPureContext()}, но
+     * может быть переопределено опцией "pure_context" в блоке настроек.
+     *
+     * @return bool true, если опция pure_context задана как 1 или 'true';
+     *              false — если не задана и значение по умолчанию ложно,
+     *              либо опция задана как 0 или 'false'.
      */
     public function isPureContext(): bool
     {
-        $value = $this->getOptions()['pure_context'] ?? true;
+        $options = $this->getOptions();
+        $value = $options['pure_context'] ?? $this->getDefaultPureContext();
+
         return OptionsHelper::toBool($value);
+    }
+
+    /**
+     * Значение по умолчанию для опции pure_context.
+     *
+     * Наследники могут переопределять этот метод, чтобы задать
+     * собственное значение по умолчанию для использования чистого
+     * контекста при выполнении компонента.
+     */
+    protected function getDefaultPureContext(): bool
+    {
+        return true;
     }
 
     /**
@@ -338,5 +359,20 @@ abstract class AbstractPromptWithParams extends APromptComponent
         );
 
         return $errors;
+    }
+
+    /**
+     * Проверяет корректность конфигурации компонента и возвращает список ошибок.
+     * 
+     * Формат каждой ошибки:
+     *  - type: строковый код ошибки;
+     *  - message: человекочитаемое описание;
+     *  - param: опционально, имя параметра, к которому относится ошибка.
+     *
+     * @return array<int, array{type:string, message:string, param?:string}>
+     */
+    public function checkErrors(): array
+    {
+        return $this->getErrors();
     }
 }

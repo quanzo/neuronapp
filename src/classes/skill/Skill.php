@@ -18,6 +18,8 @@ use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ISkill;
+use app\modules\neuron\traits\HasNeedSkillsTrait;
+use app\modules\neuron\traits\AttachesSkillToolsTrait;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
 use NeuronAI\Tools\PropertyType;
@@ -33,6 +35,9 @@ use NeuronAI\Tools\ToolProperty;
  */
 class Skill extends AbstractPromptWithParams implements ISkill
 {
+    use HasNeedSkillsTrait;
+    use AttachesSkillToolsTrait;
+
     /**
      * Создает навык на основе входного текстового описания.
      *
@@ -42,8 +47,8 @@ class Skill extends AbstractPromptWithParams implements ISkill
      *  - только блок опций (без тела);
      *  - быть пустым (без опций и тела).
      *
-     * @param string               $input     Полный текст описания навыка.
-     * @param string               $name      Имя навыка (имя файла с поддиректорией, если есть).
+     * @param string                $input     Полный текст описания навыка.
+     * @param string                $name      Имя навыка (имя файла с поддиректорией, если есть).
      * @param ConfigurationApp|null $configApp Экземпляр конфигурации приложения для разрешения зависимостей.
      */
     public function __construct(string $input, string $name = '', ?ConfigurationApp $configApp = null)
@@ -52,33 +57,6 @@ class Skill extends AbstractPromptWithParams implements ISkill
         $this->body = CommentsHelper::stripComments($this->body);
         $this->name = $name;
         $this->setConfigurationApp($configApp);
-    }
-
-    /**
-     * Возвращает имена навыков (Skill), которые нужно подключить при исполнении.
-     * Берутся из опции "skills" — строка с именами через запятую (пробелы обрезаются),
-     * при этом исключается имя текущего skill, чтобы избежать самоссылок.
-     *
-     * @return list<string>
-     */
-    public function getNeedSkills(): array
-    {
-        return $this->parseSkills(true);
-    }
-
-    /**
-     * Проверяет корректность настройки Skill и возвращает список найденных проблем.
-     *
-     * Формат элемента ошибки:
-     *  - type: строковый код ошибки
-     *  - message: человекочитаемое описание
-     *  - param: опционально, имя параметра, к которому относится ошибка
-     *
-     * @return array<int, array{type:string, message:string, param?:string}>
-     */
-    public function checkErrors(): array
-    {
-        return $this->getErrors();
     }
 
     /**
@@ -225,23 +203,8 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) // здесь агент без истории сообщений
                 : $agentCfg->cloneForSession(ChatHistoryCloneMode::COPY_CONTEXT); // здесь агент с копией, которая не влияет на сессию
 
-            $configApp = $this->getConfigurationApp();
-
-            if ($configApp !== null && $this->getNeedSkills() !== []) {
-                // здесь передаем в skill другие навыки, которые указаны в его параметрах
-                $skillTools = [];
-                foreach ($this->getNeedSkills() as $skillName) {
-                    $skill = $configApp->getSkill($skillName);
-                    if ($skill !== null) {
-                        // если в блоке настроек skill не указан используемый агент, то берется $sessionCfg
-                        $skill->setDefaultConfigurationAgent($sessionCfg);
-                        $skillTools[] = $skill->getTool($role);
-                    }
-                }
-                if ($skillTools !== []) {
-                    $sessionCfg->tools = array_merge($agentCfg->getTools(), $skillTools);
-                }
-            }
+            // здесь передаем в skill другие навыки, которые указаны в его параметрах
+            $this->attachSkillToolsToSession($sessionCfg, $role);
 
             try {
                 $message = new NeuronMessage($role, $text);
@@ -256,16 +219,14 @@ class Skill extends AbstractPromptWithParams implements ISkill
     }
 
     /**
-     * @inheritDoc
+     * Значение по умолчанию для опции pure_context у Skill.
      *
-     * добавим опции по умолчанию здесь
+     * Для текстового навыка по умолчанию используется общий контекст
+     * агента, поэтому при отсутствии опции pure_context метод
+     * {@see isPureContext()} возвращает false.
      */
-    protected function parseOptions(array $lines): array
+    protected function getDefaultPureContext(): bool
     {
-        $opts = parent::parseOptions($lines);
-        if (!isset($opts['pure_context'])) {
-            $opts['pure_context'] = true;
-        }
-        return $opts;
+        return false;
     }
 }
