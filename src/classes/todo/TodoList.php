@@ -10,6 +10,7 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\run\RunStateDto;
+use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\helpers\CommentsHelper;
@@ -37,11 +38,6 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
      * @var ITodo[]
      */
     private array $todos = [];
-
-    /**
-     * Имя списка заданий (может соответствовать имени файла).
-     */
-    private string $name = '';
 
     /**
      * Создает список заданий на основе входного текста.
@@ -104,19 +100,6 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
         return array_values($this->todos);
     }
 
-    public function getName(): string
-    {
-        return $this->name;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    protected function getComponentName(): string
-    {
-        return $this->getName();
-    }
-
     /**
      * Возвращает имена навыков (Skill), которые нужно подключить при исполнении списка.
      * Берутся из опции "skills" — строка с именами через запятую (пробелы обрезаются).
@@ -126,20 +109,6 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
     public function getNeedSkills(): array
     {
         return $this->parseSkills(true);
-    }
-
-    /**
-     * Определяет, нужно ли выполнять список с чистым контекстом.
-     *
-     * Для TodoList по умолчанию возвращает true: исполнение идёт через клон конфигурации агента,
-     * чтобы не изменять основное состояние агента.
-     *
-     * @return bool Всегда true для списка заданий.
-     */
-    public function isPureContext(): bool
-    {
-        $value = $this->getOptions()['pure_context'] ?? false;
-        return OptionsHelper::toBool($value);
     }
 
     /**
@@ -179,7 +148,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             $baseContext = ['todolist' => $this->getName()];
             $logger->info('TodoList started', $baseContext);
 
-            $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession() : $agentCfg;
+            $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) : $agentCfg;
 
             $configApp = $this->getConfigurationApp();
 
@@ -320,5 +289,19 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
         }
 
         $this->pushTodo(Todo::fromString($text));
+    }
+
+    /**
+     * @inheritDoc
+     *
+     * добавим опции по умолчанию здесь
+     */
+    protected function parseOptions(array $lines): array
+    {
+        $opts = parent::parseOptions($lines);
+        if (!isset($opts['pure_context'])) {
+            $opts['pure_context'] = false;
+        }
+        return $opts;
     }
 }

@@ -9,6 +9,7 @@ use app\modules\neuron\classes\AbstractPromptWithParams;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\params\ParamListDto;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\classes\dto\cmd\CmdDto;
 use app\modules\neuron\helpers\FileContextHelper;
 use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\PlaceholderHelper;
@@ -32,8 +33,6 @@ use NeuronAI\Tools\ToolProperty;
  */
 class Skill extends AbstractPromptWithParams implements ISkill
 {
-    private string $name;
-
     /**
      * Создает навык на основе входного текстового описания.
      *
@@ -55,19 +54,6 @@ class Skill extends AbstractPromptWithParams implements ISkill
         $this->setConfigurationApp($configApp);
     }
 
-    public function getName(): string
-    {
-        return $this->name;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    protected function getComponentName(): string
-    {
-        return $this->getName();
-    }
-
     /**
      * Возвращает имена навыков (Skill), которые нужно подключить при исполнении.
      * Берутся из опции "skills" — строка с именами через запятую (пробелы обрезаются),
@@ -78,21 +64,6 @@ class Skill extends AbstractPromptWithParams implements ISkill
     public function getNeedSkills(): array
     {
         return $this->parseSkills(true);
-    }
-
-    /**
-     * Определяет, нужно ли выполнять навык с чистым контекстом.
-     *
-     * Чистый контекст — использование клона конфигурации агента (cloneForSession),
-     * чтобы не изменять основное состояние агента (историю, кеш).
-     * Опция задаётся параметром "pure_context" в блоке опций навыка.
-     *
-     * @return bool true, если опция pure_context задана как 1 или 'true'; false — если не задана, 0 или 'false'.
-     */
-    public function isPureContext(): bool
-    {
-        $value = $this->getOptions()['pure_context'] ?? null;
-        return OptionsHelper::toBool($value);
     }
 
     /**
@@ -123,6 +94,20 @@ class Skill extends AbstractPromptWithParams implements ISkill
     public function getSkill(array $params = []): string
     {
         return PlaceholderHelper::renderWithParams($this->getBody(), $params);
+    }
+
+    /**
+     * Возвращает список управляющих команд, определённых в теле навыка.
+     *
+     * Команды ищутся по синтаксису "@@name(...)" в исходном тексте тела
+     * (без комментариев, так как {@see CommentsHelper::stripComments()} уже
+     * применён в конструкторе).
+     *
+     * @return list<CmdDto> Массив DTO-команд в порядке появления в тексте.
+     */
+    public function getCmdList(): array
+    {
+        return FileContextHelper::extractCmdFromBody($this->getBody());
     }
 
     /**
@@ -157,7 +142,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
         $options = $this->getOptions();
 
         $toolName = str_replace('/', '__', $this->name);
-        $description = $options['description'] ?? null;
+        $description = $this->getDescription();
 
         $tool = new Tool($toolName, is_string($description) ? $description : null);
 
@@ -268,5 +253,19 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 throw $e;
             }
         });
+    }
+
+    /**
+     * @inheritDoc
+     *
+     * добавим опции по умолчанию здесь
+     */
+    protected function parseOptions(array $lines): array
+    {
+        $opts = parent::parseOptions($lines);
+        if (!isset($opts['pure_context'])) {
+            $opts['pure_context'] = true;
+        }
+        return $opts;
     }
 }

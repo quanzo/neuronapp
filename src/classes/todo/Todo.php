@@ -6,6 +6,8 @@ namespace app\modules\neuron\classes\todo;
 
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\helpers\PlaceholderHelper;
+use app\modules\neuron\classes\dto\cmd\CmdDto;
+use app\modules\neuron\helpers\FileContextHelper;
 
 /**
  * Класс одного задания Todo.
@@ -56,5 +58,18 @@ class Todo implements ITodo
         }
 
         return PlaceholderHelper::renderWithParams($this->text, $params);
+    }
+
+    /**
+     * Возвращает список управляющих команд, определённых в тексте задания.
+     *
+     * Команды ищутся по синтаксису "@@name(...)" в исходном тексте todo
+     * без учёта параметров (плейсхолдеры не подставляются).
+     *
+     * @return list<CmdDto> Массив DTO-команд в порядке появления в тексте.
+     */
+    public function getCmdList(): array
+    {
+        return FileContextHelper::extractCmdFromBody($this->text);
     }
 }

@@ -7,6 +7,7 @@ namespace app\modules\neuron\classes;
 use app\modules\neuron\classes\dto\params\ParamListDto;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\PlaceholderHelper;
 use RuntimeException;
 
@@ -21,6 +22,8 @@ use RuntimeException;
  */
 abstract class AbstractPromptWithParams extends APromptComponent
 {
+    protected string $name;
+
     /**
      * Глобальная конфигурация приложения, используемая для разрешения агентов и зависимостей.
      */
@@ -34,10 +37,18 @@ abstract class AbstractPromptWithParams extends APromptComponent
     private ?ParamListDto $paramListCache = null;
     private bool $paramListCacheInitialized = false;
 
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
     /**
-     * Имя компонента, используемое, например, для проверки самоссылок в skills.
+     * Имя компонента, используемое, например, для проверки самоссылок
      */
-    abstract protected function getComponentName(): string;
+    protected function getComponentName(): string
+    {
+        return $this->getName();
+    }
 
     /**
      * Устанавливает конфигурацию приложения для компонента.
@@ -134,6 +145,16 @@ abstract class AbstractPromptWithParams extends APromptComponent
     }
 
     /**
+     * Описание компонента (если есть)
+     *
+     * @return string|null
+     */
+    public function getDescription(): ?string {
+        $options = $this->getOptions();
+        return $options['description'] ?? null;
+    }
+
+    /**
      * Возвращает список параметров (опция params) в виде DTO.
      *
      * Если опция отсутствует, возвращается пустой список параметров.
@@ -158,6 +179,21 @@ abstract class AbstractPromptWithParams extends APromptComponent
 
         $this->paramListCache = $list;
         return $this->paramListCache;
+    }
+
+    /**
+     * Определяет, нужно ли выполнять навык с чистым контекстом.
+     *
+     * Чистый контекст — использование клона конфигурации агента (cloneForSession),
+     * чтобы не изменять основное состояние агента (историю, кеш).
+     * Опция задаётся параметром "pure_context" в блоке опций навыка.
+     *
+     * @return bool true, если опция pure_context задана как 1 или 'true'; false — если не задана, 0 или 'false'.
+     */
+    public function isPureContext(): bool
+    {
+        $value = $this->getOptions()['pure_context'] ?? true;
+        return OptionsHelper::toBool($value);
     }
 
     /**
