@@ -81,17 +81,29 @@ class ConfigurationApp
     private ?string $sessionKey = null;
 
     /**
+     * Id пользователя
+     *
+     * @var int|string
+     */
+    private int|string $userId = 0;
+
+    /**
      * Приватный конструктор, выполняющий загрузку конфигурации.
      *
      * @param DirPriority $dirPriority    Приоритетный список директорий для поиска файла конфигурации.
      * @param string      $configFileName Имя файла конфигурации (например, config.jsonc).
      */
-    private function __construct(DirPriority $dirPriority, string $configFileName)
+    private function __construct(DirPriority $dirPriority, string $configFileName, int $userId = 0)
     {
         $this->dirPriority = $dirPriority;
         $this->configFileName = $configFileName;
+        $this->userId = $userId;
 
         $this->load();
+
+        if (empty($this->userId) && !empty($this->get('userId'))) {
+            $this->userId = $this->get('userId');
+        }
     }
 
     /**
@@ -103,13 +115,13 @@ class ConfigurationApp
      * @param DirPriority $dirPriority    Приоритетный список директорий для поиска файла конфигурации.
      * @param string      $configFileName Имя файла конфигурации (например, config.jsonc).
      */
-    public static function init(DirPriority $dirPriority, string $configFileName = 'config.jsonc'): void
+    public static function init(DirPriority $dirPriority, string $configFileName = 'config.jsonc', int|string $userId = 0): void
     {
         if (self::$instance !== null) {
             return;
         }
 
-        self::$instance = new self($dirPriority, $configFileName);
+        self::$instance = new self($dirPriority, $configFileName, $userId);
     }
 
     /**
@@ -132,6 +144,15 @@ class ConfigurationApp
     public function getDirPriority(): DirPriority
     {
         return $this->dirPriority;
+    }
+
+    /**
+     * Id пользователя
+     *
+     * @return integer|string
+     */
+    public function getUserId(): int|string {
+        return $this->userId;
     }
 
     /**
