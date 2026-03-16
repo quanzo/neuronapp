@@ -8,6 +8,7 @@ use Amp\Future;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\interfaces\ISkill;
+use app\modules\neuron\helpers\ToolRegistry;
 use NeuronAI\Agent\AgentHandler;
 use NeuronAI\Agent\AgentInterface;
 use NeuronAI\Chat\Enums\MessageRole;
@@ -96,12 +97,13 @@ class SkillTest extends TestCase
 
     /**
      * Вызов getSkill() без аргументов — отсутствующие плейсхолдеры
-     * заменяются пустой строкой.
+     * заменяются пустой строкой, либо значениями по умолчанию из params.
      */
     public function testGetSkillNoParams(): void
     {
-        $skill = new Skill('Hello $name');
-        $this->assertSame('Hello ', $skill->getSkill());
+        $input = "---\nparams: {\"name\": {\"type\": \"string\", \"default\": \"World\"}}\n---\nHello \$name";
+        $skill = new Skill($input, 'greet');
+        $this->assertSame('Hello World', $skill->getSkill());
     }
 
     /**
@@ -119,19 +121,21 @@ class SkillTest extends TestCase
      */
     public function testGetSkillMissingParamReplacedEmpty(): void
     {
-        $skill = new Skill('$a and $b');
-        $result = $skill->getSkill(['a' => 'X']);
-        $this->assertSame('X and ', $result);
+        $input = "---\nparams: {\"a\": {\"type\": \"string\", \"default\": \"A\"}, \"b\": {\"type\": \"string\"}}\n---\n\$a and \$b";
+        $skill = new Skill($input);
+        $result = $skill->getSkill(['b' => 'B']);
+        $this->assertSame('A and B', $result);
     }
 
     /**
-     * Текст без плейсхолдеров — параметры игнорируются, текст без изменений.
+     * Приоритет значений: runtime > default.
      */
-    public function testGetSkillNoPlaceholders(): void
+    public function testGetSkillRuntimeOverridesDefault(): void
     {
-        $skill = new Skill('No params here');
-        $result = $skill->getSkill(['x' => 'ignored']);
-        $this->assertSame('No params here', $result);
+        $input = "---\nparams: {\"name\": {\"type\": \"string\", \"default\": \"World\"}}\n---\nHello \$name";
+        $skill = new Skill($input, 'greet');
+        $result = $skill->getSkill(['name' => 'Alice']);
+        $this->assertSame('Hello Alice', $result);
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -200,6 +204,41 @@ class SkillTest extends TestCase
         $input = "---\nskills: 42\n---\nBody";
         $skill = new Skill($input, 'myskill');
         $this->assertSame([], $skill->getNeedSkills());
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  getNeedTools — встроенные инструменты через опцию tools
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * Опция tools не задана — пустой массив.
+     */
+    public function testGetNeedToolsEmpty(): void
+    {
+        $skill = new Skill('body', 'myskill');
+        $this->assertSame([], $skill->getNeedTools());
+    }
+
+    /**
+     * Опция tools с двумя именами — оба возвращаются в массиве.
+     */
+    public function testGetNeedTools(): void
+    {
+        $input = "---\ntools: wiki_search, git_summary\n---\nBody";
+        $skill = new Skill($input, 'myskill');
+        $this->assertSame(['wiki_search', 'git_summary'], $skill->getNeedTools());
+    }
+
+    /**
+     * Нестроковое значение tools (после JSON-декодирования) — ошибка invalid_tools_option_type.
+     */
+    public function testCheckErrorsInvalidToolsType(): void
+    {
+        $input = "---\ntools: [1, 2]\n---\nBody";
+        $skill = new Skill($input, 'myskill');
+        $errors = $skill->checkErrors();
+        $types = array_column($errors, 'type');
+        $this->assertContains('invalid_tools_option_type', $types);
     }
 
     // ══════════════════════════════════════════════════════════════

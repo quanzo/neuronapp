@@ -7,6 +7,7 @@ namespace app\modules\neuron\traits;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\skill\Skill;
+use app\modules\neuron\helpers\ToolRegistry;
 use NeuronAI\Chat\Enums\MessageRole;
 
 /**
@@ -40,27 +41,39 @@ trait AttachesSkillToolsTrait
             return;
         }
 
-        $needSkills = $this->getNeedSkills();
-        if ($needSkills === []) {
-            return;
-        }
+        $sessionTools = $sessionCfg->getTools();
 
-        $skillTools = [];
-        foreach ($needSkills as $skillName) {
-            $skill = $configApp->getSkill($skillName);
-            if (!$skill instanceof Skill) {
-                continue;
+        $needSkills = $this->getNeedSkills();
+        if ($needSkills !== []) {
+            $skillTools = [];
+            foreach ($needSkills as $skillName) {
+                $skill = $configApp->getSkill($skillName);
+                if (!$skill instanceof Skill) {
+                    continue;
+                }
+
+                // если в блоке настроек skill не указан используемый агент, то берется $sessionCfg
+                $skill->setDefaultConfigurationAgent($sessionCfg);
+                $skillTools[] = $skill->getTool($role);
             }
 
-            // если в блоке настроек skill не указан используемый агент, то берется $sessionCfg
-            $skill->setDefaultConfigurationAgent($sessionCfg);
-            $skillTools[] = $skill->getTool($role);
+            if ($skillTools !== []) {
+                $sessionTools = array_merge($sessionTools, $skillTools);
+            }
         }
 
-        if ($skillTools === []) {
-            return;
+        if (method_exists($this, 'getNeedTools')) {
+            /** @var list<string> $needTools */
+            $needTools = $this->getNeedTools();
+            foreach ($needTools as $toolName) {
+                $tool = ToolRegistry::makeTool($toolName, $sessionCfg);
+                if ($tool === null) {
+                    continue;
+                }
+                $sessionTools[] = $tool;
+            }
         }
 
-        $sessionCfg->tools = array_merge($sessionCfg->getTools(), $skillTools);
+        $sessionCfg->tools = $sessionTools;
     }
 }

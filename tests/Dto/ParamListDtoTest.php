@@ -190,6 +190,7 @@ class ParamListDtoTest extends TestCase
                 'type' => 'string',
                 'description' => 'Search query',
                 'required' => true,
+                'default' => 'php',
             ],
         ]);
         $this->assertSame([], $errors);
@@ -197,6 +198,7 @@ class ParamListDtoTest extends TestCase
         $this->assertSame('string', $param->getType());
         $this->assertSame('Search query', $param->getDescription());
         $this->assertTrue($param->isRequired());
+        $this->assertSame('php', $param->getDefault());
     }
 
     /**
@@ -209,6 +211,27 @@ class ParamListDtoTest extends TestCase
         ]);
         $this->assertSame([], $errors);
         $this->assertSame('string', $list->get('query')->getType());
+    }
+
+    /**
+     * Поле default не влияет на наличие ошибок и сохраняется в ParamDto.
+     */
+    public function testDefaultFieldDoesNotAffectErrors(): void
+    {
+        [$list, $errors] = ParamListDto::tryFromOptionValue([
+            'ok' => [
+                'type' => 'string',
+                'default' => 'value',
+            ],
+            'bad' => [
+                'type' => '',
+                'default' => 'ignored',
+            ],
+        ]);
+
+        $this->assertCount(1, $errors);
+        $this->assertSame('invalid_param_type_value', $errors[0]['type']);
+        $this->assertSame('value', $list->get('ok')->getDefault());
     }
 
     /**

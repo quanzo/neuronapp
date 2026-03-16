@@ -7,9 +7,10 @@ namespace app\modules\neuron\classes\dto\params;
 /**
  * DTO одного параметра, описанного в опции "params".
  *
- * Инкапсулирует имя параметра, его тип, человекочитаемое описание
- * и флаг обязательности. Используется для построения схемы инструментов
- * (LLM‑tools) и для валидации плейсхолдеров в текстовых шаблонах.
+ * Инкапсулирует имя параметра, его тип, человекочитаемое описание,
+ * флаг обязательности и значение по умолчанию. Используется для
+ * построения схемы инструментов (LLM‑tools), валидации плейсхолдеров
+ * и формирования итогового набора параметров для подстановки.
  */
 final class ParamDto
 {
@@ -24,12 +25,15 @@ final class ParamDto
      *                                 если дополнительное описание не требуется.
      * @param bool        $required    Признак обязательности параметра: true — значение обязательно,
      *                                 false — параметр является необязательным.
+     * @param mixed       $default     Значение параметра по умолчанию, используемое при формировании
+     *                                 итогового набора параметров, если явное значение не передано.
      */
     public function __construct(
         private readonly string $name,
         private readonly string $type = 'string',
         private readonly ?string $description = null,
         private readonly bool $required = false,
+        private readonly mixed $default = null,
     ) {
     }
 
@@ -72,5 +76,15 @@ final class ParamDto
     public function isRequired(): bool
     {
         return $this->required;
+    }
+
+    /**
+     * Возвращает значение параметра по умолчанию.
+     *
+     * @return mixed Значение по умолчанию или null, если default не задан.
+     */
+    public function getDefault(): mixed
+    {
+        return $this->default;
     }
 }

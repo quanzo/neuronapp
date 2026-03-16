@@ -221,6 +221,51 @@ abstract class AbstractPromptWithParams extends APromptComponent implements IDep
     }
 
     /**
+     * Формирует итоговый набор значений параметров с учётом описания params.
+     *
+     * Приоритет значений:
+     *  1) $runtimeParams — значения, переданные при непосредственном вызове компонента;
+     *  2) $sessionParams — значения, переданные извне (например, из CLI/конфига сессии);
+     *  3) default из описания параметров (опция params).
+     *
+     * Имена параметров должны соответствовать [a-zA-Z]+, как и плейсхолдеры
+     * в тексте компонента (например, $date, $branch, $user).
+     *
+     * @param array<string,mixed>|null $runtimeParams  Значения, переданные при вызове компонента.
+     * @param array<string,mixed>|null $sessionParams  Сессионные значения (дата, ветка, пользователь и др.).
+     *
+     * @return array<string,mixed> Итоговый набор значений параметров.
+     */
+    protected function buildEffectiveParams(?array $runtimeParams, ?array $sessionParams = null): array
+    {
+        $effective = [];
+
+        $paramList = $this->getParamList();
+        if ($paramList !== null) {
+            foreach ($paramList->all() as $param) {
+                $default = $param->getDefault();
+                if ($default !== null) {
+                    $effective[$param->getName()] = $default;
+                }
+            }
+        }
+
+        if ($sessionParams !== null) {
+            foreach ($sessionParams as $name => $value) {
+                $effective[(string) $name] = $value;
+            }
+        }
+
+        if ($runtimeParams !== null) {
+            foreach ($runtimeParams as $name => $value) {
+                $effective[(string) $name] = $value;
+            }
+        }
+
+        return $effective;
+    }
+
+    /**
      * Проверяет опцию params с учётом списка используемых плейсхолдеров.
      *
      * @param string[] $placeholders
@@ -264,6 +309,39 @@ abstract class AbstractPromptWithParams extends APromptComponent implements IDep
     }
 
     /**
+     * Разбирает строку tools в список имён инструментов.
+     *
+     * @return list<string>
+     */
+    protected function parseTools(): array
+    {
+        $options = $this->getOptions();
+        $toolsOpt = $options['tools'] ?? '';
+
+        if (!is_string($toolsOpt)) {
+            return [];
+        }
+
+        $names = array_map('trim', explode(',', $toolsOpt));
+
+        return array_values(array_filter($names, static fn(string $s): bool => $s !== ''));
+    }
+
+    /**
+     * Возвращает имена встроенных инструментов, которые нужно подключить.
+     *
+     * Источник списка — опция "tools" в блоке настроек компонента.
+     * Нестроковые значения опции считаются некорректными и приводят
+     * к пустому результату.
+     *
+     * @return list<string> Список имён инструментов.
+     */
+    public function getNeedTools(): array
+    {
+        return $this->parseTools();
+    }
+
+    /**
      * Валидирует опцию skills, включая формат и самоссылки.
      *
      * @return array<int, array{type:string, message:string}>
@@ -298,6 +376,33 @@ abstract class AbstractPromptWithParams extends APromptComponent implements IDep
                 ];
                 break;
             }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Валидирует опцию tools.
+     *
+     * @return array<int, array{type:string, message:string}>
+     */
+    protected function validateToolsOption(): array
+    {
+        $errors = [];
+        $options = $this->getOptions();
+
+        if (!array_key_exists('tools', $options)) {
+            return $errors;
+        }
+
+        $toolsOpt = $options['tools'];
+        if (!is_string($toolsOpt)) {
+            $errors[] = [
+                'type' => 'invalid_tools_option_type',
+                'message' => 'Опция tools должна быть строкой с именами инструментов через запятую.',
+            ];
+
+            return $errors;
         }
 
         return $errors;
@@ -349,6 +454,7 @@ abstract class AbstractPromptWithParams extends APromptComponent implements IDep
             $this->validateEmptyBody(),
             $this->validateParams(),
             $this->validateSkills(),
+            $this->validateToolsOption(),
         );
 
         return $errors;

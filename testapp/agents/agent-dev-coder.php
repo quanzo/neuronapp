@@ -1,7 +1,7 @@
 <?php
 
 use app\modules\neuron\helpers\CallableWrapper;
-use app\modules\neuron\tools\BashTool;
+use app\modules\neuron\helpers\ShellToolFactory;
 use app\modules\neuron\tools\EditTool;
 use app\modules\neuron\tools\GlobTool;
 use app\modules\neuron\tools\GrepTool;
@@ -102,29 +102,13 @@ return [
             'createIfNotExists' => false,
             'maxFileSize'       => 1024 * 1024,
         ],
-        // Безопасные shell-команды
+        // Безопасные shell-команды (профиль readonly через ShellToolFactory)
         [
             CallableWrapper::class,
             'createObject',
-            'class'           => BashTool::class,
-            'defaultTimeout'  => 30,
-            'maxOutputSize'   => 102400,
-            'workingDirectory'=> dirname(__DIR__, 2),
-            'allowedPatterns' => [
-                '/^git\\s+status\\b/',
-                '/^git\\s+diff\\b/',
-                '/^ls(\\s|$)/',
-                '/^php\\s+-v$/',
-                '/^php\\s+composer\\.phar\\s+show\\b/',
-                '/^composer\\s+show\\b/',
-            ],
-            'blockedPatterns' => [
-                '/rm\\s+-rf/',
-                '/:\\s*\\>/',
-            ],
-            'env'             => [],
-            'name'            => 'bash_safe',
-            'description'     => 'Безопасное выполнение ограниченного набора shell-команд (git status, git diff, ls, php -v, composer show).',
+            'class' => ShellToolFactory::class,
+            'method' => 'createReadonlyBashTool',
+            'args' => [dirname(__DIR__, 2)],
         ],
         // Поиск по Википедии
         [

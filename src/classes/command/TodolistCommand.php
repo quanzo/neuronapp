@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dto\params\SessionParamsDto;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\helpers\ConsoleHelper;
@@ -66,6 +67,9 @@ class TodolistCommand extends AbstractAgentCommand
             ->addOption('resume', null, InputOption::VALUE_NONE, 'Продолжить выполнение с последнего чекпоинта')
             ->addOption('abort', null, InputOption::VALUE_NONE, 'Сбросить состояние незавершённого run для сессии')
             ->addOption('format', null, InputOption::VALUE_OPTIONAL, 'Формат вывода. Доступно: md, txt, json', 'md')
+            ->addOption('date', null, InputOption::VALUE_OPTIONAL, 'Сессионный параметр date для плейсхолдера $date')
+            ->addOption('branch', null, InputOption::VALUE_OPTIONAL, 'Сессионный параметр branch для плейсхолдера $branch')
+            ->addOption('user', null, InputOption::VALUE_OPTIONAL, 'Сессионный параметр user для плейсхолдера $user')
             ->addOption(
                 'file',
                 'f',
@@ -96,6 +100,9 @@ class TodolistCommand extends AbstractAgentCommand
         $abort        = (bool) $input->getOption('abort');
         $formatOut    = $input->getOption('format');
         $fileOptions  = $input->getOption('file');
+        $dateOption   = $input->getOption('date');
+        $branchOption = $input->getOption('branch');
+        $userOption   = $input->getOption('user');
 
         if ($agentName === null || $agentName === '') {
             $output->writeln('<error>Не указан агент. Используйте --agent.</error>');
@@ -219,16 +226,29 @@ class TodolistCommand extends AbstractAgentCommand
             $todoList->setDefaultConfigurationAgent($agentCfg);
         }
 
+        $sessionParamsDto = null;
+        if (
+            ($dateOption !== null && $dateOption !== '')
+            || ($branchOption !== null && $branchOption !== '')
+            || ($userOption !== null && $userOption !== '')
+        ) {
+            $sessionParamsDto = (new SessionParamsDto())
+                ->setDate($dateOption)
+                ->setBranch($branchOption)
+                ->setUser($userOption);
+        }
+
         $history = null;
         $error = null;
 
-        EventLoop::queue(static function () use ($todoList, $attachments, $startFromTodoIndex, &$history, &$error): void {
+        EventLoop::queue(static function () use ($todoList, $attachments, $startFromTodoIndex, $sessionParamsDto, &$history, &$error): void {
             try {
                 $history = $todoList->execute(
                     MessageRole::USER,
                     $attachments,
                     null,
-                    $startFromTodoIndex
+                    $startFromTodoIndex,
+                    $sessionParamsDto
                 )->await();
             } catch (\Throwable $e) {
                 $error = $e;

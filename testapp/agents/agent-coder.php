@@ -6,7 +6,7 @@
  */
 
 use app\modules\neuron\helpers\CallableWrapper;
-use app\modules\neuron\tools\BashCmdTool;
+use app\modules\neuron\helpers\ShellToolFactory;
 use NeuronAI\Providers\Ollama\Ollama;
 use NeuronAI\Agent\SystemPrompt;
 use NeuronAI\HttpClient\GuzzleHttpClient;
@@ -68,10 +68,14 @@ return [
         [
             CallableWrapper::class,
             'createObject',
-            'class'           => BashCmdTool::class,
-            'commandTemplate' => 'git status',
-            'name'            => 'git_status',
-            'description'     => 'Статус git',
-        ]
+            'class'  => ShellToolFactory::class,
+            'method' => 'createReadonlyBashCmdTool',
+            'args'   => [
+                'git status',
+                dirname(__DIR__, 2),
+                'git_status',
+                'Статус git',
+            ],
+        ],
     ],
 ];

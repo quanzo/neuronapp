@@ -71,7 +71,8 @@ php bin/console todolist --todolist daily-brief-project --agent agent-maintenanc
 - Сценарий: `topic-research-wiki`
 
 ```bash
-php bin/console todolist --todolist topic-research-wiki --agent agent-researcher
+php bin/console todolist --todolist topic-research-wiki --agent agent-researcher \
+  --date="2026-03-16" --user="alice"
 ```
 
 Ход работы:
@@ -79,6 +80,13 @@ php bin/console todolist --todolist topic-research-wiki --agent agent-researcher
 - сформирует несколько запросов и выполнит их через инструменты wiki‑поиска;
 - подготовит структурированный обзор (определение, ключевые факты, подходы, подводные камни);
 - предложит, как применить знания к текущему проекту.
+
+### Глобальные параметры и сессионные плейсхолдеры
+
+Во всех todolist-сценариях можно задавать глобальные параметры в шапке файла через опцию `params`.
+Плейсхолдеры `$date`, `$branch`, `$user` считаются обычными параметрами (`date`, `branch`, `user`)
+и получают значения либо из `params.default`, либо из CLI-опций `--date`, `--branch`, `--user`.
+
 
 ## Использование файлов контекста
 

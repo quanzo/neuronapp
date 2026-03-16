@@ -8,6 +8,8 @@ use Amp\Future;
 use app\modules\neuron\classes\AbstractPromptWithParams;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\classes\dto\params\SessionParamsDto;
+use app\modules\neuron\classes\logger\RunLogger;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
@@ -108,6 +110,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
      * @param AttachmentDto[]          $attachments        Дополнительные вложения, передаваемые с каждым заданием.
      * @param array<string,mixed>|null $params             Параметры, передаваемые в {@see ITodo::getTodo()}.
      * @param int                      $startFromTodoIndex Индекс первого todo для выполнения (0 = с начала); предыдущие пропускаются (для resume).
+     * @param SessionParamsDto|null    $sessionParams      Сессионные параметры (date, branch, user и др.) для подстановки.
      *
      * @return Future<ChatHistoryInterface> Завершается копией истории сообщений агента после выполнения всех заданий.
      */
@@ -115,13 +118,16 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
         MessageRole $role = MessageRole::USER,
         array $attachments = [],
         ?array $params = null,
-        int $startFromTodoIndex = 0
+        int $startFromTodoIndex = 0,
+        ?SessionParamsDto $sessionParams = null
     ): Future {
         $agentCfg = $this->getConfigurationAgent();
 
-        return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $startFromTodoIndex): ChatHistoryInterface {
+        return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $startFromTodoIndex, $sessionParams): ChatHistoryInterface {
             $logger      = $agentCfg->getLoggerWithContext();
             $baseContext = ['todolist' => $this->getName()];
+            $runLogger   = new RunLogger($logger);
+            $runId       = $runLogger->startRun('todolist', $this->getName(), $baseContext);
             $logger->info('TodoList started', $baseContext);
 
             $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) : $agentCfg;
@@ -140,11 +146,16 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             }
 
             $todos = $this->getTodos();
+            $stepsExecuted = 0;
+            $effectiveParams = $this->buildEffectiveParams(
+                $params,
+                $sessionParams?->toArray()
+            );
             foreach ($todos as $todoIndex => $todo) {
                 if ($todoIndex < $startFromTodoIndex) {
                     continue;
                 }
-                $todoText = $todo->getTodo($params);
+                $todoText = $todo->getTodo($effectiveParams);
                 $logger->info('Todo started', array_merge($baseContext, ['todo_index' => $todoIndex, 'todo' => $todoText]));
                 try {
                     $message = new NeuronMessage($role, $todoText);
@@ -159,6 +170,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                         }
                     }
                     $sessionCfg->sendMessageWithAttachments($message, $todoAttachments);
+                    ++$stepsExecuted;
                     if ($runStateDto !== null) {
                         $runStateDto->setLastCompletedTodoIndex($todoIndex);
                         $runStateDto->setHistoryMessageCount(
@@ -178,6 +190,8 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             }
 
             $logger->info('TodoList completed', $baseContext);
+            $runLogger->finishRun($runId, ['steps' => $stepsExecuted]);
+
             return clone $sessionCfg->getChatHistory();
         });
     }

@@ -10,6 +10,7 @@ use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\params\ParamListDto;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\cmd\CmdDto;
+use app\modules\neuron\classes\logger\RunLogger;
 use app\modules\neuron\helpers\FileContextHelper;
 use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\PlaceholderHelper;
@@ -64,11 +65,17 @@ class Skill extends AbstractPromptWithParams implements ISkill
      * Имя параметра — только латинские буквы [a-zA-Z]+, регистр учитывается.
      * Плейсхолдеры без переданных значений заменяются на пустую строку.
      *
+     * Итоговый набор параметров формируется с учётом:
+     *  - значений по умолчанию из описания params (default);
+     *  - переданных $params (имеют приоритет над default).
+     *
      * @param array<string, mixed> $params Именованные параметры для подстановки.
      */
     public function getSkill(array $params = []): string
     {
-        return PlaceholderHelper::renderWithParams($this->getBody(), $params);
+        $effectiveParams = $this->buildEffectiveParams($params, null);
+
+        return PlaceholderHelper::renderWithParams($this->getBody(), $effectiveParams);
     }
 
     /**
@@ -177,6 +184,8 @@ class Skill extends AbstractPromptWithParams implements ISkill
         $agentCfg = $this->getConfigurationAgent();
         $logger   = $agentCfg->getLogger();
         $context  = array_merge($agentCfg->getLogContext(), ['skill' => $this->getName()]);
+        $runLogger = new RunLogger($logger);
+        $runId     = $runLogger->startRun('skill', $this->getName(), $context);
         $logger->info('Skill started', $context);
 
         $text = $this->getSkill($params ?? []);
@@ -207,9 +216,11 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 $message = new NeuronMessage($role, $text);
                 $result = $sessionCfg->sendMessageWithAttachments($message, $attachments);
                 $agentCfg->getLogger()->info('Skill completed', array_merge($agentCfg->getLogContext(), ['skill' => $this->getName()]));
+                $runLogger->finishRun($runId, ['steps' => 1]);
                 return $result;
             } catch (\Throwable $e) {
                 $agentCfg->getLogger()->error('Ошибка выполнения skill', array_merge($agentCfg->getLogContext(), ['skill' => $this->getName(), 'exception' => $e]));
+                $runLogger->finishRun($runId, ['steps' => 0], $e);
                 throw $e;
             }
         });

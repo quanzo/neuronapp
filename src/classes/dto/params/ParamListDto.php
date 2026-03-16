@@ -162,7 +162,9 @@ final class ParamListDto
             $requiredRaw = $def['required'] ?? false;
             $required = is_bool($requiredRaw) ? $requiredRaw : (bool) $requiredRaw;
 
-            $itemsByName[$paramName] = new ParamDto($paramName, $type, $description, $required);
+            $default = $def['default'] ?? null;
+
+            $itemsByName[$paramName] = new ParamDto($paramName, $type, $description, $required, $default);
         }
 
         return [new self($itemsByName), $errors];

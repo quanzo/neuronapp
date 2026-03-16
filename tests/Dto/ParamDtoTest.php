@@ -22,7 +22,7 @@ class ParamDtoTest extends TestCase
     /**
      * Конструктор с единственным обязательным аргументом (имя) —
      * остальные параметры принимают значения по умолчанию:
-     * type = 'string', description = null, required = false.
+     * type = 'string', description = null, required = false, default = null.
      */
     public function testDefaultValues(): void
     {
@@ -31,19 +31,21 @@ class ParamDtoTest extends TestCase
         $this->assertSame('string', $dto->getType());
         $this->assertNull($dto->getDescription());
         $this->assertFalse($dto->isRequired());
+        $this->assertNull($dto->getDefault());
     }
 
     /**
-     * Все четыре параметра конструктора заданы явно — все геттеры
+     * Все параметры конструктора заданы явно — все геттеры
      * возвращают соответствующие значения.
      */
     public function testAllParametersSpecified(): void
     {
-        $dto = new ParamDto('search', 'string', 'Search query text', true);
+        $dto = new ParamDto('search', 'string', 'Search query text', true, 'php');
         $this->assertSame('search', $dto->getName());
         $this->assertSame('string', $dto->getType());
         $this->assertSame('Search query text', $dto->getDescription());
         $this->assertTrue($dto->isRequired());
+        $this->assertSame('php', $dto->getDefault());
     }
 
     /**
@@ -72,5 +74,17 @@ class ParamDtoTest extends TestCase
     {
         $dto = new ParamDto('x', 'string', '', false);
         $this->assertSame('', $dto->getDescription());
+    }
+
+    /**
+     * Значение default может быть любого типа и возвращается как есть.
+     */
+    public function testDefaultValueCanBeAnyType(): void
+    {
+        $dtoInt = new ParamDto('limit', 'integer', null, false, 10);
+        $this->assertSame(10, $dtoInt->getDefault());
+
+        $dtoArray = new ParamDto('options', 'array', null, false, ['a' => 1]);
+        $this->assertSame(['a' => 1], $dtoArray->getDefault());
     }
 }

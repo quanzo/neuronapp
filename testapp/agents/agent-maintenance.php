@@ -1,7 +1,7 @@
 <?php
 
 use app\modules\neuron\helpers\CallableWrapper;
-use app\modules\neuron\tools\BashCmdTool;
+use app\modules\neuron\helpers\ShellToolFactory;
 use app\modules\neuron\tools\ViewTool;
 use NeuronAI\Agent\SystemPrompt;
 use NeuronAI\HttpClient\GuzzleHttpClient;
@@ -70,62 +70,42 @@ return [
             'name'      => 'view_app_files',
             'description' => 'Чтение файлов логов и заметок внутри рабочей директории приложения (testapp2).',
         ],
-        // Предопределённая команда git status (только чтение статуса репозитория)
+        // Предопределённые readonly-команды через ShellToolFactory
         [
             CallableWrapper::class,
             'createObject',
-            'class'           => BashCmdTool::class,
-            'commandTemplate' => 'git status --short --branch',
-            'name'            => 'git_status_short',
-            'description'     => 'Получает краткий статус git-репозитория (ветка и изменённые файлы).',
-            'defaultTimeout'  => 20,
-            'maxOutputSize'   => 65536,
-            'workingDirectory'=> dirname(__DIR__, 2),
-            'allowedPatterns' => [
-                '/^git\\s+status\\b/',
+            'class'  => ShellToolFactory::class,
+            'method' => 'createReadonlyBashCmdTool',
+            'args'   => [
+                'git status --short --branch',
+                dirname(__DIR__, 2),
+                'git_status_short',
+                'Получает краткий статус git-репозитория (ветка и изменённые файлы).',
             ],
-            'blockedPatterns' => [
-                '/rm\\s+-rf/',
-            ],
-            'env'             => [],
         ],
-        // Предопределённая команда composer show (обзор зависимостей)
         [
             CallableWrapper::class,
             'createObject',
-            'class'           => BashCmdTool::class,
-            'commandTemplate' => 'composer show --no-interaction --no-ansi',
-            'name'            => 'composer_show',
-            'description'     => 'Краткий обзор установленных composer-зависимостей.',
-            'defaultTimeout'  => 40,
-            'maxOutputSize'   => 65536,
-            'workingDirectory'=> dirname(__DIR__, 2),
-            'allowedPatterns' => [
-                '/^composer\\s+show\\b/',
+            'class'  => ShellToolFactory::class,
+            'method' => 'createReadonlyBashCmdTool',
+            'args'   => [
+                'composer show --no-interaction --no-ansi',
+                dirname(__DIR__, 2),
+                'composer_show',
+                'Краткий обзор установленных composer-зависимостей.',
             ],
-            'blockedPatterns' => [
-                '/rm\\s+-rf/',
-            ],
-            'env'             => [],
         ],
-        // Предопределённая команда php -v (версия PHP среды)
         [
             CallableWrapper::class,
             'createObject',
-            'class'           => BashCmdTool::class,
-            'commandTemplate' => 'php -v',
-            'name'            => 'php_version',
-            'description'     => 'Выводит версию PHP, используемую в среде исполнения.',
-            'defaultTimeout'  => 10,
-            'maxOutputSize'   => 32768,
-            'workingDirectory'=> dirname(__DIR__, 2),
-            'allowedPatterns' => [
-                '/^php\\s+-v$/',
+            'class'  => ShellToolFactory::class,
+            'method' => 'createReadonlyBashCmdTool',
+            'args'   => [
+                'php -v',
+                dirname(__DIR__, 2),
+                'php_version',
+                'Выводит версию PHP, используемую в среде исполнения.',
             ],
-            'blockedPatterns' => [
-                '/rm\\s+-rf/',
-            ],
-            'env'             => [],
         ],
     ],
 ];
