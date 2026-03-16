@@ -80,7 +80,7 @@ class CallableWrapper
     }
 
     public static function isCallableWrapper($call): bool {
-        if (is_array($call) && sizeof($call) >= 2) {
+        if (is_array($call) && sizeof($call) >= 2 && !empty($call[0])) {
             return $call[0] == self::class;
         }
         return false;
@@ -94,6 +94,9 @@ class CallableWrapper
      */
     public static function isCallable($call): bool
     {
+        if (is_object($call)) {
+            return false;
+        }
         if (is_callable($call)) {
             return true;
         } elseif (is_array($call) && sizeof($call) >= 2) {

@@ -66,21 +66,20 @@ return [
     'tools' => [
         [CurrentDateTimeTool::class, 'make'],
         [FactorialTool::class, 'make'],
+        /*
         [
             CallableWrapper::class,
-            'createObject',
-            'class'  => ShellToolFactory::class,
-            'method' => 'createReadonlyBashCmdTool',
-            'args'   => [
-                'git status',
-                dirname(__DIR__, 2),
-                'git_status',
-                'Статус git',
-            ],
+            'call',
+            'call' => [ShellToolFactory::class, 'createReadonlyBashCmdTool'],
+            'commandTemplate' => 'git status',
+            'workingDirectory' => dirname(__DIR__, 2),
+            'name' => 'git_status',
+            'description' => 'Статус git'
         ],
+        */
     ],
 
-    /*
+    /*/
     'mcp' => [
         [
             // Поиск
@@ -90,7 +89,7 @@ return [
             'config' => [
                 'command' => 'bash',
                 'args' => [
-                    'bash', 'run', __DIR__ . '/../../bin/open-websearch'
+                    'run', __DIR__ . '/../../bin/open-websearch'
                 ],
                 'env' => [
                     "DEFAULT_SEARCH_ENGINE"  => "duckduckgo",
@@ -101,6 +100,7 @@ return [
             ]
         ],
 
+        
         [
             // Context7
             CallableWrapper::class,
@@ -112,5 +112,5 @@ return [
             //"headers" => ["CONTEXT7_API_KEY" => "ctx7sk-7010e527-1111-4d81-983e-1111111"],
         ]
     ]
-    */
+    //*/
 ];
