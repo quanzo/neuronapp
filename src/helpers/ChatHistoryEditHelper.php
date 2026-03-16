@@ -1,0 +1,118 @@
+<?php
+
+declare(strict_types=1);
+
+namespace app\modules\neuron\helpers;
+
+use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
+use NeuronAI\Chat\Messages\Message;
+
+use function array_splice;
+use function count;
+
+/**
+ * Хелпер для редактирования полной истории сообщений {@see AbstractFullChatHistory}.
+ *
+ * Нужен для сценариев управления сессиями (удаление/вставка сообщений по индексу),
+ * так как публичного API изменения `fullHistory` в NeuronAI-историях нет.
+ *
+ * Хелпер:
+ * - изменяет защищённое поле `fullHistory` через Reflection;
+ * - пересобирает окно сообщений для LLM (`rebuildWindow`);
+ * - сохраняет изменения в хранилище (`persistFullHistory`) для файловых реализаций.
+ *
+ * Пример использования:
+ *
+ * <code>
+ * $history = new FileFullChatHistory($dir, $sessionKey);
+ * ChatHistoryEditHelper::deleteFullMessageAt($history, 0);
+ * ChatHistoryEditHelper::insertFullMessageAt($history, 1, $message);
+ * </code>
+ */
+final class ChatHistoryEditHelper
+{
+    /**
+     * Возвращает количество сообщений в полной истории.
+     *
+     * @param AbstractFullChatHistory $history История с полной проекцией.
+     */
+    public static function getFullMessageCount(AbstractFullChatHistory $history): int
+    {
+        return count($history->getFullMessages());
+    }
+
+    /**
+     * Удаляет сообщение из полной истории по индексу.
+     *
+     * @param AbstractFullChatHistory $history История с полной проекцией.
+     * @param int $index Индекс в диапазоне 0..(count-1).
+     */
+    public static function deleteFullMessageAt(AbstractFullChatHistory $history, int $index): void
+    {
+        $messages = $history->getFullMessages();
+
+        if ($index < 0 || $index >= count($messages)) {
+            throw new \InvalidArgumentException('Некорректный индекс сообщения для удаления: ' . $index);
+        }
+
+        array_splice($messages, $index, 1);
+
+        self::replaceFullHistory($history, $messages);
+    }
+
+    /**
+     * Вставляет сообщение в полную историю по индексу.
+     *
+     * Вставка допускает индекс в диапазоне 0..count (включая вставку в конец).
+     *
+     * @param AbstractFullChatHistory $history История с полной проекцией.
+     * @param int $index Индекс вставки (0..count).
+     * @param Message $message Сообщение для вставки.
+     */
+    public static function insertFullMessageAt(AbstractFullChatHistory $history, int $index, Message $message): void
+    {
+        $messages = $history->getFullMessages();
+        $count = count($messages);
+
+        if ($index < 0 || $index > $count) {
+            throw new \InvalidArgumentException('Некорректный индекс сообщения для вставки: ' . $index);
+        }
+
+        array_splice($messages, $index, 0, [$message]);
+
+        self::replaceFullHistory($history, $messages);
+    }
+
+    /**
+     * Заменяет полную историю на переданный массив и синхронизирует производные структуры.
+     *
+     * @param AbstractFullChatHistory $history История.
+     * @param Message[] $fullMessages Новая полная история.
+     */
+    private static function replaceFullHistory(AbstractFullChatHistory $history, array $fullMessages): void
+    {
+        $ref = new \ReflectionClass($history);
+
+        if (!$ref->hasProperty('fullHistory')) {
+            throw new \RuntimeException(
+                'История чата не поддерживает редактирование: отсутствует свойство fullHistory.'
+            );
+        }
+
+        $propFull = $ref->getProperty('fullHistory');
+        $propFull->setAccessible(true);
+        $propFull->setValue($history, $fullMessages);
+
+        if ($ref->hasMethod('rebuildWindow')) {
+            $m = $ref->getMethod('rebuildWindow');
+            $m->setAccessible(true);
+            $m->invoke($history);
+        }
+
+        if ($ref->hasMethod('persistFullHistory')) {
+            $m = $ref->getMethod('persistFullHistory');
+            $m->setAccessible(true);
+            $m->invoke($history);
+        }
+    }
+}

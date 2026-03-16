@@ -103,3 +103,19 @@
   - логгер для команд настраивается через `AbstractAgentCommand::resolveFileLogger()`, который использует `ConfigurationApp::getLogDir()`.
 
 Подробнее о командах см. `docs/console.md`, о skills и todolist — в `docs/skills.md` и `docs/todolist.md`.
+
+### Управление сессиями (SessionConfigAppService)
+
+Для управления историей сессий и статусами выполнения run используется сервис:
+
+- `SessionConfigAppService` (`src/services/config/SessionConfigAppService.php`)
+
+Он предоставляет API для:
+
+- списка сессий по файлам `.sessions/neuron_*.chat`;
+- чтения/удаления истории сессии;
+- получения статуса выполнения TodoList по чекпоинту `RunStateDto` в `.store`;
+- операций над сообщениями (удаление/вставка по индексу в полной истории);
+- получения копии истории, обрезанной произвольным `HistoryTrimmerInterface`.
+
+Подробности и примеры: `docs/sessions.md`.
