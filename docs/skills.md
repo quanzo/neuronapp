@@ -142,4 +142,4 @@ skills: helper/prepare_context, helper/summarize
 ### Где посмотреть примеры
 
 - Файлы `prompt/skill.md`, `prompt/execute1.md`, `prompt/execute2.md`, `prompt/execute3.md` содержат примеры форматов и общую идеологию.
-- В `testapp2/skills` и `testapp/skills` находятся реальные файлы навыков, которые используются в интеграционных тестах и CLI‑сценариях.
+- В `testapp/skills` и `testapp/skills` находятся реальные файлы навыков, которые используются в интеграционных тестах и CLI‑сценариях.

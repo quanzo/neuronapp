@@ -91,7 +91,7 @@
   - заполняет поля конфигурации по известным ключам;
   - устанавливает `logger`, `configurationApp`, `sessionKey` (через `configApp->getSessionKey()`).
 
-Файлы примеров конфигураций агентов можно найти в `testapp/agents` и `testapp2/agents`.
+Файлы примеров конфигураций агентов можно найти в `testapp/agents` и `testapp/agents`.
 
 ### Связь конфигурации с остальными компонентами
 

@@ -81,7 +81,7 @@
 - `blockedPatterns` — явные запреты (`rm`, `sudo`, деструктивные git‑операции и т.д.);
 - таймауты, лимиты на объём вывода и другие параметры безопасности.
 
-Конфигурации агентов в `testapp/agents/*.php` и `testapp2/agents/*.php` должны использовать именно `ShellToolFactory`, а не напрямую создавать `BashTool`/`BashCmdTool`.
+Конфигурации агентов в `testapp/agents/*.php` и `testapp/agents/*.php` должны использовать именно `ShellToolFactory`, а не напрямую создавать `BashTool`/`BashCmdTool`.
 
 ### Инструменты как зависимость skills и todolist
 

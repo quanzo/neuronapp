@@ -60,15 +60,15 @@ return [
     ],
 
     'tools' => [
-        // Чтение логов и заметок в пределах APP_WORK_DIR (testapp2)
+        // Чтение логов и заметок в пределах APP_WORK_DIR (testapp)
         [
             CallableWrapper::class,
             'createObject',
             'class'     => ViewTool::class,
-            'basePath'  => dirname(__DIR__, 1), // testapp2
+            'basePath'  => dirname(__DIR__, 1), // testapp
             'maxLines'  => 2000,
             'name'      => 'view_app_files',
-            'description' => 'Чтение файлов логов и заметок внутри рабочей директории приложения (testapp2).',
+            'description' => 'Чтение файлов логов и заметок внутри рабочей директории приложения (testapp).',
         ],
         // Предопределённые readonly-команды через ShellToolFactory
         [

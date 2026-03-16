@@ -5,7 +5,7 @@
 ### Базовые понятия
 
 - **`APP_START_DIR`** — директория, из которой запускается `bin/console` (стартовая точка).
-- **`APP_WORK_DIR`** — рабочая директория приложения (например, `testapp` или `testapp2`), задаётся переменной окружения и используется для изолированных окружений.
+- **`APP_WORK_DIR`** — рабочая директория приложения (например, `testapp` или `testapp`), задаётся переменной окружения и используется для изолированных окружений.
 - **`DirPriority`** — класс, инкапсулирующий приоритетный список директорий для поиска файлов и поддиректорий.
 
 При инициализации приложения создаётся объект `DirPriority` с двумя директориями:
@@ -56,23 +56,23 @@ Producers сами отвечают за расширения файлов:
 - `TodoListProducer` — `todos/<name>.txt` или `todos/<name>.md`;
 - `SkillProducer` — `skills/<name>.txt` или `skills/<name>.md`.
 
-### Альтернативные окружения (`testapp2` и др.)
+### Альтернативные окружения (`testapp` и др.)
 
 Альтернативное рабочее окружение задаётся через `APP_WORK_DIR` и может иметь собственный набор конфигов, агентов, skills и todolist.
 
-Пример структуры для `testapp2`:
+Пример структуры для `testapp`:
 
-- `testapp2/config.jsonc` — конфигурация приложения;
-- `testapp2/agents` — конфигурации агентов этого окружения;
-- `testapp2/skills` — текстовые навыки;
-- `testapp2/todos` — сценарии TodoList;
-- `testapp2/docs` — файлы контекста, доступные через `@docs/...`;
-- `testapp2/.sessions`, `testapp2/.logs`, `testapp2/.store` — служебные директории.
+- `testapp/config.jsonc` — конфигурация приложения;
+- `testapp/agents` — конфигурации агентов этого окружения;
+- `testapp/skills` — текстовые навыки;
+- `testapp/todos` — сценарии TodoList;
+- `testapp/docs` — файлы контекста, доступные через `@docs/...`;
+- `testapp/.sessions`, `testapp/.logs`, `testapp/.store` — служебные директории.
 
 При запуске:
 
 - `APP_START_DIR` — корень проекта;
-- `APP_WORK_DIR` — путь к `testapp2`;
+- `APP_WORK_DIR` — путь к `testapp`;
 - `DirPriority` конфигурируется как `[APP_START_DIR, APP_WORK_DIR]`;
 - `ConfigurationApp` и producers ищут файлы сначала в `APP_START_DIR`, затем в `APP_WORK_DIR`.
 

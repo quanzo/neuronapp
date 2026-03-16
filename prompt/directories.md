@@ -36,29 +36,29 @@
 ## Альтернативные рабочие директории (APP_WORK_DIR)
 
 В качестве рабочего каталога приложения может использоваться не только корень проекта, но и альтернативные директории
-для изолированных окружений (например, `testapp2`).
+для изолированных окружений (например, `testapp`).
 
 ### Общая схема
 
 - `APP_START_DIR` — директория, из которой запускается `bin/console`.
-- `APP_WORK_DIR` — рабочий каталог приложения (например, `testapp` или `testapp2`).
+- `APP_WORK_DIR` — рабочий каталог приложения (например, `testapp` или `testapp`).
 - `DirPriority` настраивается с двумя директориями: `[APP_START_DIR, APP_WORK_DIR]`.
 - Все элементы (`agents`, `skills`, `todos`, `.sessions`, `.logs`, `.store`) ищутся через `DirPriority`.
 
-### Пример для `testapp2`
+### Пример для `testapp`
 
 Структура:
 
-- `testapp2/config.jsonc` — конфиг приложения для этого окружения.
-- `testapp2/agents` — конфигурации агентов.
-- `testapp2/skills` — текстовые навыки.
-- `testapp2/todos` — сценарии TodoList.
-- `testapp2/docs` — файлы контекста, подключаемые через @docs/… в skills/todos.
-- `testapp2/.sessions`, `testapp2/.logs`, `testapp2/.store` — служебные директории.
+- `testapp/config.jsonc` — конфиг приложения для этого окружения.
+- `testapp/agents` — конфигурации агентов.
+- `testapp/skills` — текстовые навыки.
+- `testapp/todos` — сценарии TodoList.
+- `testapp/docs` — файлы контекста, подключаемые через @docs/… в skills/todos.
+- `testapp/.sessions`, `testapp/.logs`, `testapp/.store` — служебные директории.
 
 При запуске:
 
-- переменная окружения `APP_WORK_DIR` указывает на `testapp2`;
+- переменная окружения `APP_WORK_DIR` указывает на `testapp`;
 - `DirPriority` конфигурируется на `[APP_START_DIR, APP_WORK_DIR]`;
 - `ConfigurationApp` через producers читает `agents/`, `skills/`, `todos/` сначала из `APP_WORK_DIR`, при отсутствии — из `APP_START_DIR`.
 
