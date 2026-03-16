@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\traits\LoggerAwareTrait;
 use NeuronAI\Tools\Tool;
 
@@ -16,6 +17,28 @@ use NeuronAI\Tools\Tool;
 abstract class ATool extends Tool
 {
     use LoggerAwareTrait;
+
+    private $_agentCfg = null;
+
+    /**
+     * Агент, который использует инструмент
+     *
+     * @return ConfigurationAgent|null
+     */
+    public function getAgentCfg(): ?ConfigurationAgent {
+        return $this->_agentCfg;
+    }
+
+    /**
+     * Задать агента для этого инструмента
+     *
+     * @param ConfigurationAgent $agentCfg
+     * @return static
+     */
+    public function setAgentCfg(ConfigurationAgent $agentCfg): static {
+        $this->_agentCfg = $agentCfg;
+        return $this;
+    }
 
     /**
      * Выполняет инструмент с логированием начала, успешного завершения и ошибок.

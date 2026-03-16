@@ -203,7 +203,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
             }
         }
 
-        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments): mixed {
+        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments, $runLogger, $runId): mixed {
 
             $sessionCfg = $this->isPureContext()
                 ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) // здесь агент без истории сообщений

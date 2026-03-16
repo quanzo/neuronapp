@@ -21,8 +21,6 @@ use function stream_get_meta_data;
 use function strtolower;
 use function trim;
 
-use const FILTER_FLAG_SCHEME_REQUIRED;
-use const FILTER_FLAG_HOST_REQUIRED;
 use const FILTER_VALIDATE_URL;
 use const JSON_UNESCAPED_UNICODE;
 
@@ -256,7 +254,7 @@ class HttpFetchTool extends ATool
      */
     private function validateUrl(string $url): ?string
     {
-        if (filter_var($url, FILTER_VALIDATE_URL, FILTER_FLAG_SCHEME_REQUIRED | FILTER_FLAG_HOST_REQUIRED) === false) {
+        if (filter_var($url, FILTER_VALIDATE_URL) === false) {
             return 'Некорректный URL. Ожидается абсолютный http/https URL.';
         }
 

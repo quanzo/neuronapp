@@ -8,6 +8,7 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\helpers\ToolRegistry;
+use app\modules\neuron\tools\ATool;
 use NeuronAI\Chat\Enums\MessageRole;
 
 /**
@@ -22,6 +23,7 @@ use NeuronAI\Chat\Enums\MessageRole;
  * Ожидания к классу-носителю:
  *  - реализует метод {@see getConfigurationApp()} и возвращает {@see ConfigurationApp|null};
  *  - предоставляет метод {@see getNeedSkills()} (например, через {@see HasNeedSkillsTrait}).
+ *  - реализует метод getConfigurationAgent
  */
 trait AttachesSkillToolsTrait
 {
@@ -69,6 +71,14 @@ trait AttachesSkillToolsTrait
                 $tool = ToolRegistry::makeTool($toolName, $sessionCfg);
                 if ($tool === null) {
                     continue;
+                }
+                if ($tool instanceof ATool) {
+                    /**
+                     * В инструмент пробрасываем конфиг агента и его логгер
+                     */
+                    $a = $skill->getConfigurationAgent();
+                    $tool->setAgentCfg($a);
+                    $tool->setLogger($a->getLoggerWithContext());
                 }
                 $sessionTools[] = $tool;
             }

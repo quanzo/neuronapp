@@ -24,6 +24,7 @@
 - **`GrepTool`** — поиск текста внутри файлов.
 - **`ViewTool`** — чтение содержимого файлов.
 - **`EditTool`** — безопасное редактирование файлов проекта (используется только по запросу пользователя).
+- **`IntermediateSaveTool` / `IntermediateLoadTool` / `IntermediateListTool` / `IntermediateExistTool`** — сохранение/загрузка/список/проверка промежуточных результатов в рамках `sessionKey` в `.store`.
 - **`FileTreeTool`** — обзор структуры каталогов.
 - **`SearchReplaceTool`** — поиск и замена по проекту с ограничениями.
 - **`GitSummaryTool`** — получение краткой сводки по текущему git‑состоянию (например, изменения, ветка).
@@ -32,6 +33,35 @@
 - **`OllamaSearchTool`** — взаимодействие с локальными моделями через Ollama (если настроено).
 
 Конкретное поведение каждого инструмента реализовано в соответствующем классе, опираясь на интерфейсы NeuronAI (`ToolInterface`, `ProviderToolInterface`, `ToolkitInterface`).
+
+### Intermediate*-инструменты: промежуточные результаты в `.store`
+
+Набор инструментов:
+
+- `IntermediateSaveTool` (`src/tools/IntermediateSaveTool.php`) — сохраняет промежуточный результат по метке;
+- `IntermediateLoadTool` (`src/tools/IntermediateLoadTool.php`) — загружает результат по метке;
+- `IntermediateListTool` (`src/tools/IntermediateListTool.php`) — возвращает список всех результатов для текущего `sessionKey`;
+- `IntermediateExistTool` (`src/tools/IntermediateExistTool.php`) — проверяет наличие результата по метке.
+ - `IntermediateDeleteTool` (`src/tools/IntermediateDeleteTool.php`) — удаляет сохранённый результат по метке.
+
+Общее:
+
+- **Подключение**: через `tools: intermediate_save`, `intermediate_load`, `intermediate_list`, `intermediate_exist`, `intermediate_delete` — создаются через `ToolRegistry::makeTool(...)`.
+- **Хранилище**: директория `.store` (через `ConfigurationApp::getStoreDir()`).
+- **Имена файлов**:
+  - результат: `.store/intermediate_{sessionKey}_{label}.json` (небезопасные символы в частях имени заменяются на `_`);
+  - индекс: `.store/intermediate_index_{sessionKey}.json` (для ускорения `list`).
+
+Формат хранения (LLM-friendly JSON envelope) остаётся прежним:
+
+- `schema`: `neuronapp.intermediate.v1`
+- `sessionKey`: ключ сессии
+- `label`: метка
+- `savedAt`: ISO‑8601 дата/время сохранения
+- `dataType`: `string|object|array|number|boolean|null`
+- `data`: сохранённое значение (JSON‑совместимое)
+
+Индекс хранит список элементов (без `data`) для `IntermediateListTool`.
 
 ### Bash‑инструменты и безопасность
 

@@ -6,6 +6,11 @@ namespace app\modules\neuron\helpers;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\tools\GitSummaryTool;
+use app\modules\neuron\tools\IntermediateExistTool;
+use app\modules\neuron\tools\IntermediateListTool;
+use app\modules\neuron\tools\IntermediateLoadTool;
+use app\modules\neuron\tools\IntermediateSaveTool;
+use app\modules\neuron\tools\IntermediateDeleteTool;
 use app\modules\neuron\tools\WikiSearchTool;
 use app\modules\neuron\tools\RuWikiSearchTool;
 use app\modules\neuron\tools\UniSearchTool;
@@ -40,8 +45,12 @@ final class ToolRegistry
             'ru_wiki_search' => new RuWikiSearchTool(),
             'uni_search' => new UniSearchTool(),
             'git_summary' => new GitSummaryTool(),
+            'intermediate_save' => new IntermediateSaveTool(),
+            'intermediate_load' => new IntermediateLoadTool(),
+            'intermediate_list' => new IntermediateListTool(),
+            'intermediate_exist' => new IntermediateExistTool(),
+            'intermediate_delete' => new IntermediateDeleteTool(),
             default => null,
         };
     }
 }
-
