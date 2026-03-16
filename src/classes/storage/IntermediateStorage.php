@@ -33,22 +33,78 @@ use const JSON_UNESCAPED_UNICODE;
 /**
  * Хранилище промежуточных результатов для одной директории `.store`.
  *
- * Инкапсулирует операции exists/save/load/list/delete, используя LLM-friendly
- * JSON-формат и индекс по sessionKey. Не зависит от ConfigurationApp,
- * получает путь к директории в конструкторе.
+ * Этот класс инкапсулирует работу с файлами промежуточных результатов для
+ * конкретной директории хранилища (обычно `.store`, путь к которой отдаёт
+ * {@see \app\modules\neuron\classes\config\ConfigurationApp::getStoreDir()}).
+ *
+ * Основные возможности:
+ * - формирование имён файлов по паре (sessionKey, label);
+ * - сохранение результата в LLM-friendly JSON-формате (envelope с метаданными);
+ * - загрузка результата по метке;
+ * - проверка существования, удаление и перечисление результатов для сессии;
+ * - поддержка индекс-файла для ускорения операций list().
+ *
+ * Формат файла результата:
+ * - `schema`      — версия схемы (`neuronapp.intermediate.v1`);
+ * - `sessionKey`  — ключ сессии;
+ * - `label`       — метка результата;
+ * - `savedAt`     — время сохранения в ISO‑8601;
+ * - `dataType`    — тип данных (`string|object|array|number|boolean|null`);
+ * - `data`        — произвольное JSON-совместимое значение.
+ *
+ * Формат индекс-файла:
+ * - `schema`      — версия схемы (`neuronapp.intermediate_index.v1`);
+ * - `sessionKey`  — ключ сессии;
+ * - `items`       — массив {@see IntermediateIndexItemDto::toArray()}.
+ *
+ * Пример использования:
+ *
+ * ```php
+ * use app\modules\neuron\classes\storage\IntermediateStorage;
+ *
+ * $storage = new IntermediateStorage(__DIR__ . '/.store');
+ * $sessionKey = '20250101-120000-1';
+ *
+ * // Сохранить результат
+ * $item = $storage->save($sessionKey, 'plan', ['steps' => ['a', 'b']]);
+ *
+ * // Проверить существование
+ * if ($storage->exists($sessionKey, 'plan')) {
+ *     // Загрузить содержимое
+ *     $data = $storage->load($sessionKey, 'plan');
+ * }
+ *
+ * // Получить список всех результатов этой сессии
+ * $items = $storage->list($sessionKey);
+ *
+ * // Удалить результат
+ * $storage->delete($sessionKey, 'plan');
+ * ```
  */
 final class IntermediateStorage
 {
     public const SCHEMA_INTERMEDIATE_V1 = 'neuronapp.intermediate.v1';
     public const SCHEMA_INDEX_V1 = 'neuronapp.intermediate_index.v1';
 
+    /**
+     * @param string $storeDir Абсолютный путь к директории хранилища `.store`.
+     */
     public function __construct(
         private readonly string $storeDir,
     ) {
     }
 
     /**
-     * Формирует безопасное имя файла результата.
+     * Формирует безопасное имя файла результата по паре (sessionKey, label).
+     *
+     * В имени файла используются только символы [a-zA-Z0-9_-]; все остальные
+     * символы в ключе сессии и метке заменяются на подчёркивание. Расширение
+     * всегда `.json`.
+     *
+     * @param string $sessionKey Базовый ключ сессии (без имени агента).
+     * @param string $label      Метка результата.
+     *
+     * @return string Имя файла без пути (например, `intermediate_20250101-120000-1_label.json`).
      */
     public function resultFileName(string $sessionKey, string $label): string
     {
@@ -73,11 +129,33 @@ final class IntermediateStorage
         return $this->storeDir . DIRECTORY_SEPARATOR . $this->indexFileName($sessionKey);
     }
 
+    /**
+     * Проверяет, существует ли файл результата для переданных sessionKey и label.
+     *
+     * Метод не валидирует содержимое файла, только факт его наличия.
+     *
+     * @param string $sessionKey Базовый ключ сессии.
+     * @param string $label      Метка результата.
+     *
+     * @return bool true, если файл существует в директории хранилища.
+     */
     public function exists(string $sessionKey, string $label): bool
     {
         return file_exists($this->resultFilePath($sessionKey, $label));
     }
 
+    /**
+     * Удаляет результат и синхронизирует индекс для заданной пары (sessionKey, label).
+     *
+     * Поведение идемпотентно: если файла результата или записи в индексе нет,
+     * метод завершится без исключения. Если индекс существует, из него
+     * удаляется элемент с соответствующей меткой.
+     *
+     * @param string $sessionKey Базовый ключ сессии.
+     * @param string $label      Метка результата.
+     *
+     * @return void
+     */
     public function delete(string $sessionKey, string $label): void
     {
         $this->validateLabel($label);
@@ -112,6 +190,20 @@ final class IntermediateStorage
 
     /**
      * Сохраняет промежуточный результат и обновляет индекс.
+     *
+     * Данные сохраняются в JSON-файл с LLM-friendly конвертом (см. описание
+     * класса). Индекс-файл дополняется или обновляет существующую запись
+     * для переданной метки.
+     *
+     * @param string $sessionKey Базовый ключ сессии.
+     * @param string $label      Метка результата (валидируется; не может быть пустой/слишком длинной).
+     * @param mixed  $data       JSON-совместимое значение для записи.
+     *
+     * @return IntermediateIndexItemDto DTO с метаданными сохранённого результата.
+     *
+     * @throws \InvalidArgumentException Если label некорректен.
+     * @throws \JsonException            При ошибке кодирования JSON.
+     * @throws \RuntimeException         При ошибке записи/переименования файла.
      */
     public function save(string $sessionKey, string $label, mixed $data): IntermediateIndexItemDto
     {
@@ -148,9 +240,17 @@ final class IntermediateStorage
     }
 
     /**
-     * Загружает ранее сохранённый результат.
+     * Загружает ранее сохранённый результат по паре (sessionKey, label).
+     *
+     * При отсутствии файла или при некорректном/неожиданном содержимом возвращает null
+     * без выброса исключения.
+     *
+     * @param string $sessionKey Базовый ключ сессии.
+     * @param string $label      Метка результата (валидируется).
      *
      * @return array{schema?: string, sessionKey?: string, label?: string, savedAt?: string, dataType?: string, data?: mixed}|null
+     *
+     * @throws \InvalidArgumentException Если label некорректен.
      */
     public function load(string $sessionKey, string $label): ?array
     {
@@ -175,7 +275,15 @@ final class IntermediateStorage
     }
 
     /**
-     * Возвращает список сохранённых результатов для sessionKey.
+     * Возвращает список всех сохранённых результатов для указанного sessionKey.
+     *
+     * Приоритет отдаётся индекс-файлу. Если индекс отсутствует или повреждён,
+     * выполняется прямое сканирование директории `.store` по префиксу файлов
+     * этой сессии.
+     *
+     * @param string $sessionKey Базовый ключ сессии.
+     *
+     * @return IntermediateIndexItemDto[] Массив DTO с метаданными результатов.
      */
     public function list(string $sessionKey): array
     {
@@ -187,6 +295,13 @@ final class IntermediateStorage
         return $this->scanStoreForSession($sessionKey);
     }
 
+    /**
+     * Читает индекс для заданного sessionKey.
+     *
+     * @param string $sessionKey Базовый ключ сессии.
+     *
+     * @return IntermediateIndexDto|null Объект индекса или null, если файла нет или он некорректен.
+     */
     private function readIndex(string $sessionKey): ?IntermediateIndexDto
     {
         $path = $this->indexFilePath($sessionKey);
@@ -207,6 +322,17 @@ final class IntermediateStorage
         return IntermediateIndexDto::tryFromArray($decoded);
     }
 
+    /**
+     * Добавляет или обновляет элемент индекса и записывает индекс-файл атомарно.
+     *
+     * @param string                  $sessionKey Базовый ключ сессии.
+     * @param IntermediateIndexItemDto $item      Элемент индекса (метаданные результата).
+     *
+     * @return void
+     *
+     * @throws \JsonException    При ошибке кодирования JSON.
+     * @throws \RuntimeException При ошибке записи/переименования индекс-файла.
+     */
     private function upsertIndexItem(string $sessionKey, IntermediateIndexItemDto $item): void
     {
         $existing = $this->readIndex($sessionKey);
@@ -236,6 +362,17 @@ final class IntermediateStorage
         $this->atomicWrite($this->indexFilePath($sessionKey), $json);
     }
 
+    /**
+     * Выполняет полное сканирование директории хранилища для данной сессии.
+     *
+     * Используется как fallback, когда индекс-файл отсутствует или повреждён.
+     * Ищет файлы формата `intermediate_{sessionKey}_*.json` и пытается
+     * восстановить метаданные из их содержимого.
+     *
+     * @param string $sessionKey Базовый ключ сессии.
+     *
+     * @return IntermediateIndexItemDto[] Массив DTO на основе найденных файлов.
+     */
     private function scanStoreForSession(string $sessionKey): array
     {
         $entries = @scandir($this->storeDir);
@@ -289,6 +426,20 @@ final class IntermediateStorage
         return $items;
     }
 
+    /**
+     * Атомарно записывает содержимое в файл.
+     *
+     * Запись производится во временный файл в той же директории, после чего
+     * выполняется `rename()` в целевой путь. Это защищает от появления
+     * битых файлов при сбое в процессе записи.
+     *
+     * @param string $targetPath Путь к целевому файлу.
+     * @param string $content    Содержимое для записи.
+     *
+     * @return void
+     *
+     * @throws \RuntimeException При ошибке записи или переименования.
+     */
     private function atomicWrite(string $targetPath, string $content): void
     {
         $dir = dirname($targetPath);
@@ -307,12 +458,35 @@ final class IntermediateStorage
         }
     }
 
+    /**
+     * Делает строку безопасной для использования в имени файла.
+     *
+     * Разрешены только символы `[a-zA-Z0-9_-]`, остальные заменяются
+     * на символ подчёркивания.
+     *
+     * @param string $value Исходное значение.
+     *
+     * @return string Безопасная строка для имени файла.
+     */
     private function sanitizeKeyPart(string $value): string
     {
         $safe = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $value);
         return is_string($safe) ? $safe : '';
     }
 
+    /**
+     * Валидирует метку результата.
+     *
+     * Правила:
+     * - метка не может быть пустой (после trim);
+     * - длина метки не должна превышать 120 символов.
+     *
+     * @param string $label Метка для проверки.
+     *
+     * @return void
+     *
+     * @throws \InvalidArgumentException При нарушении правил.
+     */
     private function validateLabel(string $label): void
     {
         $label = trim($label);
@@ -324,6 +498,13 @@ final class IntermediateStorage
         }
     }
 
+    /**
+     * Определяет тип сохраняемых данных для поля `dataType`.
+     *
+     * @param mixed $data Произвольное значение.
+     *
+     * @return string Одно из: `string|object|array|number|boolean|null`.
+     */
     private function detectDataType(mixed $data): string
     {
         if ($data === null) {
