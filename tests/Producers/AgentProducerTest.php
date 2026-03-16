@@ -103,16 +103,16 @@ class AgentProducerTest extends TestCase
     // ══════════════════════════════════════════════════════════════
 
     /**
-     * По умолчанию sessionKey = null; после setSessionKey() — заданное значение.
+     * getSessionKey() проксирует базовый ключ сессии из ConfigurationApp.
      */
     public function testSessionKey(): void
     {
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new AgentProducer($dp);
-        $this->assertNull($producer->getSessionKey());
+        $producer = new AgentProducer($dp, ConfigurationApp::getInstance());
 
-        $producer->setSessionKey('test-key');
-        $this->assertSame('test-key', $producer->getSessionKey());
+        $sessionKey = $producer->getSessionKey();
+        $this->assertNotNull($sessionKey);
+        $this->assertMatchesRegularExpression(ConfigurationApp::SESSION_KEY_PATTERN, $sessionKey);
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -125,7 +125,7 @@ class AgentProducerTest extends TestCase
     public function testExistReturnsFalseForMissing(): void
     {
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new AgentProducer($dp);
+        $producer = new AgentProducer($dp, ConfigurationApp::getInstance());
         $this->assertFalse($producer->exist('nonexistent'));
     }
 
@@ -140,7 +140,7 @@ class AgentProducerTest extends TestCase
         );
 
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new AgentProducer($dp);
+        $producer = new AgentProducer($dp, ConfigurationApp::getInstance());
         $this->assertTrue($producer->exist('test'));
     }
 
@@ -155,7 +155,7 @@ class AgentProducerTest extends TestCase
         );
 
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new AgentProducer($dp);
+        $producer = new AgentProducer($dp, ConfigurationApp::getInstance());
         $this->assertTrue($producer->exist('test'));
     }
 
@@ -165,7 +165,7 @@ class AgentProducerTest extends TestCase
     public function testGetReturnsNullForMissing(): void
     {
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new AgentProducer($dp);
+        $producer = new AgentProducer($dp, ConfigurationApp::getInstance());
         $this->assertNull($producer->get('missing'));
     }
 
@@ -181,8 +181,7 @@ class AgentProducerTest extends TestCase
         );
 
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new AgentProducer($dp);
-        $producer->setSessionKey('sess');
+        $producer = new AgentProducer($dp, ConfigurationApp::getInstance());
 
         $cfg = $producer->get('myagent');
         $this->assertInstanceOf(ConfigurationAgent::class, $cfg);
@@ -201,7 +200,7 @@ class AgentProducerTest extends TestCase
         );
 
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new AgentProducer($dp);
+        $producer = new AgentProducer($dp, ConfigurationApp::getInstance());
 
         $first = $producer->get('cached');
         $second = $producer->get('cached');
@@ -214,7 +213,7 @@ class AgentProducerTest extends TestCase
     public function testGetCachesNullForMissing(): void
     {
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new AgentProducer($dp);
+        $producer = new AgentProducer($dp, ConfigurationApp::getInstance());
 
         $this->assertNull($producer->get('missing'));
         $this->assertNull($producer->get('missing'));
@@ -235,7 +234,7 @@ class AgentProducerTest extends TestCase
         );
 
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new AgentProducer($dp);
+        $producer = new AgentProducer($dp, ConfigurationApp::getInstance());
 
         $cfg = $producer->get('dual');
         $this->assertSame(1000, $cfg->contextWindow);
@@ -252,7 +251,7 @@ class AgentProducerTest extends TestCase
         );
 
         $dp = new DirPriority([$this->tmpDir]);
-        $producer = new AgentProducer($dp);
+        $producer = new AgentProducer($dp, ConfigurationApp::getInstance());
         $cfg = $producer->get('nohist');
 
         $this->assertFalse($cfg->enableChatHistory);

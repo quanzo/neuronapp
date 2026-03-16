@@ -104,7 +104,7 @@ class ConfigurationAgentTest extends TestCase
      */
     public function testMakeFromArrayEmptyReturnsNull(): void
     {
-        $this->assertNull(ConfigurationAgent::makeFromArray([], 'session'));
+        $this->assertNull(ConfigurationAgent::makeFromArray([], ConfigurationApp::getInstance()));
     }
 
     /**
@@ -112,11 +112,14 @@ class ConfigurationAgentTest extends TestCase
      */
     public function testMakeFromArrayBasic(): void
     {
+        $configApp = ConfigurationApp::getInstance();
+        $configApp->setSessionKey('test-session');
+
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
             'contextWindow' => 10000,
             'instructions' => 'Be helpful',
-        ], 'test-session');
+        ], $configApp);
 
         $this->assertInstanceOf(ConfigurationAgent::class, $cfg);
         $this->assertFalse($cfg->enableChatHistory);
@@ -145,7 +148,7 @@ class ConfigurationAgentTest extends TestCase
             'embeddingProvider' => null,
             'embeddingChunkSize' => 500,
             'vectorStore' => null,
-        ], 'session-key');
+        ], ConfigurationApp::getInstance());
 
         $this->assertSame(20000, $cfg->contextWindow);
         $this->assertSame(5, $cfg->history_id);
@@ -161,7 +164,7 @@ class ConfigurationAgentTest extends TestCase
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'history_id' => null,
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $this->assertNull($cfg->history_id);
     }
@@ -178,7 +181,7 @@ class ConfigurationAgentTest extends TestCase
         $filePath = $this->tmpDir . '/agent.php';
         file_put_contents($filePath, '<?php return ["enableChatHistory" => false, "contextWindow" => 5000];');
 
-        $cfg = ConfigurationAgent::makeFromFile($filePath, 'test-session');
+        $cfg = ConfigurationAgent::makeFromFile($filePath, ConfigurationApp::getInstance());
         $this->assertInstanceOf(ConfigurationAgent::class, $cfg);
         $this->assertFalse($cfg->enableChatHistory);
         $this->assertSame(5000, $cfg->contextWindow);
@@ -192,7 +195,7 @@ class ConfigurationAgentTest extends TestCase
         $filePath = $this->tmpDir . '/agent.jsonc';
         file_put_contents($filePath, '{"enableChatHistory": false, "contextWindow": 7000}');
 
-        $cfg = ConfigurationAgent::makeFromFile($filePath, 'test-session');
+        $cfg = ConfigurationAgent::makeFromFile($filePath, ConfigurationApp::getInstance());
         $this->assertInstanceOf(ConfigurationAgent::class, $cfg);
         $this->assertSame(7000, $cfg->contextWindow);
     }
@@ -205,7 +208,7 @@ class ConfigurationAgentTest extends TestCase
         $filePath = $this->tmpDir . '/agent.json';
         file_put_contents($filePath, '{"contextWindow": 8000}');
 
-        $cfg = ConfigurationAgent::makeFromFile($filePath, 'test-session');
+        $cfg = ConfigurationAgent::makeFromFile($filePath, ConfigurationApp::getInstance());
         $this->assertInstanceOf(ConfigurationAgent::class, $cfg);
         $this->assertSame(8000, $cfg->contextWindow);
     }
@@ -215,7 +218,7 @@ class ConfigurationAgentTest extends TestCase
      */
     public function testMakeFromFileEmptyPath(): void
     {
-        $this->assertNull(ConfigurationAgent::makeFromFile('', 'session'));
+        $this->assertNull(ConfigurationAgent::makeFromFile('', ConfigurationApp::getInstance()));
     }
 
     /**
@@ -223,7 +226,7 @@ class ConfigurationAgentTest extends TestCase
      */
     public function testMakeFromFileNonExistent(): void
     {
-        $this->assertNull(ConfigurationAgent::makeFromFile('/nonexistent/path.php', 'session'));
+        $this->assertNull(ConfigurationAgent::makeFromFile('/nonexistent/path.php', ConfigurationApp::getInstance()));
     }
 
     /**
@@ -234,7 +237,7 @@ class ConfigurationAgentTest extends TestCase
         $filePath = $this->tmpDir . '/agent.yaml';
         file_put_contents($filePath, 'key: value');
 
-        $this->assertNull(ConfigurationAgent::makeFromFile($filePath, 'session'));
+        $this->assertNull(ConfigurationAgent::makeFromFile($filePath, ConfigurationApp::getInstance()));
     }
 
     /**
@@ -245,7 +248,7 @@ class ConfigurationAgentTest extends TestCase
         $filePath = $this->tmpDir . '/bad.jsonc';
         file_put_contents($filePath, '{invalid json}');
 
-        $this->assertNull(ConfigurationAgent::makeFromFile($filePath, 'session'));
+        $this->assertNull(ConfigurationAgent::makeFromFile($filePath, ConfigurationApp::getInstance()));
     }
 
     /**
@@ -256,7 +259,7 @@ class ConfigurationAgentTest extends TestCase
         $filePath = $this->tmpDir . '/bad.php';
         file_put_contents($filePath, '<?php return "not an array";');
 
-        $this->assertNull(ConfigurationAgent::makeFromFile($filePath, 'session'));
+        $this->assertNull(ConfigurationAgent::makeFromFile($filePath, ConfigurationApp::getInstance()));
     }
 
     /**
@@ -275,7 +278,7 @@ class ConfigurationAgentTest extends TestCase
 JSONC;
         file_put_contents($filePath, $contents);
 
-        $cfg = ConfigurationAgent::makeFromFile($filePath, 'session');
+        $cfg = ConfigurationAgent::makeFromFile($filePath, ConfigurationApp::getInstance());
         $this->assertInstanceOf(ConfigurationAgent::class, $cfg);
         $this->assertSame(9000, $cfg->contextWindow);
     }
@@ -293,7 +296,7 @@ JSONC;
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
             'provider' => new EchoProvider(),
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $cfg->getAgent();
 
@@ -314,7 +317,7 @@ JSONC;
             'enableChatHistory' => false,
             'contextWindow' => 12345,
             'instructions' => 'Keep it',
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $clone = $cfg->cloneForSession();
         $this->assertSame(12345, $clone->contextWindow);
@@ -330,7 +333,7 @@ JSONC;
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => true,
             'contextWindow' => 1000,
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $originalHistory = $cfg->getChatHistory();
         $this->assertInstanceOf(FileFullChatHistory::class, $originalHistory);
@@ -352,7 +355,7 @@ JSONC;
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => true,
             'contextWindow' => 1000,
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $originalHistory = $cfg->getChatHistory();
         $this->assertInstanceOf(FileFullChatHistory::class, $originalHistory);
@@ -377,7 +380,7 @@ JSONC;
         $provider = new EchoProvider();
         $cfg = ConfigurationAgent::makeFromArray([
             'provider' => $provider,
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $this->assertSame($provider, $cfg->getProvider());
     }
@@ -389,7 +392,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'provider' => fn() => new EchoProvider(),
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $result = $cfg->getProvider();
         $this->assertInstanceOf(EchoProvider::class, $result);
@@ -406,7 +409,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'instructions' => 'Be helpful',
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $this->assertSame('Be helpful', $cfg->getInstructions());
     }
@@ -418,7 +421,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'instructions' => fn() => 'Dynamic instructions',
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $this->assertSame('Dynamic instructions', $cfg->getInstructions());
     }
@@ -430,7 +433,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $this->assertSame('', $cfg->getInstructions());
     }
@@ -446,7 +449,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'tools' => [],
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $this->assertSame([], $cfg->getTools());
     }
@@ -459,7 +462,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'tools' => [],
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $logger = $this->createMock(LoggerInterface::class);
         $cfg->setLogger($logger);
@@ -496,9 +499,12 @@ JSONC;
      */
     public function testSetSessionKeyResetsChatHistory(): void
     {
+        $configApp = ConfigurationApp::getInstance();
+        $configApp->setSessionKey('session-1');
+
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
-        ], 'session-1');
+        ], $configApp);
 
         $cfg->getChatHistory();
         $cfg->setSessionKey('session-2');
@@ -513,9 +519,12 @@ JSONC;
      */
     public function testGetSessionKey(): void
     {
+        $configApp = ConfigurationApp::getInstance();
+        $configApp->setSessionKey('my-session');
+
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
-        ], 'my-session');
+        ], $configApp);
 
         $this->assertSame('my-session', $cfg->getSessionKey());
     }
@@ -532,7 +541,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $history = $cfg->getChatHistory();
         $this->assertInstanceOf(InMemoryChatHistory::class, $history);
@@ -545,7 +554,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => true,
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $history = $cfg->getChatHistory();
         $this->assertInstanceOf(FileFullChatHistory::class, $history);
@@ -558,7 +567,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $first = $cfg->getChatHistory();
         $second = $cfg->getChatHistory();
@@ -572,7 +581,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $custom = new InMemoryChatHistory(1000);
         $cfg->setChatHistory($custom);
@@ -588,7 +597,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $cfg->getChatHistory();
         $cfg->resetChatHistory();
@@ -605,7 +614,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
-        ], 'session-1');
+        ], ConfigurationApp::getInstance());
 
         $first = $cfg->getChatHistory();
         $cfg->setSessionKey('session-2');
@@ -626,7 +635,7 @@ JSONC;
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
             'provider' => new EchoProvider(),
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $agent = $cfg->getAgent();
         $this->assertInstanceOf(\NeuronAI\Agent\AgentInterface::class, $agent);
@@ -639,7 +648,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $cfg->embeddingProvider = $this->createMock(EmbeddingsProviderInterface::class);
         $cfg->vectorStore = $this->createMock(VectorStoreInterface::class);
@@ -656,7 +665,7 @@ JSONC;
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
             'provider' => new EchoProvider(),
-        ], 'session');
+        ], ConfigurationApp::getInstance());
 
         $first = $cfg->getAgent();
         $second = $cfg->getAgent();
