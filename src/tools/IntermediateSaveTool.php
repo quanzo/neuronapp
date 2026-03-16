@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\tools\IntermediateToolResultDto;
-use app\modules\neuron\helpers\IntermediateStorageHelper;
+use app\modules\neuron\classes\storage\IntermediateStorage;
+use app\modules\neuron\classes\config\ConfigurationApp;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
@@ -30,7 +30,7 @@ use const JSON_UNESCAPED_UNICODE;
  * - выберите стабильную и понятную метку (`label`), например `"requirements"`, `"parsed_config"`;
  * - передавайте `data` как JSON-строку, когда это возможно (массив/объект), иначе — как текст.
  */
-final class IntermediateSaveTool extends ATool
+final class IntermediateSaveTool extends AIntermediateTool
 {
     public function __construct(
         string $name = 'intermediate_save',
@@ -72,14 +72,15 @@ final class IntermediateSaveTool extends ATool
      */
     public function __invoke(string $label, string $data): string
     {
-        $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
+        $storage      = $this->getStorage();
+        $sessionKey   = $this->getSessionKey();
         $labelTrimmed = trim($label);
 
         if ($labelTrimmed === '') {
             return $this->resultJson(new IntermediateToolResultDto(
-                action: 'save',
-                success: false,
-                message: 'label не может быть пустым.',
+                action    : 'save',
+                success   : false,
+                message   : 'label не может быть пустым.',
                 sessionKey: $sessionKey,
             ));
         }
@@ -87,26 +88,26 @@ final class IntermediateSaveTool extends ATool
         $payload = $this->parseDataString($data);
 
         try {
-            $item = IntermediateStorageHelper::save($sessionKey, $labelTrimmed, $payload);
+            $item = $storage->save($sessionKey, $labelTrimmed, $payload);
         } catch (\Throwable $e) {
             return $this->resultJson(new IntermediateToolResultDto(
-                action: 'save',
-                success: false,
-                message: 'Ошибка сохранения: ' . $e->getMessage(),
+                action    : 'save',
+                success   : false,
+                message   : 'Ошибка сохранения: ' . $e->getMessage(),
                 sessionKey: $sessionKey,
-                label: $labelTrimmed,
+                label     : $labelTrimmed,
             ));
         }
 
         return $this->resultJson(new IntermediateToolResultDto(
-            action: 'save',
-            success: true,
-            message: 'Сохранено.',
+            action    : 'save',
+            success   : true,
+            message   : 'Сохранено.',
             sessionKey: $sessionKey,
-            label: $item->label,
-            fileName: $item->fileName,
-            savedAt: $item->savedAt,
-            dataType: $item->dataType,
+            label     : $item->label,
+            fileName  : $item->fileName,
+            savedAt   : $item->savedAt,
+            dataType  : $item->dataType,
         ));
     }
 
@@ -129,16 +130,5 @@ final class IntermediateSaveTool extends ATool
         }
 
         return $raw;
-    }
-
-    /**
-     * Сериализует результат в JSON.
-     *
-     * @param IntermediateToolResultDto $dto DTO результата.
-     * @return string JSON.
-     */
-    private function resultJson(IntermediateToolResultDto $dto): string
-    {
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
     }
 }

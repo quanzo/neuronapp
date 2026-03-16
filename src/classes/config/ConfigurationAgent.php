@@ -33,6 +33,7 @@ use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use app\modules\neuron\interfaces\IAttachmentFile;
 use app\modules\neuron\interfaces\IDependConfigApp;
+use app\modules\neuron\classes\storage\IntermediateStorage;
 use app\modules\neuron\tools\ATool;
 use app\modules\neuron\traits\DependConfigAppTrait;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
@@ -135,6 +136,11 @@ class ConfigurationAgent implements IDependConfigApp
      * @var string|null
      */
     protected ?string $sessionKey = null;
+
+    /**
+     * Хранилище промежуточных результатов для данного агента.
+     */
+    protected ?IntermediateStorage $intermediateStorage = null;
 
     /**
      * Системный промпт
@@ -569,6 +575,27 @@ class ConfigurationAgent implements IDependConfigApp
     {
         $this->sessionKey = $sessionKey;
         $this->resetChatHistory();
+    }
+
+    /**
+     * Возвращает хранилище промежуточных результатов для агента.
+     *
+     * По умолчанию делегирует в ConfigurationApp::getIntermediateStorage().
+     */
+    public function getIntermediateStorage(): IntermediateStorage
+    {
+        if ($this->intermediateStorage !== null) {
+            return $this->intermediateStorage;
+        }
+
+        $configApp = $this->getConfigurationApp();
+        if ($configApp !== null) {
+            $this->intermediateStorage = $configApp->getIntermediateStorage();
+        } else {
+            $this->intermediateStorage = ConfigurationApp::getInstance()->getIntermediateStorage();
+        }
+
+        return $this->intermediateStorage;
     }
 
     /**

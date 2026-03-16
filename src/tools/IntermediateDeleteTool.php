@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\tools\IntermediateToolResultDto;
-use app\modules\neuron\helpers\IntermediateStorageHelper;
+use app\modules\neuron\classes\storage\IntermediateStorage;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
+use app\modules\neuron\classes\config\ConfigurationApp;
 
 use function json_encode;
 use function trim;
@@ -22,7 +22,7 @@ use const JSON_UNESCAPED_UNICODE;
  * - позволить LLM очищать больше не нужные промежуточные результаты для текущего `sessionKey`;
  * - поддерживать аккуратное хранилище `.store` в долгих сессиях.
  */
-final class IntermediateDeleteTool extends ATool
+final class IntermediateDeleteTool extends AIntermediateTool
 {
     public function __construct(
         string $name = 'intermediate_delete',
@@ -57,50 +57,40 @@ final class IntermediateDeleteTool extends ATool
      */
     public function __invoke(string $label): string
     {
-        $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
+        $storage      = $this->getStorage();
+        $sessionKey   = $this->getSessionKey();
         $labelTrimmed = trim($label);
 
         if ($labelTrimmed === '') {
             return $this->resultJson(new IntermediateToolResultDto(
-                action: 'delete',
-                success: false,
-                message: 'label не может быть пустым.',
+                action    : 'delete',
+                success   : false,
+                message   : 'label не может быть пустым.',
                 sessionKey: $sessionKey,
             ));
         }
 
-        $existedBefore = IntermediateStorageHelper::exists($sessionKey, $labelTrimmed);
+        $existedBefore = $storage->exists($sessionKey, $labelTrimmed);
 
         try {
-            IntermediateStorageHelper::delete($sessionKey, $labelTrimmed);
+            $storage->delete($sessionKey, $labelTrimmed);
         } catch (\Throwable $e) {
             return $this->resultJson(new IntermediateToolResultDto(
-                action: 'delete',
-                success: false,
-                message: 'Ошибка удаления: ' . $e->getMessage(),
+                action    : 'delete',
+                success   : false,
+                message   : 'Ошибка удаления: ' . $e->getMessage(),
                 sessionKey: $sessionKey,
-                label: $labelTrimmed,
+                label     : $labelTrimmed,
             ));
         }
 
         return $this->resultJson(new IntermediateToolResultDto(
-            action: 'delete',
-            success: true,
-            message: $existedBefore ? 'Удалено.' : 'Нечего удалять (запись отсутствовала).',
+            action    : 'delete',
+            success   : true,
+            message   : $existedBefore ? 'Удалено.': 'Нечего удалять (запись отсутствовала).',
             sessionKey: $sessionKey,
-            label: $labelTrimmed,
-            exists: false,
+            label     : $labelTrimmed,
+            exists    : false,
         ));
-    }
-
-    /**
-     * Сериализует результат в JSON.
-     *
-     * @param IntermediateToolResultDto $dto DTO результата.
-     * @return string JSON.
-     */
-    private function resultJson(IntermediateToolResultDto $dto): string
-    {
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
     }
 }

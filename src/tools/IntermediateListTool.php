@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\tools\IntermediateToolResultDto;
-use app\modules\neuron\helpers\IntermediateStorageHelper;
+use app\modules\neuron\classes\storage\IntermediateStorage;
+use app\modules\neuron\classes\config\ConfigurationApp;
 
 use function count;
 use function json_encode;
@@ -20,7 +20,7 @@ use const JSON_UNESCAPED_UNICODE;
  * - дать LLM обзор того, какие метки уже сохранены в текущей сессии;
  * - использовать этот список, чтобы выбирать подходящий `label` для дальнейших load/exist.
  */
-final class IntermediateListTool extends ATool
+final class IntermediateListTool extends AIntermediateTool
 {
     public function __construct(
         string $name = 'intermediate_list',
@@ -46,28 +46,18 @@ final class IntermediateListTool extends ATool
      */
     public function __invoke(): string
     {
-        $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
+        $storage      = $this->getStorage();
+        $sessionKey   = $this->getSessionKey();
 
-        $items = IntermediateStorageHelper::list($sessionKey);
+        $items = $storage->list($sessionKey);
 
         return $this->resultJson(new IntermediateToolResultDto(
-            action: 'list',
-            success: true,
-            message: 'OK',
+            action    : 'list',
+            success   : true,
+            message   : 'OK',
             sessionKey: $sessionKey,
-            items: $items,
-            count: count($items),
+            items     : $items,
+            count     : count($items),
         ));
-    }
-
-    /**
-     * Сериализует результат в JSON.
-     *
-     * @param IntermediateToolResultDto $dto DTO результата.
-     * @return string JSON.
-     */
-    private function resultJson(IntermediateToolResultDto $dto): string
-    {
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
     }
 }

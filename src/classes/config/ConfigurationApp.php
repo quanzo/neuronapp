@@ -15,6 +15,7 @@ use app\modules\neuron\classes\logger\ContextualLogger;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
+use app\modules\neuron\classes\storage\IntermediateStorage;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 
@@ -72,6 +73,9 @@ class ConfigurationApp
 
     /** Producer навыков (создаётся при первом обращении). */
     private ?SkillProducer $skillProducer = null;
+
+    /** Хранилище промежуточных результатов (лениво инициализируется). */
+    private ?IntermediateStorage $intermediateStorage = null;
 
     /**
      * Базовый ключ сессии (временна́я часть без имени агента).
@@ -272,6 +276,17 @@ class ConfigurationApp
             throw new RuntimeException('Директория хранилища чекпоинтов (.store) не найдена.');
         }
         return $path;
+    }
+
+    /**
+     * Возвращает объект хранилища промежуточных результатов для директории .store.
+     */
+    public function getIntermediateStorage(): IntermediateStorage
+    {
+        if ($this->intermediateStorage === null) {
+            $this->intermediateStorage = new IntermediateStorage($this->getStoreDir());
+        }
+        return $this->intermediateStorage;
     }
 
     /**

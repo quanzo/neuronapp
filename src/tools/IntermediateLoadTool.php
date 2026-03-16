@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\tools\IntermediateToolResultDto;
-use app\modules\neuron\helpers\IntermediateStorageHelper;
+use app\modules\neuron\classes\storage\IntermediateStorage;
+use app\modules\neuron\classes\config\ConfigurationApp;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
@@ -24,7 +24,7 @@ use const JSON_UNESCAPED_UNICODE;
  *   не запрашивая пользователя и не повторяя вычисления;
  * - удобно для последовательных шагов (сперва разобрать данные, затем использовать результат).
  */
-final class IntermediateLoadTool extends ATool
+final class IntermediateLoadTool extends AIntermediateTool
 {
     public function __construct(
         string $name = 'intermediate_load',
@@ -59,27 +59,28 @@ final class IntermediateLoadTool extends ATool
      */
     public function __invoke(string $label): string
     {
-        $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
+        $storage      = $this->getStorage();
+        $sessionKey   = $this->getSessionKey();
         $labelTrimmed = trim($label);
 
         if ($labelTrimmed === '') {
             return $this->resultJson(new IntermediateToolResultDto(
-                action: 'load',
-                success: false,
-                message: 'label не может быть пустым.',
+                action    : 'load',
+                success   : false,
+                message   : 'label не может быть пустым.',
                 sessionKey: $sessionKey,
             ));
         }
 
-        $loaded = IntermediateStorageHelper::load($sessionKey, $labelTrimmed);
+        $loaded = $storage->load($sessionKey, $labelTrimmed);
         if ($loaded === null) {
             return $this->resultJson(new IntermediateToolResultDto(
-                action: 'load',
-                success: false,
-                message: 'Не найдено.',
+                action    : 'load',
+                success   : false,
+                message   : 'Не найдено.',
                 sessionKey: $sessionKey,
-                label: $labelTrimmed,
-                exists: false,
+                label     : $labelTrimmed,
+                exists    : false,
             ));
         }
 
@@ -88,27 +89,16 @@ final class IntermediateLoadTool extends ATool
         $dataType = is_string($loaded['dataType'] ?? null) ? (string) $loaded['dataType'] : null;
 
         return $this->resultJson(new IntermediateToolResultDto(
-            action: 'load',
-            success: true,
-            message: 'Загружено.',
+            action    : 'load',
+            success   : true,
+            message   : 'Загружено.',
             sessionKey: $sessionKey,
-            label: $labelTrimmed,
-            fileName: IntermediateStorageHelper::resultFileName($sessionKey, $labelTrimmed),
-            savedAt: $savedAt,
-            dataType: $dataType,
-            data: $data,
-            exists: true,
+            label     : $labelTrimmed,
+            fileName  : $storage->resultFileName($sessionKey, $labelTrimmed),
+            savedAt   : $savedAt,
+            dataType  : $dataType,
+            data      : $data,
+            exists    : true,
         ));
-    }
-
-    /**
-     * Сериализует результат в JSON.
-     *
-     * @param IntermediateToolResultDto $dto DTO результата.
-     * @return string JSON.
-     */
-    private function resultJson(IntermediateToolResultDto $dto): string
-    {
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
     }
 }

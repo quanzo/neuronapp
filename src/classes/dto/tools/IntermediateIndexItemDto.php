@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\dto\tools;
 
 /**
- * DTO элемента индекса промежуточных результатов (IntermediateStorageHelper).
+ * DTO элемента индекса промежуточных результатов (IntermediateStorage).
  *
  * Используется для list_intermediate(): показывает метаданные сохранённого значения
  * без необходимости загружать само data.
