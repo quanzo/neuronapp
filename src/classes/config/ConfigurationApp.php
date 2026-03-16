@@ -16,6 +16,7 @@ use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
 use app\modules\neuron\classes\storage\IntermediateStorage;
+use app\modules\neuron\services\config\SessionConfigAppService;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 
@@ -442,6 +443,20 @@ class ConfigurationApp
 
         return $default;
     }
+
+    private $_sessionSrv = null;
+
+    /**
+     * Сервис по упроавлению сессиями
+     *
+     * @return SessionConfigAppService
+     */
+    public function getSessionService(): SessionConfigAppService {
+        if (empty($this->_sessionSrv)) {
+            $this->_sessionSrv = new SessionConfigAppService($this);
+        }
+        return $this->_sessionSrv;
+    } 
 
     /**
      * Загружает конфигурацию из файла config.jsonc.

@@ -10,6 +10,7 @@ use app\modules\neuron\helpers\ShellToolFactory;
 use NeuronAI\Providers\Ollama\Ollama;
 use NeuronAI\Agent\SystemPrompt;
 use NeuronAI\HttpClient\GuzzleHttpClient;
+use NeuronAI\MCP\McpConnector;
 use NeuronAI\Tools\Toolkits\Calendar\CurrentDateTimeTool;
 use NeuronAI\Tools\Toolkits\Calculator\FactorialTool;
 
@@ -78,4 +79,38 @@ return [
             ],
         ],
     ],
+
+    /*
+    'mcp' => [
+        [
+            // Поиск
+            CallableWrapper::class,
+            'createObject',
+            'class'  => McpConnector::class,
+            'config' => [
+                'command' => 'bash',
+                'args' => [
+                    'bash', 'run', __DIR__ . '/../../bin/open-websearch'
+                ],
+                'env' => [
+                    "DEFAULT_SEARCH_ENGINE"  => "duckduckgo",
+                    "ALLOWED_SEARCH_ENGINES" => "duckduckgo,exa,baidu,bing,linuxdo,csdn,brave",
+                    "PORT"                   => "5051",
+                    "MODE"                   => "both",
+                ]
+            ]
+        ],
+
+        [
+            // Context7
+            CallableWrapper::class,
+            'createObject',
+            'class'   => McpConnector::class,
+            'url'     => 'https://mcp.context7.com/mcp',
+            'async'   => false,
+            'timeout' => 10,
+            //"headers" => ["CONTEXT7_API_KEY" => "ctx7sk-7010e527-1111-4d81-983e-1111111"],
+        ]
+    ]
+    */
 ];
