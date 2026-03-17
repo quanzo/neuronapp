@@ -41,14 +41,14 @@ final class ToolRegistry
         }
 
         return match ($name) {
-            'wiki_search' => new WikiSearchTool(),
-            'ru_wiki_search' => new RuWikiSearchTool(),
-            'uni_search' => new UniSearchTool(),
-            'git_summary' => new GitSummaryTool(),
-            'intermediate_save' => new IntermediateSaveTool(),
-            'intermediate_load' => new IntermediateLoadTool(),
-            'intermediate_list' => new IntermediateListTool(),
-            'intermediate_exist' => new IntermediateExistTool(),
+            'wiki_search'         => new WikiSearchTool(),
+            'ru_wiki_search'      => new RuWikiSearchTool(),
+            'uni_search'          => new UniSearchTool(),
+            'git_summary'         => new GitSummaryTool(),
+            'intermediate_save'   => new IntermediateSaveTool(),
+            'intermediate_load'   => new IntermediateLoadTool(),
+            'intermediate_list'   => new IntermediateListTool(),
+            'intermediate_exist'  => new IntermediateExistTool(),
             'intermediate_delete' => new IntermediateDeleteTool(),
             default => null,
         };

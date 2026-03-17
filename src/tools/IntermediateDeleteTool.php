@@ -87,7 +87,7 @@ final class IntermediateDeleteTool extends AIntermediateTool
         return $this->resultJson(new IntermediateToolResultDto(
             action    : 'delete',
             success   : true,
-            message   : $existedBefore ? 'Удалено.': 'Нечего удалять (запись отсутствовала).',
+            message   : $existedBefore ? 'Удалено.' : 'Нечего удалять (запись отсутствовала).',
             sessionKey: $sessionKey,
             label     : $labelTrimmed,
             exists    : false,

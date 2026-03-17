@@ -78,7 +78,7 @@ final class IntermediateExistTool extends AIntermediateTool
             message   : $exists ? 'Найдено.'                                          : 'Не найдено.',
             sessionKey: $sessionKey,
             label     : $labelTrimmed,
-            fileName  : $exists ? $storage->resultFileName($sessionKey, $labelTrimmed): null,
+            fileName  : $exists ? $storage->resultFileName($sessionKey, $labelTrimmed) : null,
             exists    : $exists,
         ));
     }

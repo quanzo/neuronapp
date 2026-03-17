@@ -20,7 +20,7 @@ interface IDependConfigApp
      * @return static
      */
     public function setConfigurationApp(?ConfigurationApp $configApp): static;
-    
+
     /**
      * Возвращает конфигурацию приложения, если она была установлена.
      */

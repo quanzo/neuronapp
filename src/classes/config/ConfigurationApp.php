@@ -156,7 +156,8 @@ class ConfigurationApp
      *
      * @return integer|string
      */
-    public function getUserId(): int|string {
+    public function getUserId(): int|string
+    {
         return $this->userId;
     }
 
@@ -297,7 +298,8 @@ class ConfigurationApp
      *
      * @return SessionConfigAppService
      */
-    public function getSessionService(): SessionConfigAppService {
+    public function getSessionService(): SessionConfigAppService
+    {
         if (empty($this->_sessionSrv)) {
             $this->_sessionSrv = new SessionConfigAppService($this);
         }

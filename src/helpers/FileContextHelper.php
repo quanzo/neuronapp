@@ -7,6 +7,7 @@ namespace app\modules\neuron\helpers;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\classes\dto\cmd\AgentCmdDto;
 use app\modules\neuron\classes\dto\cmd\CmdDto;
 
 /**

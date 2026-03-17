@@ -59,4 +59,3 @@ class RunLoggerTest extends TestCase
         $this->assertStringContainsString('fail', $contents);
     }
 }
-

@@ -101,6 +101,11 @@ public function execute(
 - если включена история чата, создаётся/обновляется `RunStateDto` в директории `.store` через `ConfigurationApp::getStoreDir()` и `RunStateCheckpointHelper`;
 - формируется общий набор параметров (`effectiveParams`) и последовательно выполняются todos:
   - текст задачи = `Todo::getTodo($effectiveParams)`;
+  - в тексте todo может встречаться команда `@@agent("agent-name")`:
+    - переключает выполнение **только этого todo** на указанного агента;
+    - имя агента разрешается через `ConfigurationApp::getAgent($name)`;
+    - если агент не найден или команда некорректна — выполнение продолжается текущим агентом (логируется предупреждение);
+    - сигнатура `@@agent(...)` удаляется из текста перед отправкой в LLM;
   - из текста извлекаются @‑ссылки на файлы (`AttachmentHelper::buildContextAttachments()`), учитывая настройки `context_files.*` из `config.jsonc`;
   - сообщение отправляется в LLM через `ConfigurationAgent::sendMessageWithAttachments()`;
   - по завершении задачи обновляется чекпоинт (`last_completed_todo_index`, `history_message_count`);

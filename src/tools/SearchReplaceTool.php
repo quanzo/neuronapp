@@ -257,4 +257,3 @@ class SearchReplaceTool extends ATool
         return $this;
     }
 }
-

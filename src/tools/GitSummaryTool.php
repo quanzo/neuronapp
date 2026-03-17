@@ -183,4 +183,3 @@ class GitSummaryTool extends ATool
         return $this;
     }
 }
-

@@ -334,4 +334,3 @@ class HttpFetchTool extends ATool
         return $result;
     }
 }
-

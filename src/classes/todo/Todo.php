@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\todo;
 
+use app\modules\neuron\classes\dto\cmd\AgentCmdDto;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\helpers\PlaceholderHelper;
 use app\modules\neuron\classes\dto\cmd\CmdDto;
@@ -21,6 +22,13 @@ class Todo implements ITodo
      * Полный текст задания.
      */
     private string $text;
+
+    /**
+     * D тексте задан кастомный агент-исполнитель в конструкции @@agent("agent-custom")
+     *
+     * @var AgentCmdDto|null|false
+     */
+    private AgentCmdDto|null|false $agentDto = null;
 
     /**
      * Создает экземпляр задания с указанным текстом.
@@ -71,5 +79,35 @@ class Todo implements ITodo
     public function getCmdList(): array
     {
         return FileContextHelper::extractCmdFromBody($this->text);
+    }
+
+    /**
+     * Из текста задания вернуть агента, который указан в `@@agent("agent-name")`
+     *
+     * @return AgentCmdDto|null
+     */
+    public function getSwitchToAgent(): ?AgentCmdDto {
+        if ($this->agentDto === false) {
+            return null;
+        }
+        if (!$this->agentDto) {
+            $body = $this->text;
+            $cmds = FileContextHelper::extractCmdFromBody($body);
+            $agentDto = null;
+            foreach ($cmds as $cmd) {
+                if ($cmd instanceof AgentCmdDto) {
+                    $agentDto = $cmd;
+                    // убираем @@agent из текста
+                    $body = $cmd->replaceSignatureInText($body, '');
+                }
+            }
+            if ($agentDto) {
+                $this->text = $body;
+                $this->agentDto = $agentDto;
+            } else {
+                $this->agentDto = false;
+            }
+        }
+        return $this->agentDto ? $this->agentDto : null;
     }
 }

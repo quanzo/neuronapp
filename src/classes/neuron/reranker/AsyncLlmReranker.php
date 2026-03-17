@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\neuron\reranker;
 
 use NeuronAI\Chat\Enums\MessageRole;
-
-use function Amp\ParallelFunctions\parallelMap;
-
 use NeuronAI\Chat\Messages\Message;
 use NeuronAI\RAG\Document;
 use NeuronAI\RAG\PostProcessor\PostProcessorInterface;
 use app\modules\neuron\helpers\CallableWrapper;
+
+use function Amp\ParallelFunctions\parallelMap;
 
 /**
  * Class AsyncLlmReranker

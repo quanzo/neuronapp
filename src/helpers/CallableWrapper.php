@@ -15,8 +15,10 @@ class CallableWrapper
      * Callable в виде массива с параметрами
      *
      * Вот такой:
-     * [CallableWrapper::class, 'createObject', 'class' => Ollama::class, 'url' => 'http://localhost:11434/api', 'model' => 'codegemma:7b']
-     * массив будет считаться callable и будет вызван метод createObject, который создаст объект из класса с параметрами конструктора класса url и model
+     * [CallableWrapper::class, 'createObject', 'class' => Ollama::class,
+     *  'url' => 'http://localhost:11434/api', 'model' => 'codegemma:7b']
+     * массив будет считаться callable и будет вызван метод createObject, который создаст
+     * объект из класса с параметрами конструктора класса url и model
      *
      * @param array|callable $call
      * @return mixed
@@ -44,7 +46,9 @@ class CallableWrapper
      * Создать объект из класса.
      *
      * @param string $class - имя класса
-     * @param array $params - здесь параметры надо передавать ассоциативный массив. ключи должны соответсвовать параметрам конструктора класса $class. Лишних ключей быть не должно.
+     * @param array  $params - здесь параметры надо передавать ассоциативный массив.
+     *                        Ключи должны соответсвовать параметрам конструктора класса $class.
+     *                        Лишних ключей быть не должно.
      * @return mixed
      */
     public static function createObject(string $class, ...$params)
@@ -79,7 +83,8 @@ class CallableWrapper
         return new $class(...$args);
     }
 
-    public static function isCallableWrapper($call): bool {
+    public static function isCallableWrapper($call): bool
+    {
         if (is_array($call) && sizeof($call) >= 2 && !empty($call[0])) {
             return $call[0] == self::class;
         }

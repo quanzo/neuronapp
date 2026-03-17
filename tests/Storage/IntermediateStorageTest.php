@@ -109,4 +109,3 @@ final class IntermediateStorageTest extends TestCase
         rmdir($dir);
     }
 }
-

@@ -7,7 +7,7 @@ namespace app\modules\neuron\tools;
 use app\modules\neuron\classes\storage\IntermediateStorage;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\tools\IntermediateToolResultDto;
-use \JSON_UNESCAPED_UNICODE;
+use JSON_UNESCAPED_UNICODE;
 
 /**
  * Инструмент для работы с промежуточными данными
@@ -15,12 +15,14 @@ use \JSON_UNESCAPED_UNICODE;
  */
 class AIntermediateTool extends ATool
 {
-    protected function getStorage(): IntermediateStorage {
+    protected function getStorage(): IntermediateStorage
+    {
         $agentCfg = $this->getAgentCfg();
         return $agentCfg?->getIntermediateStorage() ?? ConfigurationApp::getInstance()->getIntermediateStorage();
     }
 
-    protected function getSessionKey(): string {
+    protected function getSessionKey(): string
+    {
         $agentCfg = $this->getAgentCfg();
         return $agentCfg?->getSessionKey() ?? ConfigurationApp::getInstance()->getSessionKey();
     }

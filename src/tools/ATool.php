@@ -25,7 +25,8 @@ abstract class ATool extends Tool
      *
      * @return ConfigurationAgent|null
      */
-    public function getAgentCfg(): ?ConfigurationAgent {
+    public function getAgentCfg(): ?ConfigurationAgent
+    {
         return $this->_agentCfg;
     }
 
@@ -35,7 +36,8 @@ abstract class ATool extends Tool
      * @param ConfigurationAgent $agentCfg
      * @return static
      */
-    public function setAgentCfg(ConfigurationAgent $agentCfg): static {
+    public function setAgentCfg(ConfigurationAgent $agentCfg): static
+    {
         $this->_agentCfg = $agentCfg;
         return $this;
     }

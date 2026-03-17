@@ -7,7 +7,10 @@ namespace app\modules\neuron\classes\todo;
 use Amp\Future;
 use app\modules\neuron\classes\AbstractPromptWithParams;
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\classes\dto\cmd\AgentCmdDto;
+use app\modules\neuron\classes\dto\cmd\CmdDto;
 use app\modules\neuron\classes\dto\params\SessionParamsDto;
 use app\modules\neuron\classes\logger\RunLogger;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
@@ -33,6 +36,11 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
 {
     use HasNeedSkillsTrait;
     use AttachesSkillToolsTrait;
+
+    /**
+     * Имя команды переключения агента в тексте todo.
+     */
+    private const CMD_AGENT = 'agent';
 
     /**
      * Очередь заданий в порядке FIFO.
@@ -155,26 +163,58 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                 if ($todoIndex < $startFromTodoIndex) {
                     continue;
                 }
-                $todoText = $todo->getTodo($effectiveParams);
-                $logger->info('Todo started', array_merge($baseContext, ['todo_index' => $todoIndex, 'todo' => $todoText]));
+                $todoTextRaw    = $todo->getTodo($effectiveParams);
+                $todoTextToSend = $todoTextRaw;
+                $todoSessionCfg = $sessionCfg; // агент конкретно этой todo
+
+                if ($todo instanceof Todo) {
+                    $switchToAgentDto = $todo->getSwitchToAgent();
+                    if ($switchToAgentDto) {
+                        $resolvedAgent = $configApp->getAgent($switchToAgentDto->getAgentName());
+                        if ($resolvedAgent) {
+                            // такой агент есть
+                            // агент должен работать с той же историей что и $sessionCfg
+                            $r = $resolvedAgent->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY); // агент с пустой историей
+                            $r->setChatHistory($sessionCfg->getChatHistory()); // передаем ему историю текущего контекста исполнения
+                            $r->tools       = $sessionCfg->getTools(); // и интструменты
+                            $todoSessionCfg = $r;
+                        } else {
+                            // агента нет
+                            $sessionCfg->getLoggerWithContext()->warning('Агент из @@agent(...) не найден — используется агент по умолчанию', [
+                                'todolist' => $this->getName(),
+                                'agent' => $switchToAgentDto->getAgentName(),
+                            ]);
+                        }
+                    }
+                }
+
+                $logger->info('Todo started', array_merge($baseContext, [
+                    'todo_index' => $todoIndex,
+                    'todo'       => $todoTextRaw,
+                    'todo_agent' => $todoSessionCfg->getAgentName(),
+                ]));
                 try {
-                    $message = new NeuronMessage($role, $todoText);
+                    $message = new NeuronMessage($role, $todoTextToSend);
                     $todoAttachments = $attachments;
                     if ($configApp !== null) {
                         /**
                          * В тексте каждого элемента списка ищем указание на файл для его подключения в контекст исполнени именно этого todo
                          */
-                        $contextFiles = AttachmentHelper::buildContextAttachments($todoText, $configApp);
+                        $contextFiles = AttachmentHelper::buildContextAttachments($todoTextToSend, $configApp);
                         if ($contextFiles['attachments'] !== []) {
                             $todoAttachments = array_merge($todoAttachments, $contextFiles['attachments']);
                         }
                     }
-                    $sessionCfg->sendMessageWithAttachments($message, $todoAttachments);
+                    $todoSessionCfg->sendMessageWithAttachments($message, $todoAttachments);
                     ++$stepsExecuted;
+
+                    /**
+                     * Здесь мы записываем какой пункт списка выполнили
+                     */
                     if ($runStateDto !== null) {
                         $runStateDto->setLastCompletedTodoIndex($todoIndex);
                         $runStateDto->setHistoryMessageCount(
-                            ChatHistoryTruncateHelper::getMessageCount($sessionCfg->getChatHistory())
+                            ChatHistoryTruncateHelper::getMessageCount($todoSessionCfg->getChatHistory())
                         );
                         $runStateDto->write();
                     }

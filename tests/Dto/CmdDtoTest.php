@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Dto;
 
+use app\modules\neuron\classes\dto\cmd\AgentCmdDto;
 use app\modules\neuron\classes\dto\cmd\CmdDto;
 use app\modules\neuron\classes\dto\cmd\FuncCmdDto;
 use PHPUnit\Framework\TestCase;
@@ -19,6 +20,19 @@ use PHPUnit\Framework\TestCase;
  */
 class CmdDtoTest extends TestCase
 {
+    /**
+     * Строка вида "@@agent(\"name\")" разбирается в специализированный {@see AgentCmdDto}.
+     */
+    public function testParsesAgentCommandAsAgentDto(): void
+    {
+        $dto = CmdDto::fromString('@@agent("agent-coder")');
+
+        $this->assertInstanceOf(AgentCmdDto::class, $dto);
+        $this->assertSame('agent', $dto->getName());
+        $this->assertSame(['agent-coder'], $dto->getParams());
+        $this->assertSame('agent-coder', $dto->getAgentName());
+    }
+
     /**
      * Строка вида "@@func(\"text\", 1)" разбирается в команду с именем "func",
      * двумя параметрами и возвращает специализированный класс {@see FuncCmdDto}.

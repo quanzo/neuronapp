@@ -52,4 +52,3 @@ class ShellToolFactoryTest extends TestCase
         $this->assertIsString($resultJson);
     }
 }
-

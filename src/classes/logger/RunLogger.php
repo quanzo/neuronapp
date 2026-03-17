@@ -80,4 +80,3 @@ final class RunLogger
         return bin2hex(random_bytes(16));
     }
 }
-

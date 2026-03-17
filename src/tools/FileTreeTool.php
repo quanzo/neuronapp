@@ -239,4 +239,3 @@ class FileTreeTool extends ATool
         return $this;
     }
 }
-

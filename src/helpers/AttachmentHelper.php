@@ -12,7 +12,6 @@ use NeuronAI\Chat\Messages\ContentBlocks\ContentBlockInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use app\modules\neuron\classes\config\ConfigurationApp;
 
-
 /**
  * Хелпер для построения DTO вложений (attachments) из путей к файлам.
  *

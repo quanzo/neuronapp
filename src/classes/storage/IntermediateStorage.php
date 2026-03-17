@@ -557,4 +557,3 @@ final class IntermediateStorage
         return 'object';
     }
 }
-

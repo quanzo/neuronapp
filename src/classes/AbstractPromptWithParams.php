@@ -462,7 +462,7 @@ abstract class AbstractPromptWithParams extends APromptComponent implements IDep
 
     /**
      * Проверяет корректность конфигурации компонента и возвращает список ошибок.
-     * 
+     *
      * Формат каждой ошибки:
      *  - type: строковый код ошибки;
      *  - message: человекочитаемое описание;
