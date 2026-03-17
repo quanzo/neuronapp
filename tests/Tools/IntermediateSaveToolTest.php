@@ -53,12 +53,13 @@ final class IntermediateSaveToolTest extends TestCase
      */
     public function testSaveJson(): void
     {
-        $json = ($this->tool)('parsed', '{"x":[1,2]}');
+        $json = ($this->tool)('parsed', 'Распарсенный JSON для проверки', '{"x":[1,2]}');
         $data = json_decode($json, true);
 
         $this->assertTrue($data['success']);
         $this->assertSame('save', $data['action']);
         $this->assertSame('parsed', $data['label']);
+        $this->assertSame('Распарсенный JSON для проверки', $data['description']);
     }
 
     /**
@@ -66,7 +67,7 @@ final class IntermediateSaveToolTest extends TestCase
      */
     public function testEmptyLabelReturnsError(): void
     {
-        $json = ($this->tool)('   ', '{"a":1}');
+        $json = ($this->tool)('   ', 'desc', '{"a":1}');
         $data = json_decode($json, true);
 
         $this->assertFalse($data['success']);

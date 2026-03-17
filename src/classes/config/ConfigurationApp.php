@@ -16,6 +16,7 @@ use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
 use app\modules\neuron\classes\storage\IntermediateStorage;
+use app\modules\neuron\services\config\IntermediateConfigAppService;
 use app\modules\neuron\services\config\SessionConfigAppService;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -456,7 +457,21 @@ class ConfigurationApp
             $this->_sessionSrv = new SessionConfigAppService($this);
         }
         return $this->_sessionSrv;
-    } 
+    }
+
+    private $_intermediateSrv = null;
+
+    /**
+     * Сервис по управлению промежуточными intermediate данными приложения
+     *
+     * @return IntermediateConfigAppService
+     */
+    public function getIntermediateService(): IntermediateConfigAppService {
+        if (empty($this->_intermediateSrv)) {
+            $this->_intermediateSrv = new IntermediateConfigAppService($this);
+        }
+        return $this->_intermediateSrv;
+    }
 
     /**
      * Загружает конфигурацию из файла config.jsonc.

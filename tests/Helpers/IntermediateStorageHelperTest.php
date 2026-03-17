@@ -57,7 +57,7 @@ final class IntermediateStorageHelperTest extends TestCase
     public function testSaveCreatesResultFileAndIndex(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        $item = IntermediateStorageHelper::save($sessionKey, 'requirements', ['a' => 1]);
+        $item = IntermediateStorageHelper::save($sessionKey, 'requirements', ['a' => 1], 'Требования (минимальный пример)');
 
         $this->assertSame('requirements', $item->label);
         $this->assertTrue(file_exists(IntermediateStorageHelper::resultFilePath($sessionKey, 'requirements')));
@@ -70,7 +70,7 @@ final class IntermediateStorageHelperTest extends TestCase
     public function testLoadReturnsSavedData(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        IntermediateStorageHelper::save($sessionKey, 'parsed', ['x' => ['y' => 2]]);
+        IntermediateStorageHelper::save($sessionKey, 'parsed', ['x' => ['y' => 2]], 'Parsed data');
 
         $loaded = IntermediateStorageHelper::load($sessionKey, 'parsed');
         $this->assertNotNull($loaded);
@@ -86,7 +86,7 @@ final class IntermediateStorageHelperTest extends TestCase
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
         $this->assertFalse(IntermediateStorageHelper::exists($sessionKey, 'missing'));
 
-        IntermediateStorageHelper::save($sessionKey, 'present', 'hello');
+        IntermediateStorageHelper::save($sessionKey, 'present', 'hello', 'Greeting');
         $this->assertTrue(IntermediateStorageHelper::exists($sessionKey, 'present'));
     }
 
@@ -96,8 +96,8 @@ final class IntermediateStorageHelperTest extends TestCase
     public function testListReturnsIndexItems(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        IntermediateStorageHelper::save($sessionKey, 'l1', 'a');
-        IntermediateStorageHelper::save($sessionKey, 'l2', 'b');
+        IntermediateStorageHelper::save($sessionKey, 'l1', 'a', 'one');
+        IntermediateStorageHelper::save($sessionKey, 'l2', 'b', 'two');
 
         $items = IntermediateStorageHelper::list($sessionKey);
         $labels = array_map(static fn($i) => $i->label, $items);
@@ -112,7 +112,7 @@ final class IntermediateStorageHelperTest extends TestCase
     public function testListFallbackWhenIndexMissing(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        IntermediateStorageHelper::save($sessionKey, 'scan_me', ['k' => 1]);
+        IntermediateStorageHelper::save($sessionKey, 'scan_me', ['k' => 1], 'scan fallback');
 
         @unlink(IntermediateStorageHelper::indexFilePath($sessionKey));
 
@@ -139,7 +139,7 @@ final class IntermediateStorageHelperTest extends TestCase
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
         $label = 'my label/with:bad*chars';
-        IntermediateStorageHelper::save($sessionKey, $label, 'x');
+        IntermediateStorageHelper::save($sessionKey, $label, 'x', 'sanitized');
 
         $fileName = IntermediateStorageHelper::resultFileName($sessionKey, $label);
         $this->assertStringContainsString('intermediate_', $fileName);
@@ -162,7 +162,7 @@ final class IntermediateStorageHelperTest extends TestCase
     public function testListFallbackWhenIndexCorrupted(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        IntermediateStorageHelper::save($sessionKey, 'recover', ['v' => 1]);
+        IntermediateStorageHelper::save($sessionKey, 'recover', ['v' => 1], 'recover');
 
         file_put_contents(IntermediateStorageHelper::indexFilePath($sessionKey), '{not json');
 

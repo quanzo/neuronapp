@@ -60,17 +60,19 @@ final class IntermediateIndexDto
                 continue;
             }
             $label = $item['label'] ?? null;
+            $description = $item['description'] ?? null;
             $fileName = $item['fileName'] ?? null;
             $savedAt = $item['savedAt'] ?? null;
             $dataType = $item['dataType'] ?? null;
             $sizeBytes = $item['sizeBytes'] ?? null;
 
-            if (!is_string($label) || !is_string($fileName) || !is_string($savedAt) || !is_string($dataType) || !is_int($sizeBytes)) {
+            if (!is_string($label) || !is_string($description) || !is_string($fileName) || !is_string($savedAt) || !is_string($dataType) || !is_int($sizeBytes)) {
                 continue;
             }
 
             $dtoItems[] = new IntermediateIndexItemDto(
                 label: $label,
+                description: $description,
                 fileName: $fileName,
                 savedAt: $savedAt,
                 dataType: $dataType,

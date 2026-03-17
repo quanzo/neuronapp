@@ -66,17 +66,19 @@ return [
     'tools' => [
         [CurrentDateTimeTool::class, 'make'],
         [FactorialTool::class, 'make'],
-        /*
         [
             CallableWrapper::class,
             'call',
-            'call' => [ShellToolFactory::class, 'createReadonlyBashCmdTool'],
-            'commandTemplate' => 'git status',
-            'workingDirectory' => dirname(__DIR__, 2),
-            'name' => 'git_status',
-            'description' => 'Статус git'
+            'call' => [
+                // фабрика возвращает объект инструмента
+                ShellToolFactory::class,
+                'createReadonlyBashCmdTool',
+                'commandTemplate'  => 'git status',
+                'workingDirectory' => dirname(__DIR__, 2),
+                'name'             => 'git_status',
+                'description'      => 'Статус git'
+            ],
         ],
-        */
     ],
 
     /*/

@@ -54,7 +54,7 @@ final class IntermediateLoadToolTest extends TestCase
     public function testLoadExisting(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        IntermediateStorageHelper::save($sessionKey, 'parsed', ['x' => 1]);
+        IntermediateStorageHelper::save($sessionKey, 'parsed', ['x' => 1], 'Короткое описание');
 
         $json = ($this->tool)('parsed');
         $data = json_decode($json, true);

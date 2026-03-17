@@ -23,6 +23,7 @@ use function is_string;
  *   'sessionKey' => string,
  *   'label'      => string|null,
  *   'fileName'   => string|null,
+ *   'description'=> string|null,
  *   'savedAt'    => string|null,
  *   'dataType'   => string|null,
  *   'data'       => mixed|null,
@@ -41,6 +42,7 @@ final class IntermediateToolResultDto
      * @param string                     $sessionKey Текущий sessionKey.
      * @param string|null                $label      Метка (если применимо).
      * @param string|null                $fileName   Имя файла (если применимо).
+     * @param string|null                $description Краткое описание результата (если применимо).
      * @param string|null                $savedAt    ISO-8601 время сохранения (если применимо).
      * @param string|null                $dataType   Тип данных (если применимо).
      * @param mixed|null                 $data       Данные (для load или echo save при необходимости).
@@ -55,6 +57,7 @@ final class IntermediateToolResultDto
         public readonly string $sessionKey,
         public readonly ?string $label = null,
         public readonly ?string $fileName = null,
+        public readonly ?string $description = null,
         public readonly ?string $savedAt = null,
         public readonly ?string $dataType = null,
         public readonly mixed $data = null,
@@ -78,6 +81,7 @@ final class IntermediateToolResultDto
             'sessionKey' => $this->sessionKey,
             'label' => $this->label,
             'fileName' => $this->fileName,
+            'description' => $this->description,
             'savedAt' => $this->savedAt,
             'dataType' => $this->dataType,
             'data' => $this->data,

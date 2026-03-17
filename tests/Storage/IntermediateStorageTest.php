@@ -44,8 +44,9 @@ final class IntermediateStorageTest extends TestCase
 
     public function testSaveAndLoad(): void
     {
-        $item = $this->storage->save('s1', 'label1', ['a' => 1]);
+        $item = $this->storage->save('s1', 'label1', ['a' => 1], 'Example data');
         $this->assertSame('label1', $item->label);
+        $this->assertSame('Example data', $item->description);
 
         $loaded = $this->storage->load('s1', 'label1');
         $this->assertNotNull($loaded);
@@ -56,7 +57,7 @@ final class IntermediateStorageTest extends TestCase
     {
         $this->assertFalse($this->storage->exists('s1', 'x'));
 
-        $this->storage->save('s1', 'x', 'v');
+        $this->storage->save('s1', 'x', 'v', 'x value');
         $this->assertTrue($this->storage->exists('s1', 'x'));
 
         $this->storage->delete('s1', 'x');
@@ -65,8 +66,8 @@ final class IntermediateStorageTest extends TestCase
 
     public function testListUsesIndex(): void
     {
-        $this->storage->save('s1', 'a', '1');
-        $this->storage->save('s1', 'b', '2');
+        $this->storage->save('s1', 'a', '1', 'one');
+        $this->storage->save('s1', 'b', '2', 'two');
 
         $items = $this->storage->list('s1');
         $labels = array_map(static fn(IntermediateIndexItemDto $i) => $i->label, $items);
@@ -77,7 +78,7 @@ final class IntermediateStorageTest extends TestCase
 
     public function testListFallbackWhenIndexCorrupted(): void
     {
-        $this->storage->save('s1', 'recover', ['v' => 1]);
+        $this->storage->save('s1', 'recover', ['v' => 1], 'recover');
         $indexPath = $this->tmpDir . '/.store/' . 'intermediate_index_' . 's1' . '.json';
         file_put_contents($indexPath, '{not json');
 

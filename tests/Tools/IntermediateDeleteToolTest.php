@@ -52,7 +52,7 @@ final class IntermediateDeleteToolTest extends TestCase
     public function testDeleteExisting(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        IntermediateStorageHelper::save($sessionKey, 'tmp', '1');
+        IntermediateStorageHelper::save($sessionKey, 'tmp', '1', 'tmp value');
         $this->assertTrue(IntermediateStorageHelper::exists($sessionKey, 'tmp'));
 
         $json = ($this->tool)('tmp');

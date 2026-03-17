@@ -23,6 +23,7 @@ use function rename;
 use function scandir;
 use function str_ends_with;
 use function str_starts_with;
+use function substr;
 use function strlen;
 use function time;
 use function unlink;
@@ -158,22 +159,25 @@ final class IntermediateStorageHelper
      *
      * @param string $sessionKey Базовый ключ сессии.
      * @param string $label      Метка результата.
-     * @param mixed  $data       Данные (JSON-совместимое значение).
+     * @param mixed       $data        Данные (JSON-совместимое значение).
+     * @param string|null $description Краткое описание результата.
      * @return IntermediateIndexItemDto Метаданные сохранённого результата.
      * @throws \JsonException При ошибке кодирования JSON.
      * @throws \RuntimeException При ошибке записи.
      */
-    public static function save(string $sessionKey, string $label, mixed $data): IntermediateIndexItemDto
+    public static function save(string $sessionKey, string $label, mixed $data, ?string $description = null): IntermediateIndexItemDto
     {
         self::validateLabel($label);
 
         $savedAt = date('c', time());
         $dataType = self::detectDataType($data);
+        $descriptionNorm = self::normalizeDescription($description);
 
         $payload = [
             'schema' => self::SCHEMA_INTERMEDIATE_V1,
             'sessionKey' => $sessionKey,
             'label' => $label,
+            'description' => $descriptionNorm,
             'savedAt' => $savedAt,
             'dataType' => $dataType,
             'data' => $data,
@@ -186,6 +190,7 @@ final class IntermediateStorageHelper
         $sizeBytes = filesize($path);
         $item = new IntermediateIndexItemDto(
             label: $label,
+            description: $descriptionNorm,
             fileName: self::resultFileName($sessionKey, $label),
             savedAt: $savedAt,
             dataType: $dataType,
@@ -353,12 +358,14 @@ final class IntermediateStorageHelper
                 continue;
             }
 
+            $description = is_string($decoded['description'] ?? null) ? (string) $decoded['description'] : '';
             $savedAt = is_string($decoded['savedAt'] ?? null) ? (string) $decoded['savedAt'] : '';
             $dataType = is_string($decoded['dataType'] ?? null) ? (string) $decoded['dataType'] : '';
             $sizeBytes = filesize($path);
 
             $items[] = new IntermediateIndexItemDto(
                 label: $label,
+                description: $description,
                 fileName: $entry,
                 savedAt: $savedAt,
                 dataType: $dataType,
@@ -421,6 +428,25 @@ final class IntermediateStorageHelper
         if (strlen($label) > 120) {
             throw new \InvalidArgumentException('label слишком длинный (максимум 120 символов).');
         }
+    }
+
+    /**
+     * Нормализует описание результата (краткое).
+     *
+     * - null -> ''
+     * - trim
+     * - ограничение длины 200 символов
+     */
+    private static function normalizeDescription(?string $description): string
+    {
+        $description = trim((string) ($description ?? ''));
+        if ($description === '') {
+            return '';
+        }
+        if (strlen($description) > 200) {
+            return substr($description, 0, 200);
+        }
+        return $description;
     }
 
     /**

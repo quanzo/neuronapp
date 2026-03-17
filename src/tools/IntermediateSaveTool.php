@@ -54,6 +54,12 @@ final class IntermediateSaveTool extends AIntermediateTool
                 required: true,
             ),
             ToolProperty::make(
+                name: 'description',
+                type: PropertyType::STRING,
+                description: 'Краткое описание (1 строка) того, что сохранено. Обязательна. Пример: "План реализации IntermediateStorage", "Распарсенный конфиг из user input".',
+                required: true,
+            ),
+            ToolProperty::make(
                 name: 'data',
                 type: PropertyType::STRING,
                 description: 'Данные для сохранения. Рекомендуется JSON-строка ({"a":1} или ["x","y"]). Если JSON невалиден — сохраняется как обычный текст.',
@@ -70,11 +76,12 @@ final class IntermediateSaveTool extends AIntermediateTool
      *
      * @return string JSON-результат.
      */
-    public function __invoke(string $label, string $data): string
+    public function __invoke(string $label, string $description, string $data): string
     {
         $storage      = $this->getStorage();
         $sessionKey   = $this->getSessionKey();
         $labelTrimmed = trim($label);
+        $descTrimmed  = trim($description);
 
         if ($labelTrimmed === '') {
             return $this->resultJson(new IntermediateToolResultDto(
@@ -85,10 +92,20 @@ final class IntermediateSaveTool extends AIntermediateTool
             ));
         }
 
+        if ($descTrimmed === '') {
+            return $this->resultJson(new IntermediateToolResultDto(
+                action    : 'save',
+                success   : false,
+                message   : 'description не может быть пустым.',
+                sessionKey: $sessionKey,
+                label     : $labelTrimmed,
+            ));
+        }
+
         $payload = $this->parseDataString($data);
 
         try {
-            $item = $storage->save($sessionKey, $labelTrimmed, $payload);
+            $item = $storage->save($sessionKey, $labelTrimmed, $payload, $descTrimmed);
         } catch (\Throwable $e) {
             return $this->resultJson(new IntermediateToolResultDto(
                 action    : 'save',
@@ -106,6 +123,7 @@ final class IntermediateSaveTool extends AIntermediateTool
             sessionKey: $sessionKey,
             label     : $item->label,
             fileName  : $item->fileName,
+            description: $item->description,
             savedAt   : $item->savedAt,
             dataType  : $item->dataType,
         ));

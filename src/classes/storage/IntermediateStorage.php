@@ -22,6 +22,7 @@ use function rename;
 use function scandir;
 use function str_ends_with;
 use function str_starts_with;
+use function substr;
 use function strlen;
 use function time;
 use function unlink;
@@ -48,6 +49,7 @@ use const JSON_UNESCAPED_UNICODE;
  * - `schema`      — версия схемы (`neuronapp.intermediate.v1`);
  * - `sessionKey`  — ключ сессии;
  * - `label`       — метка результата;
+ * - `description` — краткое описание результата (для list и понимания LLM);
  * - `savedAt`     — время сохранения в ISO‑8601;
  * - `dataType`    — тип данных (`string|object|array|number|boolean|null`);
  * - `data`        — произвольное JSON-совместимое значение.
@@ -197,7 +199,8 @@ final class IntermediateStorage
      *
      * @param string $sessionKey Базовый ключ сессии.
      * @param string $label      Метка результата (валидируется; не может быть пустой/слишком длинной).
-     * @param mixed  $data       JSON-совместимое значение для записи.
+     * @param mixed       $data        JSON-совместимое значение для записи.
+     * @param string|null $description Краткое описание результата (рекомендуется для list).
      *
      * @return IntermediateIndexItemDto DTO с метаданными сохранённого результата.
      *
@@ -205,9 +208,10 @@ final class IntermediateStorage
      * @throws \JsonException            При ошибке кодирования JSON.
      * @throws \RuntimeException         При ошибке записи/переименования файла.
      */
-    public function save(string $sessionKey, string $label, mixed $data): IntermediateIndexItemDto
+    public function save(string $sessionKey, string $label, mixed $data, ?string $description = null): IntermediateIndexItemDto
     {
         $this->validateLabel($label);
+        $descriptionNorm = $this->normalizeDescription($description);
 
         $savedAt = date('c', time());
         $dataType = $this->detectDataType($data);
@@ -216,6 +220,7 @@ final class IntermediateStorage
             'schema' => self::SCHEMA_INTERMEDIATE_V1,
             'sessionKey' => $sessionKey,
             'label' => $label,
+            'description' => $descriptionNorm,
             'savedAt' => $savedAt,
             'dataType' => $dataType,
             'data' => $data,
@@ -228,6 +233,7 @@ final class IntermediateStorage
         $sizeBytes = filesize($path);
         $item = new IntermediateIndexItemDto(
             label: $label,
+            description: $descriptionNorm,
             fileName: $this->resultFileName($sessionKey, $label),
             savedAt: $savedAt,
             dataType: $dataType,
@@ -248,7 +254,7 @@ final class IntermediateStorage
      * @param string $sessionKey Базовый ключ сессии.
      * @param string $label      Метка результата (валидируется).
      *
-     * @return array{schema?: string, sessionKey?: string, label?: string, savedAt?: string, dataType?: string, data?: mixed}|null
+     * @return array{schema?: string, sessionKey?: string, label?: string, description?: string, savedAt?: string, dataType?: string, data?: mixed}|null
      *
      * @throws \InvalidArgumentException Если label некорректен.
      */
@@ -410,12 +416,14 @@ final class IntermediateStorage
                 continue;
             }
 
+            $description = is_string($decoded['description'] ?? null) ? (string) $decoded['description'] : '';
             $savedAt = is_string($decoded['savedAt'] ?? null) ? (string) $decoded['savedAt'] : '';
             $dataType = is_string($decoded['dataType'] ?? null) ? (string) $decoded['dataType'] : '';
             $sizeBytes = filesize($path);
 
             $items[] = new IntermediateIndexItemDto(
                 label: $label,
+                description: $description,
                 fileName: $entry,
                 savedAt: $savedAt,
                 dataType: $dataType,
@@ -496,6 +504,30 @@ final class IntermediateStorage
         if (strlen($label) > 120) {
             throw new \InvalidArgumentException('label слишком длинный (максимум 120 символов).');
         }
+    }
+
+    /**
+     * Нормализует описание результата.
+     *
+     * Требование: описание должно быть кратким. Здесь:
+     * - null приводится к пустой строке;
+     * - выполняется trim;
+     * - строка обрезается до 200 символов.
+     *
+     * @param string|null $description Описание от вызывающего кода.
+     *
+     * @return string Нормализованное описание (может быть пустым).
+     */
+    private function normalizeDescription(?string $description): string
+    {
+        $description = trim((string) ($description ?? ''));
+        if ($description === '') {
+            return '';
+        }
+        if (strlen($description) > 200) {
+            return substr($description, 0, 200);
+        }
+        return $description;
     }
 
     /**
