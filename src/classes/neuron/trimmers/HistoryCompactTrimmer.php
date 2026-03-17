@@ -6,7 +6,6 @@ namespace app\modules\neuron\classes\neuron\trimmers;
 
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\HistoryTrimmerInterface;
-use NeuronAI\Chat\History\TokenCounter;
 use NeuronAI\Chat\Messages\Message;
 use NeuronAI\Chat\Messages\ToolCallMessage;
 use NeuronAI\Chat\Messages\ToolResultMessage;

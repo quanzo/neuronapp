@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Neuron;
 
 use app\modules\neuron\classes\neuron\trimmers\FluidContextWindowTrimmer;
+use app\modules\neuron\classes\neuron\trimmers\TokenCounter;
 use NeuronAI\Chat\Enums\MessageRole;
-use NeuronAI\Chat\History\TokenCounter;
 use NeuronAI\Chat\Messages\Message;
 use NeuronAI\Chat\Messages\ToolCallMessage;
 use NeuronAI\Chat\Messages\ToolResultMessage;
@@ -19,6 +19,7 @@ final class FluidContextWindowTrimmerTest extends TestCase
 {
     public function testEmptyHistoryReturnsEmpty(): void
     {
+        TrimmersTokenCounter
         $trimmer = new FluidContextWindowTrimmer(new TokenCounter());
         $result = $trimmer->trim([], 1000);
 

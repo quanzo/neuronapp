@@ -55,6 +55,8 @@ class SimpleMessageCommand extends AbstractAgentCommand
             ->addOption('message', null, InputOption::VALUE_REQUIRED, 'Текст сообщения')
             ->addOption('session_id', null, InputOption::VALUE_OPTIONAL, 'Ключ сессии для продолжения (формат buildSessionKey)')
             ->addOption('format', null, InputOption::VALUE_OPTIONAL, 'Формат вывода. Доступно: md, txt, json', 'md')
+            ->addOption('resume', null, InputOption::VALUE_NONE, 'Продолжить выполнение с последнего чекпоинта')
+            ->addOption('abort', null, InputOption::VALUE_NONE, 'Сбросить состояние незавершённого run для сессии')
             ->addOption(
                 'file',
                 'f',
@@ -154,13 +156,24 @@ class SimpleMessageCommand extends AbstractAgentCommand
         // проверим а завершено ли предыдущее сообщение
         $runStateDto = $agentCfg->getExistRunStateDto();
         if ($runStateDto) {
-            $output->writeln(
-                sprintf(
-                    '<error>В сессии обнаружено незавершённое выполнение списка "%s".</error>',
-                    $runStateDto->getTodolistName()
-                )
-            );
-            return Command::FAILURE;
+            if ($abort) {
+                // сброс флага "идет выполнение списка"
+                $agentCfg->abortRunState();
+                $output->writeln('Статус "выполняется список" убран');
+            } elseif ($resume) {
+                $agentCfg->resumeRunState();
+                $output->writeln('Откат истории выполнен');
+                $agentCfg->abortRunState();
+                $output->writeln('Статус "выполняется список" убран');
+            } else {
+                $output->writeln(
+                    sprintf(
+                        '<error>В сессии обнаружено незавершённое выполнение списка "%s".</error>',
+                        $runStateDto->getTodolistName()
+                    )
+                );
+                return Command::FAILURE;
+            }
         }
 
         // Список из одного задания (текст сообщения), использующий глобальную конфигурацию приложения

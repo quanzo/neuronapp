@@ -652,7 +652,9 @@ class ConfigurationAgent implements IDependConfigApp
     }
 
     /**
-     * Возобновить исполнение списка с пункта, на котором прервалось
+     * Возобновить исполнение списка с пункта, на котором прервалось.
+     * 
+     * Откатывает историю "до последнего сообщения".
      *
      * @return boolean
      * @throws RunStateNotFoundException
@@ -674,7 +676,7 @@ class ConfigurationAgent implements IDependConfigApp
     }
 
     /**
-     * Убрать состояние исполнения
+     * Убрать состояние исполнения списка
      *
      * @return boolean
      * @throws RunStateNotFoundException
