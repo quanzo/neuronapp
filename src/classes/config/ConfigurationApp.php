@@ -35,9 +35,9 @@ class ConfigurationApp
      * Регулярное выражение для проверки формата sessionKey.
      *
      * Формат совпадает с {@see ConfigurationApp::buildSessionKey()}: Ymd-His-u
-     * (дата 8 цифр, дефис, время 6 цифр, дефис, микросекунды).
+     * (дата 8 цифр, дефис, время 6 цифр, дефис, микросекунды, дефис, id пользователя или 0).
      */
-    const SESSION_KEY_PATTERN = '/^\d{8}-\d{6}-\d+$/';
+    const SESSION_KEY_PATTERN = '/^\d{8}-\d{6}-\d+-\d+$/';
 
     /**
      * Единственный экземпляр конфигурации.
@@ -354,7 +354,7 @@ class ConfigurationApp
     {
         if ($this->sessionKey === null) {
             $uid = $this->getUserId();
-            $this->sessionKey = $this::buildSessionKey() . ($uid ? '-' . $uid : '');
+            $this->sessionKey = $this::buildSessionKey() . ($uid ? '-' . $uid : '0');
         }
 
         return $this->sessionKey;

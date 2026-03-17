@@ -69,6 +69,14 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
     }
 
     /**
+     * Значение по умолчанию для опции pure_context.
+     */
+    protected function getDefaultPureContext(): bool
+    {
+        return false;
+    }
+
+    /**
      * Добавляет одно или несколько заданий в очередь.
      *
      * @param ITodo ...$todos Экземпляры заданий для добавления.
@@ -308,17 +316,5 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
         }
 
         $this->pushTodo(Todo::fromString($text));
-    }
-
-    /**
-     * Значение по умолчанию для опции pure_context у TodoList.
-     *
-     * Для списка заданий по умолчанию используется чистый контекст
-     * агента, поэтому при отсутствии опции pure_context метод
-     * {@see isPureContext()} возвращает true.
-     */
-    protected function getDefaultPureContext(): bool
-    {
-        return true;
     }
 }
