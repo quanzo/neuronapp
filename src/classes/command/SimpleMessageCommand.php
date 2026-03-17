@@ -92,6 +92,8 @@ class SimpleMessageCommand extends AbstractAgentCommand
         $sessionId   = $input->getOption('session_id');
         $formatOut   = $input->getOption('format');
         $fileOptions = $input->getOption('file');
+        $resume      = (bool) $input->getOption('resume');
+        $abort       = (bool) $input->getOption('abort');
 
         // Проверка обязательных опций
         if ($agentName === null || $agentName === '') {
@@ -128,7 +130,7 @@ class SimpleMessageCommand extends AbstractAgentCommand
         // Если передан session_id — проверяем формат и существование сессии, затем подставляем ключ
         if ($sessionId !== null && $sessionId !== '') {
             if (!ConfigurationApp::isValidSessionKey($sessionId)) {
-                $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u (например, 20250301-143022-123456).</error>');
+                $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u-userId (например, 20250301-143022-123456-0).</error>');
                 return Command::FAILURE;
             }
 

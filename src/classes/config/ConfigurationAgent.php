@@ -34,6 +34,8 @@ use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use app\modules\neuron\interfaces\IAttachmentFile;
 use app\modules\neuron\interfaces\IDependConfigApp;
 use app\modules\neuron\classes\storage\IntermediateStorage;
+use app\modules\neuron\exceptions\RunStateNotFoundException;
+use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\tools\ATool;
 use app\modules\neuron\traits\DependConfigAppTrait;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
@@ -647,6 +649,44 @@ class ConfigurationAgent implements IDependConfigApp
             return $unfinishedCheckpoint;
         }
         return null;
+    }
+
+    /**
+     * Возобновить исполнение списка с пункта, на котором прервалось
+     *
+     * @return boolean
+     * @throws RunStateNotFoundException
+     */
+    public function resumeRunState(): bool {
+        $runStateDto = $this->getExistRunStateDto();
+        if ($runStateDto) {
+            $historyMessageCount = $runStateDto->getHistoryMessageCount();
+            if ($historyMessageCount !== null) {
+                $this->resetChatHistory();
+                $history = $this->getChatHistory();
+                ChatHistoryTruncateHelper::truncateToMessageCount($history, $historyMessageCount);
+                return true;
+            }
+        } else {
+            throw new RunStateNotFoundException();
+        }
+        return false;
+    }
+
+    /**
+     * Убрать состояние исполнения
+     *
+     * @return boolean
+     * @throws RunStateNotFoundException
+     */
+    public function abortRunState(): bool {
+        $runStateDto = $this->getExistRunStateDto();
+        if ($runStateDto) {
+            $runStateDto->delete();
+            return true;
+        } else {
+            throw new RunStateNotFoundException();
+        }
     }
 
     /**

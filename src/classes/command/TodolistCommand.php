@@ -112,7 +112,7 @@ class TodolistCommand extends AbstractAgentCommand
         $configApp = ConfigurationApp::getInstance();
         if ($sessionId !== null && $sessionId !== '') { // если сессия задана вручную
             if (!ConfigurationApp::isValidSessionKey($sessionId)) {
-                $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u (например, 20250301-143022-123456).</error>');
+                $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u-userId (например, 20250301-143022-123456-0).</error>');
                 return Command::FAILURE;
             }
 
