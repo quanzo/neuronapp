@@ -16,7 +16,6 @@ use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
 use app\modules\neuron\classes\storage\IntermediateStorage;
-use app\modules\neuron\services\config\IntermediateConfigAppService;
 use app\modules\neuron\services\config\SessionConfigAppService;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -291,6 +290,20 @@ class ConfigurationApp
         return $this->intermediateStorage;
     }
 
+    private $_sessionSrv = null;
+
+    /**
+     * Сервис по упроавлению сессиями
+     *
+     * @return SessionConfigAppService
+     */
+    public function getSessionService(): SessionConfigAppService {
+        if (empty($this->_sessionSrv)) {
+            $this->_sessionSrv = new SessionConfigAppService($this);
+        }
+        return $this->_sessionSrv;
+    }
+
     /**
      * Проверяет, существует ли файл сессии для заданного ключа и агента.
      *
@@ -443,34 +456,6 @@ class ConfigurationApp
         }
 
         return $default;
-    }
-
-    private $_sessionSrv = null;
-
-    /**
-     * Сервис по упроавлению сессиями
-     *
-     * @return SessionConfigAppService
-     */
-    public function getSessionService(): SessionConfigAppService {
-        if (empty($this->_sessionSrv)) {
-            $this->_sessionSrv = new SessionConfigAppService($this);
-        }
-        return $this->_sessionSrv;
-    }
-
-    private $_intermediateSrv = null;
-
-    /**
-     * Сервис по управлению промежуточными intermediate данными приложения
-     *
-     * @return IntermediateConfigAppService
-     */
-    public function getIntermediateService(): IntermediateConfigAppService {
-        if (empty($this->_intermediateSrv)) {
-            $this->_intermediateSrv = new IntermediateConfigAppService($this);
-        }
-        return $this->_intermediateSrv;
     }
 
     /**

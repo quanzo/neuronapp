@@ -6,7 +6,7 @@ namespace Tests\Tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\helpers\IntermediateStorageHelper;
+use app\modules\neuron\classes\storage\IntermediateStorage;
 use app\modules\neuron\tools\IntermediateListTool;
 use PHPUnit\Framework\TestCase;
 
@@ -53,8 +53,9 @@ final class IntermediateListToolTest extends TestCase
     public function testListReturnsItems(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        IntermediateStorageHelper::save($sessionKey, 'a', '1');
-        IntermediateStorageHelper::save($sessionKey, 'b', '2');
+        $storage = new IntermediateStorage($this->tmpDir . '/.store');
+        $storage->save($sessionKey, 'a', '1', 'one');
+        $storage->save($sessionKey, 'b', '2', 'two');
 
         $json = ($this->tool)();
         $data = json_decode($json, true);

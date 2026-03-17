@@ -6,7 +6,7 @@ namespace Tests\Tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\helpers\IntermediateStorageHelper;
+use app\modules\neuron\classes\storage\IntermediateStorage;
 use app\modules\neuron\tools\IntermediateDeleteTool;
 use PHPUnit\Framework\TestCase;
 
@@ -52,20 +52,22 @@ final class IntermediateDeleteToolTest extends TestCase
     public function testDeleteExisting(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        IntermediateStorageHelper::save($sessionKey, 'tmp', '1', 'tmp value');
-        $this->assertTrue(IntermediateStorageHelper::exists($sessionKey, 'tmp'));
+        $storage = new IntermediateStorage($this->tmpDir . '/.store');
+        $storage->save($sessionKey, 'tmp', '1', 'tmp value');
+        $this->assertTrue($storage->exists($sessionKey, 'tmp'));
 
         $json = ($this->tool)('tmp');
         $data = json_decode($json, true);
 
         $this->assertTrue($data['success']);
-        $this->assertFalse(IntermediateStorageHelper::exists($sessionKey, 'tmp'));
+        $this->assertFalse($storage->exists($sessionKey, 'tmp'));
     }
 
     public function testDeleteMissing(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        $this->assertFalse(IntermediateStorageHelper::exists($sessionKey, 'nope'));
+        $storage = new IntermediateStorage($this->tmpDir . '/.store');
+        $this->assertFalse($storage->exists($sessionKey, 'nope'));
 
         $json = ($this->tool)('nope');
         $data = json_decode($json, true);

@@ -6,7 +6,7 @@ namespace Tests\Tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\helpers\IntermediateStorageHelper;
+use app\modules\neuron\classes\storage\IntermediateStorage;
 use app\modules\neuron\tools\IntermediateExistTool;
 use PHPUnit\Framework\TestCase;
 
@@ -52,7 +52,8 @@ final class IntermediateExistToolTest extends TestCase
     public function testExistTrueAndFalse(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        IntermediateStorageHelper::save($sessionKey, 'x', '1');
+        $storage = new IntermediateStorage($this->tmpDir . '/.store');
+        $storage->save($sessionKey, 'x', '1', 'desc');
 
         $json1 = ($this->tool)('x');
         $d1 = json_decode($json1, true);

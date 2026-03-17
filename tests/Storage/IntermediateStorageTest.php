@@ -19,7 +19,7 @@ use function uniqid;
 /**
  * Тесты для {@see IntermediateStorage}.
  *
- * Проверяют те же сценарии, что и IntermediateStorageHelperTest, но через объектный интерфейс.
+ * Проверяют операции промежуточного хранилища через объектный интерфейс.
  */
 final class IntermediateStorageTest extends TestCase
 {

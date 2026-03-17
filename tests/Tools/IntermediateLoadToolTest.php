@@ -6,7 +6,7 @@ namespace Tests\Tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\helpers\IntermediateStorageHelper;
+use app\modules\neuron\classes\storage\IntermediateStorage;
 use app\modules\neuron\tools\IntermediateLoadTool;
 use PHPUnit\Framework\TestCase;
 
@@ -54,7 +54,8 @@ final class IntermediateLoadToolTest extends TestCase
     public function testLoadExisting(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        IntermediateStorageHelper::save($sessionKey, 'parsed', ['x' => 1], 'Короткое описание');
+        $storage = new IntermediateStorage($this->tmpDir . '/.store');
+        $storage->save($sessionKey, 'parsed', ['x' => 1], 'Короткое описание');
 
         $json = ($this->tool)('parsed');
         $data = json_decode($json, true);
