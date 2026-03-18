@@ -20,6 +20,9 @@ class TokenCounter extends NeuronAiTokenCounter
      */
     protected function handleTextBlock(TextContent $block): int
     {
+        /**
+         * Стандартная переключалка символы юникода превращает в \u0438 и размер текстового блока становится нереальным
+         */
         $txt = preg_replace(['/\s+/is'], [' '], json_encode($block->toArray(), JSON_UNESCAPED_UNICODE));
         return mb_strlen($txt);
     }
