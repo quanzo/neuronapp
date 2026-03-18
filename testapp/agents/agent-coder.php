@@ -91,27 +91,28 @@ return [
             'config' => [
                 'command' => 'bash',
                 'args' => [
-                    'run', __DIR__ . '/../../bin/open-websearch'
+                    __DIR__ . '/mcp-open-websearch'
                 ],
                 'env' => [
                     "DEFAULT_SEARCH_ENGINE"  => "duckduckgo",
                     "ALLOWED_SEARCH_ENGINES" => "duckduckgo,exa,baidu,bing,linuxdo,csdn,brave",
                     "PORT"                   => "5051",
-                    "MODE"                   => "both",
+                    "MODE"                   => "stdio",
                 ]
             ]
         ],
 
-        
         [
             // Context7
             CallableWrapper::class,
             'createObject',
             'class'   => McpConnector::class,
-            'url'     => 'https://mcp.context7.com/mcp',
-            'async'   => false,
-            'timeout' => 10,
-            //"headers" => ["CONTEXT7_API_KEY" => "ctx7sk-7010e527-1111-4d81-983e-1111111"],
+            'config' => [
+                'url'     => 'https://mcp.context7.com/mcp',
+                'async'   => false,
+                'timeout' => 10,
+                //"headers" => ["CONTEXT7_API_KEY" => "ctx7sk-7010e527-1111-4d81-983e-1111111"],
+            ]
         ]
     ]
     //*/

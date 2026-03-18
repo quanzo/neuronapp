@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# https://github.com/Aas-ee/open-webSearch
+
+# Указываем порт (должен совпадать с настройкой выше)
+PORT=5051
+
+# echo "Проверяем порт $PORT..."
+
+# Пытаемся найти процесс, слушающий порт
+PID=$(lsof -ti :$PORT)
+
+if [ -n "$PID" ]; then
+#  echo "⚠️  На порту $PORT уже работает процесс (PID: $PID)."
+#  echo "   Перезапускаем сервер..."
+#  kill -9 $PID
+#  sleep 2
+#  сервер уже запущен
+  exit 0
+fi
+
+# echo "🚀 Запускаем open-websearch на порту $PORT..."
+PORT=$PORT DEFAULT_SEARCH_ENGINE=duckduckgo ALLOWED_SEARCH_ENGINES=duckduckgo,exa,baidu,bing,csdn,brave npx -y open-websearch --port $PORT

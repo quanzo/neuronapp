@@ -7,6 +7,7 @@
 use app\modules\neuron\helpers\CallableWrapper;
 use app\modules\neuron\classes\neuron\providers\EchoProvider;
 use NeuronAI\Agent\SystemPrompt;
+use NeuronAI\MCP\McpConnector;
 
 return [
     'enableChatHistory' => true,
@@ -33,6 +34,22 @@ return [
             'Проанализируй данные и сформулируй выводы.',
         ],
         'output' => ['Представь анализ и рекомендации.'],
+    ],
+
+    /**/
+    'mcp' => [
+        [
+            // Context7
+            CallableWrapper::class,
+            'createObject',
+            'class'   => McpConnector::class,
+            'config' => [
+                'url'     => 'https://mcp.context7.com/mcp',
+                'async'   => false,
+                'timeout' => 10,
+                //"headers" => ["CONTEXT7_API_KEY" => "ctx7sk-7010e527-1111-4d81-983e-1111111"],
+            ]
+        ]
     ],
 
     'tools' => [],
