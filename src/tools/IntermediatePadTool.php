@@ -178,4 +178,3 @@ final class IntermediatePadTool extends AIntermediateTool
         return $existing . $append;
     }
 }
-

@@ -653,13 +653,14 @@ class ConfigurationAgent implements IDependConfigApp
 
     /**
      * Возобновить исполнение списка с пункта, на котором прервалось.
-     * 
+     *
      * Откатывает историю "до последнего сообщения".
      *
      * @return boolean
      * @throws RunStateNotFoundException
      */
-    public function resumeRunState(): bool {
+    public function resumeRunState(): bool
+    {
         $runStateDto = $this->getExistRunStateDto();
         if ($runStateDto) {
             $historyMessageCount = $runStateDto->getHistoryMessageCount();
@@ -681,7 +682,8 @@ class ConfigurationAgent implements IDependConfigApp
      * @return boolean
      * @throws RunStateNotFoundException
      */
-    public function abortRunState(): bool {
+    public function abortRunState(): bool
+    {
         $runStateDto = $this->getExistRunStateDto();
         if ($runStateDto) {
             $runStateDto->delete();

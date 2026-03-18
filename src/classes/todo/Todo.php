@@ -86,7 +86,8 @@ class Todo implements ITodo
      *
      * @return AgentCmdDto|null
      */
-    public function getSwitchToAgent(): ?AgentCmdDto {
+    public function getSwitchToAgent(): ?AgentCmdDto
+    {
         if ($this->agentDto === false) {
             return null;
         }

@@ -87,4 +87,3 @@ final class IntermediatePadToolTest extends TestCase
         rmdir($dir);
     }
 }
-
