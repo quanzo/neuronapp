@@ -7,6 +7,14 @@
 
 use app\modules\neuron\helpers\CallableWrapper;
 use app\modules\neuron\helpers\ShellToolFactory;
+use app\modules\neuron\tools\GlobTool;
+use app\modules\neuron\tools\GrepTool;
+use app\modules\neuron\tools\IntermediateDeleteTool;
+use app\modules\neuron\tools\IntermediateExistTool;
+use app\modules\neuron\tools\IntermediateListTool;
+use app\modules\neuron\tools\IntermediateLoadTool;
+use app\modules\neuron\tools\IntermediatePadTool;
+use app\modules\neuron\tools\ViewTool;
 use NeuronAI\Providers\Ollama\Ollama;
 use NeuronAI\Agent\SystemPrompt;
 use NeuronAI\HttpClient\GuzzleHttpClient;
@@ -14,7 +22,13 @@ use NeuronAI\MCP\McpConnector;
 use NeuronAI\Tools\Toolkits\Calendar\CurrentDateTimeTool;
 use NeuronAI\Tools\Toolkits\Calculator\FactorialTool;
 
-$contextWindow = 8192;
+$homeDir = getenv('HOME');
+
+if ($homeDir === false || $homeDir === '') {
+    $homeDir = $_SERVER['HOME'] ?? '';
+}
+
+$contextWindow = 8192 * 4;
 
 $url = 'http://localhost:11434/api';
 
@@ -32,7 +46,7 @@ return [
             CallableWrapper::class,
             'createObject',
             'class'          => GuzzleHttpClient::class,
-            'timeout'        => 180.0,
+            'timeout'        => 1800.0,
             'connectTimeout' => 10.0,
         ],
         'parameters' => [
@@ -65,6 +79,7 @@ return [
 
     'tools' => [
         [CurrentDateTimeTool::class, 'make'],
+        /*
         [FactorialTool::class, 'make'],
         [
             CallableWrapper::class,
@@ -79,10 +94,22 @@ return [
                 'description'      => 'Статус git'
             ],
         ],
+        */
+        [GlobTool::class, 'make'],
+        [GrepTool::class, 'make'],
+        [ViewTool::class, 'make'],
+
+        [IntermediatePadTool::class, 'make'],
+        [IntermediateListTool::class, 'make'],
+        [IntermediateExistTool::class, 'make'],
+        [IntermediateDeleteTool::class, 'make'],
+        [IntermediateLoadTool::class, 'make'],
+
     ],
 
-    /*/
+    /**/
     'mcp' => [
+        /*
         [
             // Поиск
             CallableWrapper::class,
@@ -113,7 +140,21 @@ return [
                 'timeout' => 10,
                 //"headers" => ["CONTEXT7_API_KEY" => "ctx7sk-7010e527-1111-4d81-983e-1111111"],
             ]
-        ]
+        ],
+        */
+
+        /*
+        [
+            // docx и xlsx для llm
+            CallableWrapper::class,
+            'createObject',
+            'class'  => McpConnector::class,
+            'config' => [
+                'command' => $homeDir . '/.kreuzberg/bin/kreuzberg mcp --transport stdio',
+            ]
+        ],
+        //*/
+
     ]
     //*/
 ];
