@@ -29,7 +29,15 @@ use function is_string;
  *   'data'       => mixed|null,
  *   'exists'     => bool|null,
  *   'items'      => array<IntermediateIndexItemDto::toArray()>|null,
- *   'count'      => int|null
+ *   'count'      => int|null,
+ *   'totalCount' => int|null,
+ *   'page'       => int|null,
+ *   'pageSize'   => int|null,
+ *   'query'      => string|null,
+ *   'startLine'  => int|null,
+ *   'endLine'    => int|null,
+ *   'totalLines' => int|null,
+ *   'truncated'  => bool|null
  * ]
  * ```
  */
@@ -49,6 +57,14 @@ final class IntermediateToolResultDto
      * @param bool|null                  $exists     Результат exist (если применимо).
      * @param IntermediateIndexItemDto[]|null $items Список (для list).
      * @param int|null                   $count      Количество элементов (для list).
+     * @param int|null                   $totalCount Общее количество элементов (для list с фильтрацией/пагинацией).
+     * @param int|null                   $page       Номер страницы (1-based).
+     * @param int|null                   $pageSize   Размер страницы.
+     * @param string|null                $query      Строка поиска (для list).
+     * @param int|null                   $startLine  Начальная строка (1-based) для строковых данных (load).
+     * @param int|null                   $endLine    Конечная строка (1-based) для строковых данных (load).
+     * @param int|null                   $totalLines Общее число строк в строковых данных (load).
+     * @param bool|null                  $truncated  Был ли результат усечён (load диапазона).
      */
     public function __construct(
         public readonly string $action,
@@ -64,6 +80,14 @@ final class IntermediateToolResultDto
         public readonly ?bool $exists = null,
         public readonly ?array $items = null,
         public readonly ?int $count = null,
+        public readonly ?int $totalCount = null,
+        public readonly ?int $page = null,
+        public readonly ?int $pageSize = null,
+        public readonly ?string $query = null,
+        public readonly ?int $startLine = null,
+        public readonly ?int $endLine = null,
+        public readonly ?int $totalLines = null,
+        public readonly ?bool $truncated = null,
     ) {
     }
 
@@ -90,6 +114,14 @@ final class IntermediateToolResultDto
                 ? null
                 : array_map(static fn(IntermediateIndexItemDto $i): array => $i->toArray(), $this->items),
             'count' => $this->count,
+            'totalCount' => $this->totalCount,
+            'page' => $this->page,
+            'pageSize' => $this->pageSize,
+            'query' => $this->query,
+            'startLine' => $this->startLine,
+            'endLine' => $this->endLine,
+            'totalLines' => $this->totalLines,
+            'truncated' => $this->truncated,
         ];
     }
 }

@@ -11,6 +11,7 @@ use app\modules\neuron\tools\IntermediateListTool;
 use app\modules\neuron\tools\IntermediateLoadTool;
 use app\modules\neuron\tools\IntermediateSaveTool;
 use app\modules\neuron\tools\IntermediateDeleteTool;
+use app\modules\neuron\tools\IntermediatePadTool;
 use app\modules\neuron\tools\WikiSearchTool;
 use app\modules\neuron\tools\RuWikiSearchTool;
 use app\modules\neuron\tools\UniSearchTool;
@@ -50,6 +51,7 @@ final class ToolRegistry
             'intermediate_list'   => new IntermediateListTool(),
             'intermediate_exist'  => new IntermediateExistTool(),
             'intermediate_delete' => new IntermediateDeleteTool(),
+            'intermediate_pad'    => new IntermediatePadTool(),
             default => null,
         };
     }

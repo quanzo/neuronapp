@@ -65,6 +65,28 @@ final class IntermediateListToolTest extends TestCase
         $this->assertCount(2, $data['items']);
     }
 
+    /**
+     * list поддерживает поиск по label/description и пагинацию.
+     */
+    public function testListSearchAndPagination(): void
+    {
+        $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
+        $storage = new IntermediateStorage($this->tmpDir . '/.store');
+        $storage->save($sessionKey, 'alpha', '1', 'first');
+        $storage->save($sessionKey, 'beta', '2', 'second');
+        $storage->save($sessionKey, 'gamma', '3', 'second match');
+
+        $json = ($this->tool)(2, 1, 'second'); // page_size=2, page=1, query=second
+        $data = json_decode($json, true);
+
+        $this->assertTrue($data['success']);
+        $this->assertSame(2, $data['pageSize']);
+        $this->assertSame(1, $data['page']);
+        $this->assertSame('second', $data['query']);
+        $this->assertSame(2, $data['totalCount']); // beta + gamma
+        $this->assertSame(2, $data['count']); // first page gets both
+    }
+
     private function resetConfigurationAppSingleton(): void
     {
         $ref = new \ReflectionClass(ConfigurationApp::class);

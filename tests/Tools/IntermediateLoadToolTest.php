@@ -66,6 +66,25 @@ final class IntermediateLoadToolTest extends TestCase
     }
 
     /**
+     * Для строковых данных поддерживается загрузка диапазона строк (start_line/end_line).
+     */
+    public function testLoadStringRange(): void
+    {
+        $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
+        $storage = new IntermediateStorage($this->tmpDir . '/.store');
+        $storage->save($sessionKey, 'text', "l1\nl2\nl3\nl4", 'Text');
+
+        $json = ($this->tool)('text', 2, 3);
+        $data = json_decode($json, true);
+
+        $this->assertTrue($data['success']);
+        $this->assertSame("l2\nl3", $data['data']);
+        $this->assertSame(2, $data['startLine']);
+        $this->assertSame(3, $data['endLine']);
+        $this->assertSame(4, $data['totalLines']);
+    }
+
+    /**
      * Отсутствующее значение должно давать success=false и exists=false.
      */
     public function testLoadMissing(): void

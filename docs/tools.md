@@ -43,10 +43,11 @@
 - `IntermediateListTool` (`src/tools/IntermediateListTool.php`) — возвращает список всех результатов для текущего `sessionKey`;
 - `IntermediateExistTool` (`src/tools/IntermediateExistTool.php`) — проверяет наличие результата по метке.
  - `IntermediateDeleteTool` (`src/tools/IntermediateDeleteTool.php`) — удаляет сохранённый результат по метке.
+- `IntermediatePadTool` (`src/tools/IntermediatePadTool.php`) — дополняет (append) строковые данные по метке, сохраняя переводы строк.
 
 Общее:
 
-- **Подключение**: через `tools: intermediate_save`, `intermediate_load`, `intermediate_list`, `intermediate_exist`, `intermediate_delete` — создаются через `ToolRegistry::makeTool(...)`.
+- **Подключение**: через `tools: intermediate_save`, `intermediate_load`, `intermediate_list`, `intermediate_exist`, `intermediate_delete`, `intermediate_pad` — создаются через `ToolRegistry::makeTool(...)`.
 - **Хранилище**: директория `.store` (через `ConfigurationApp::getStoreDir()`).
 - **Имена файлов**:
   - результат: `.store/intermediate_{sessionKey}_{label}.json` (небезопасные символы в частях имени заменяются на `_`);
