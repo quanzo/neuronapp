@@ -6,6 +6,9 @@
  */
 
 use app\modules\neuron\helpers\CallableWrapper;
+use app\modules\neuron\tools\ChatHistoryMessageTool;
+use app\modules\neuron\tools\ChatHistoryMetaTool;
+use app\modules\neuron\tools\ChatHistorySizeTool;
 use NeuronAI\Providers\Ollama\Ollama;
 use NeuronAI\Agent\SystemPrompt;
 
@@ -41,5 +44,9 @@ return [
         'output' => ['Дай ответ.'],
     ],
 
-    'tools' => [],
+    'tools' => [
+        [ChatHistorySizeTool::class, 'make'],
+        [ChatHistoryMetaTool::class, 'make'],
+        [ChatHistoryMessageTool::class, 'make'],
+    ],
 ];

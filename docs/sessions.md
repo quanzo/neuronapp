@@ -14,6 +14,12 @@
 - полная история: `getFullMessages()`
 - окно: `getMessages()` (формируется триммером под контекстное окно модели)
 
+### Очистка истории от `chat_history.*`
+
+LLM может вызывать инструменты просмотра истории (`chat_history.*`) и получать ответы, содержащие фрагменты истории. Чтобы файл `.sessions/neuron_<sessionKey>.chat` не разрастался копиями, в `FileFullChatHistory` предусмотрен метод:
+
+- `purgeHistoryInspectionTools()` — удаляет из полной истории tool-call/tool-result, относящиеся к `chat_history.size`, `chat_history.meta`, `chat_history.message`, пересобирает окно и сохраняет файл истории.
+
 ### Где лежат файлы
 
 - `.sessions/neuron_<sessionKey>.chat` — история диалога (см. `FileFullChatHistory`).

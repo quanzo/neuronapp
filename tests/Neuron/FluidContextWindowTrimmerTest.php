@@ -19,7 +19,6 @@ final class FluidContextWindowTrimmerTest extends TestCase
 {
     public function testEmptyHistoryReturnsEmpty(): void
     {
-        TrimmersTokenCounter
         $trimmer = new FluidContextWindowTrimmer(new TokenCounter());
         $result = $trimmer->trim([], 1000);
 

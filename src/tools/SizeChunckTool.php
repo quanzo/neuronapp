@@ -39,7 +39,7 @@ class SizeChunckTool extends AChunckTool
     ) {
         parent::__construct(
             basePath: $basePath,
-            maxFileSize: 1048576,
+            maxFileSize: 10485760,
             name: $name,
             description: $description,
         );
@@ -100,8 +100,8 @@ class SizeChunckTool extends AChunckTool
         fclose($handle);
 
         $dto = new SizeChunkResultDto(
-            filePath: $path,
-            totalLines: $totalLines,
+            filePath   : $path,
+            totalLines : $totalLines,
             totalLength: $totalLength,
         );
 

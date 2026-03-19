@@ -111,13 +111,9 @@ class ViewChunckTool extends AChunckTool
             return $validated;
         }
 
-        $start = $start_line !== null && $start_line > 0 ? $start_line : 0;
-        if ($start < 0) {
-            $start = 0;
-        }
-
-        $maxLines = $lines !== null && $lines > 0 ? $lines : null;
-        $maxChars = $max_chars !== null && $max_chars > 0 ? $max_chars : null;
+        $start    = $start_line !== null && $start_line > 0 ? $start_line : 0;
+        $maxLines = $lines      !== null && $lines > 0 ? $lines : null;
+        $maxChars = $max_chars  !== null && $max_chars > 0 ? $max_chars : null;
 
         $handle = @fopen($validated['resolvedPath'], 'rb');
         if ($handle === false || !is_resource($handle)) {
@@ -126,12 +122,13 @@ class ViewChunckTool extends AChunckTool
             ], JSON_UNESCAPED_UNICODE);
         }
 
-        $totalLines = 0;
-        $totalLength = 0;
-        $chunkLines = [];
-        $chunkLength = 0;
-        $end = $start;
-        $currentIndex = 0;
+        $totalLines          = 0;
+        $totalLength         = 0;
+        $chunkLines          = [];
+        $chunkLength         = 0;
+        $currentIndex        = 0;
+        $effectiveLineLength = 0;
+        $end                 = $start;
 
         while (!feof($handle)) {
             $line = fgets($handle);
@@ -149,39 +146,16 @@ class ViewChunckTool extends AChunckTool
             $totalLines++;
             $totalLength += $lineLength;
 
-            if ($currentIndex < $start) {
-                $currentIndex++;
-                continue;
-            }
-
-            if ($maxLines !== null && count($chunkLines) >= $maxLines) {
-                $end = $currentIndex - 1;
-                $currentIndex++;
-                continue;
-            }
-
-            $effectiveLineLength = $lineLength;
-            if ($totalLines > 1) {
-                $effectiveLineLength++; // учёт \n между строками в чанке
-            }
-
-            if ($maxChars !== null && $chunkLength > 0 && $chunkLength + $effectiveLineLength > $maxChars) {
-                $end = $currentIndex - 1;
-                $currentIndex++;
-                continue;
-            }
-
-            if ($maxChars !== null && $chunkLength === 0 && $effectiveLineLength > $maxChars) {
-                $chunkLines[] = $line;
-                $chunkLength = $effectiveLineLength;
+            if (
+                (($maxChars !== null && $effectiveLineLength < $maxChars) || $maxChars === null)
+                && $currentIndex >= $start
+                && count($chunkLines) < $maxLines
+            ) {
+                $effectiveLineLength += $lineLength + 1;
+                $chunkLines[]         = $line;
                 $end = $currentIndex;
-                $currentIndex++;
-                continue;
             }
 
-            $chunkLines[] = $line;
-            $chunkLength += $effectiveLineLength;
-            $end = $currentIndex;
             $currentIndex++;
         }
 
@@ -203,7 +177,7 @@ class ViewChunckTool extends AChunckTool
             chunk      : $chunk,
             startLine  : $start,
             endLine    : $end,
-            chunkLength: $chunkLength,
+            chunkLength: $effectiveLineLength,
             totalLines : $totalLines,
             totalLength: $totalLength,
         );

@@ -10,6 +10,9 @@ use NeuronAI\Tools\Toolkits\Calendar\CurrentDateTimeTool;
 use NeuronAI\MCP\McpConnector;
 use NeuronAI\RAG\VectorStore\QdrantVectorStore;
 use NeuronAI\Tools\Toolkits\Calculator\FactorialTool;
+use app\modules\neuron\tools\ChatHistorySizeTool;
+use app\modules\neuron\tools\ChatHistoryMetaTool;
+use app\modules\neuron\tools\ChatHistoryMessageTool;
 
 /**
  * Концепция агента
@@ -78,6 +81,9 @@ return [
         //[CalendarToolkit::class, 'make']
         [CurrentDateTimeTool::class, 'make'],
         [FactorialTool::class, 'make'],
+        [ChatHistorySizeTool::class, 'make'],
+        [ChatHistoryMetaTool::class, 'make'],
+        [ChatHistoryMessageTool::class, 'make'],
     ],
 
     'vectorStore' => [

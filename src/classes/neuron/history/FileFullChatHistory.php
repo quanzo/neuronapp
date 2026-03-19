@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\neuron\history;
 
+use app\modules\neuron\helpers\ChatHistoryToolMessageHelper;
 use NeuronAI\Chat\History\HistoryTrimmerInterface;
 use NeuronAI\Exceptions\ChatHistoryException;
+use NeuronAI\Chat\Messages\ToolCallMessage;
+use NeuronAI\Chat\Messages\ToolResultMessage;
 
 use function file_exists;
 use function file_get_contents;
@@ -15,6 +18,8 @@ use function is_file;
 use function json_decode;
 use function json_encode;
 use function mkdir;
+use function array_values;
+use function count;
 use function unlink;
 
 use const DIRECTORY_SEPARATOR;
@@ -105,7 +110,7 @@ final class FileFullChatHistory extends AbstractFullChatHistory
      */
     protected function persistFullHistory(): void
     {
-        $content = json_encode($this->jsonSerialize());
+        $content = json_encode($this->jsonSerialize(), JSON_UNESCAPED_UNICODE);
         $filePath = $this->getFilePath();
 
         $result = @file_put_contents($filePath, $content, LOCK_EX);
@@ -139,5 +144,74 @@ final class FileFullChatHistory extends AbstractFullChatHistory
     protected function getFilePath(): string
     {
         return $this->directory . DIRECTORY_SEPARATOR . $this->prefix . $this->key . $this->ext;
+    }
+
+    /**
+     * Очищает полную историю от вызовов/ответов инструментов просмотра истории.
+     *
+     * Нужен для предотвращения разрастания истории копиями: LLM может вызывать
+     * chat_history.* и получать большие ответы, но эти ответы не должны навсегда
+     * оставаться в контексте и вытеснять полезный диалог.
+     *
+     * Метод удаляет:
+     * - tool-call сообщения указанных инструментов;
+     * - tool-result сообщения, следующие сразу после соответствующего tool-call;
+     * - tool-result сообщения, которые сами идентифицируются как ответы указанных инструментов.
+     *
+     * После очистки пересобирается окно и сохраняется файл истории.
+     *
+     * @param list<string>|null $toolNames Полные имена инструментов. Если null — используются chat_history.size/meta/message.
+     *
+     * @return int Количество удалённых сообщений.
+     */
+    public function purgeHistoryInspectionTools(?array $toolNames = null): int
+    {
+        $toolNames = $toolNames ?? [
+            'chat_history.size',
+            'chat_history.meta',
+            'chat_history.message',
+        ];
+
+        if ($this->fullHistory === []) {
+            return 0;
+        }
+
+        $removed = 0;
+        $kept = [];
+        $count = count($this->fullHistory);
+
+        for ($i = 0; $i < $count; $i++) {
+            $msg = $this->fullHistory[$i];
+
+            // Удаляем tool-call + его tool-result (если это наши history-tools).
+            if ($msg instanceof ToolCallMessage && ChatHistoryToolMessageHelper::isToolMessageInList($msg, $toolNames)) {
+                $removed++;
+
+                if ($i + 1 < $count && $this->fullHistory[$i + 1] instanceof ToolResultMessage) {
+                    $removed++;
+                    $i++; // пропускаем tool-result
+                }
+
+                continue;
+            }
+
+            // Подстраховка: если tool-result сам распознан как относящийся к history-tools — удаляем.
+            if ($msg instanceof ToolResultMessage && ChatHistoryToolMessageHelper::isToolMessageInList($msg, $toolNames)) {
+                $removed++;
+                continue;
+            }
+
+            $kept[] = $msg;
+        }
+
+        if ($removed === 0) {
+            return 0;
+        }
+
+        $this->fullHistory = array_values($kept);
+        $this->rebuildWindow();
+        $this->persistFullHistory();
+
+        return $removed;
     }
 }

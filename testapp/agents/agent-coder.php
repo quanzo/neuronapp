@@ -15,6 +15,9 @@ use app\modules\neuron\tools\IntermediateListTool;
 use app\modules\neuron\tools\IntermediateLoadTool;
 use app\modules\neuron\tools\IntermediatePadTool;
 use app\modules\neuron\tools\ViewTool;
+use app\modules\neuron\tools\ChatHistoryMessageTool;
+use app\modules\neuron\tools\ChatHistoryMetaTool;
+use app\modules\neuron\tools\ChatHistorySizeTool;
 use NeuronAI\Providers\Ollama\Ollama;
 use NeuronAI\Agent\SystemPrompt;
 use NeuronAI\HttpClient\GuzzleHttpClient;
@@ -79,6 +82,9 @@ return [
 
     'tools' => [
         [CurrentDateTimeTool::class, 'make'],
+        [ChatHistorySizeTool::class, 'make'],
+        [ChatHistoryMetaTool::class, 'make'],
+        [ChatHistoryMessageTool::class, 'make'],
         /*
         [FactorialTool::class, 'make'],
         [

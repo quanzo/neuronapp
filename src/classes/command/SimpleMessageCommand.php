@@ -212,7 +212,7 @@ class SimpleMessageCommand extends AbstractAgentCommand
         $content = $lastMessage->getContent();
 
         $output->writeln(
-            ConsoleHelper::formatOut($content, $agentCfg->getSessionKey(), $formatOut)
+            ConsoleHelper::formatOut($content ?? '[пусто]', $agentCfg->getSessionKey(), $formatOut)
         );
 
         return Command::SUCCESS;
