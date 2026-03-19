@@ -21,11 +21,11 @@ use const JSON_UNESCAPED_UNICODE;
  * Инструмент получения размера текстового файла в символах и строках.
  *
  * Удобен для LLM, чтобы оценить объём файла перед чтением его частями
- * с помощью {@see ViewChunckTool} или других инструментов.
+ * с помощью {@see ChunckViewTool} или других инструментов.
  *
  * Возвращает количество строк и символов только для текстовых файлов.
  */
-class SizeChunckTool extends AChunckTool
+class ChunckSizeTool extends AChunckTool
 {
     /**
      * @param string $basePath    Базовая директория

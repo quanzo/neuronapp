@@ -18,8 +18,8 @@ use app\modules\neuron\tools\ViewTool;
 use app\modules\neuron\tools\ChatHistoryMessageTool;
 use app\modules\neuron\tools\ChatHistoryMetaTool;
 use app\modules\neuron\tools\ChatHistorySizeTool;
-use app\modules\neuron\tools\SizeChunckTool;
-use app\modules\neuron\tools\ViewChunckTool;
+use app\modules\neuron\tools\ChunckSizeTool;
+use app\modules\neuron\tools\ChunckViewTool;
 use NeuronAI\Providers\Ollama\Ollama;
 use NeuronAI\Agent\SystemPrompt;
 use NeuronAI\HttpClient\GuzzleHttpClient;
@@ -106,8 +106,8 @@ return [
 
         [GlobTool::class, 'make'],
         [GrepTool::class, 'make'],
-        [ViewChunckTool::class, 'make'],
-        [SizeChunckTool::class, 'make'],
+        [ChunckViewTool::class, 'make'],
+        [ChunckSizeTool::class, 'make'],
 
         [IntermediatePadTool::class, 'make'],
         [IntermediateListTool::class, 'make'],

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\dto\tools;
 
 /**
- * DTO результата чтения текстового файла чанком строк ({@see \app\modules\neuron\tools\ViewChunckTool}).
+ * DTO результата чтения текстового файла чанком строк ({@see \app\modules\neuron\tools\ChunckViewTool}).
  *
  * Используется, чтобы возвращать LLM не весь файл целиком, а компактный
  * непрерывный фрагмент (чанк), ограниченный количеством строк и/или

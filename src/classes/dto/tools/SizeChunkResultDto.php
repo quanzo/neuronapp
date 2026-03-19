@@ -6,7 +6,7 @@ namespace app\modules\neuron\classes\dto\tools;
 
 /**
  * DTO результата инструмента получения размера текстового файла
- * ({@see \app\modules\neuron\tools\SizeChunckTool}).
+ * ({@see \app\modules\neuron\tools\ChunckSizeTool}).
  *
  * Предоставляет сводную информацию о числе строк и символов в файле.
  *

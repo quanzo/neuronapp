@@ -38,7 +38,7 @@ use const JSON_UNESCAPED_UNICODE;
  *
  * Результат возвращается в виде JSON через {@see ViewChunkResultDto}.
  */
-class ViewChunckTool extends AChunckTool
+class ChunckViewTool extends AChunckTool
 {
     /**
      * @param string $basePath    Базовая директория
