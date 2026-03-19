@@ -110,14 +110,16 @@ class TodolistCommand extends AbstractAgentCommand
         }
 
         $configApp = ConfigurationApp::getInstance();
-        if ($sessionId !== null && $sessionId !== '') { // если сессия задана вручную
+
+        // Если передан session_id — проверяем формат и существование сессии, затем подставляем ключ
+        if ($sessionId !== null && $sessionId !== '') {
             if (!ConfigurationApp::isValidSessionKey($sessionId)) {
                 $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u-userId (например, 20250301-143022-123456-0).</error>');
                 return Command::FAILURE;
             }
 
-            if (!ConfigurationApp::getInstance()->sessionExists($sessionId, $agentName)) {
-                $output->writeln(sprintf('<error>Сессия с session_id "%s" для агента "%s" не найдена.</error>', $sessionId, $agentName));
+            if (!ConfigurationApp::getInstance()->sessionExists($sessionId)) {
+                $output->writeln(sprintf('<error>Сессия с session_id "%s" не найдена.</error>', $sessionId));
                 return Command::FAILURE;
             }
             $configApp->setSessionKey($sessionId);

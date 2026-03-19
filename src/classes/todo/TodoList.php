@@ -235,7 +235,17 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                     }
                     $logger->info('Todo completed', array_merge($baseContext, ['todo_index' => $todoIndex]));
                 } catch (\Throwable $e) {
-                    $logger->error('Ошибка выполнения todo', array_merge($baseContext, ['todo_index' => $todoIndex, 'exception' => $e]));
+                    $logger->error(
+                        'Ошибка выполнения todo',
+                        array_merge(
+                            $baseContext,
+                            [
+                                'todo_index' => $todoIndex,
+                                'exception'  => $e,
+                                'trace'      => $e->getTraceAsString()
+                            ]
+                        )
+                    );
                     throw $e;
                 }
 

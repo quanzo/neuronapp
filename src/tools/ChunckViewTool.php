@@ -41,6 +41,13 @@ use const JSON_UNESCAPED_UNICODE;
 class ChunckViewTool extends AChunckTool
 {
     /**
+     * Максимальное кол-во вызовов в сессии одного агента этого инструмента
+     *
+     * @var integer|null
+     */
+    protected ?int $maxRuns = 50;
+
+    /**
      * @param string $basePath    Базовая директория
      * @param int    $maxFileSize Максимальный размер файла (байт)
      * @param string $name        Имя инструмента

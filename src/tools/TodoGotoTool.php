@@ -25,6 +25,13 @@ use const JSON_UNESCAPED_UNICODE;
  */
 final class TodoGotoTool extends ATool
 {
+    /**
+     * Максимальное кол-во вызовов в сессии одного агента этого инструмента
+     *
+     * @var integer|null
+     */
+    protected ?int $maxRuns = 50;
+
     public function __construct(
         string $name        = 'todo_goto',
         string $description = 'Запрашивает переход к пункту списка по номеру (1-based). Переход применится после завершения текущего шага.',

@@ -31,6 +31,13 @@ use const JSON_UNESCAPED_UNICODE;
  */
 final class IntermediatePadTool extends AIntermediateTool
 {
+    /**
+     * Максимальное кол-во вызовов в сессии одного агента этого инструмента
+     *
+     * @var integer|null
+     */
+    protected ?int $maxRuns = 50;
+
     public function __construct(
         string $name = 'intermediate_pad',
         string $description = 'Дополняет (append) строковые промежуточные данные по метке, сохраняя переводы строк. Если метки нет — создаёт новую запись.',
@@ -95,11 +102,11 @@ final class IntermediatePadTool extends AIntermediateTool
 
         if ($descTrimmed === '') {
             return $this->resultJson(new IntermediateToolResultDto(
-                action: 'pad',
-                success: false,
-                message: 'description не может быть пустым.',
+                action    : 'pad',
+                success   : false,
+                message   : 'description не может быть пустым.',
                 sessionKey: $sessionKey,
-                label: $labelTrimmed,
+                label     : $labelTrimmed,
             ));
         }
 
@@ -108,16 +115,16 @@ final class IntermediatePadTool extends AIntermediateTool
 
         if ($loaded !== null && $existing !== null && !is_string($existing)) {
             return $this->resultJson(new IntermediateToolResultDto(
-                action: 'pad',
-                success: false,
-                message: 'Pad поддерживает только строковые данные. Текущие данные не строка.',
-                sessionKey: $sessionKey,
-                label: $labelTrimmed,
-                fileName: $storage->resultFileName($sessionKey, $labelTrimmed),
-                description: is_string($loaded['description'] ?? null) ? (string) $loaded['description'] : null,
-                savedAt: is_string($loaded['savedAt'] ?? null) ? (string) $loaded['savedAt'] : null,
-                dataType: is_string($loaded['dataType'] ?? null) ? (string) $loaded['dataType'] : null,
-                exists: true,
+                action     : 'pad',
+                success    : false,
+                message    : 'Pad поддерживает только строковые данные. Текущие данные не строка.',
+                sessionKey : $sessionKey,
+                label      : $labelTrimmed,
+                fileName   : $storage->resultFileName($sessionKey, $labelTrimmed),
+                description: is_string($loaded['description'] ?? null) ? (string) $loaded['description']: null,
+                savedAt    : is_string($loaded['savedAt'] ?? null) ? (string) $loaded['savedAt']        : null,
+                dataType   : is_string($loaded['dataType'] ?? null) ? (string) $loaded['dataType']      : null,
+                exists     : true,
             ));
         }
 
@@ -130,25 +137,25 @@ final class IntermediatePadTool extends AIntermediateTool
             $item = $storage->save($sessionKey, $labelTrimmed, $merged, $descTrimmed);
         } catch (\Throwable $e) {
             return $this->resultJson(new IntermediateToolResultDto(
-                action: 'pad',
-                success: false,
-                message: 'Ошибка сохранения: ' . $e->getMessage(),
+                action    : 'pad',
+                success   : false,
+                message   : 'Ошибка сохранения: ' . $e->getMessage(),
                 sessionKey: $sessionKey,
-                label: $labelTrimmed,
+                label     : $labelTrimmed,
             ));
         }
 
         return $this->resultJson(new IntermediateToolResultDto(
-            action: 'pad',
-            success: true,
-            message: $loaded === null ? 'Создано.' : 'Дополнено.',
-            sessionKey: $sessionKey,
-            label: $item->label,
-            fileName: $item->fileName,
+            action     : 'pad',
+            success    : true,
+            message    : $loaded === null ? 'Создано.': 'Дополнено.',
+            sessionKey : $sessionKey,
+            label      : $item->label,
+            fileName   : $item->fileName,
             description: $item->description,
-            savedAt: $item->savedAt,
-            dataType: $item->dataType,
-            exists: true,
+            savedAt    : $item->savedAt,
+            dataType   : $item->dataType,
+            exists     : true,
         ));
     }
 
