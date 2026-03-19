@@ -9,7 +9,7 @@
 - Инструменты передаются в `ConfigurationAgent::$tools` и используются агентом NeuronAI при вызове `getTools()`.
 - Навыки и todolist могут подключать встроенные инструменты через:
   - опцию `tools` (строка с именами инструментов);
-  - `ToolRegistry::makeTool()` — фабрика, создающая экземпляры по имени (`wiki_search`, `ru_wiki_search`, `uni_search`, `git_summary`).
+  - `ToolRegistry::makeTool()` — фабрика, создающая экземпляры по имени (`wiki_search`, `ru_wiki_search`, `uni_search`, `git_summary`, `todo_goto`).
 
 При выполнении:
 
@@ -26,6 +26,7 @@
 - **`EditTool`** — безопасное редактирование файлов проекта (используется только по запросу пользователя).
 - **`chat_history.*`** — просмотр полной истории сообщений (размер, метаданные, получение сообщения по индексу).
 - **`IntermediateSaveTool` / `IntermediateLoadTool` / `IntermediateListTool` / `IntermediateExistTool`** — сохранение/загрузка/список/проверка промежуточных результатов в рамках `sessionKey` в `.store`.
+- **`TodoGotoTool`** (`todo_goto`) — запрос перехода к пункту TodoList по номеру (`target_point`, 1-based), переход применяется циклом `TodoList::execute()`.
 - **`FileTreeTool`** — обзор структуры каталогов.
 - **`SearchReplaceTool`** — поиск и замена по проекту с ограничениями.
 - **`GitSummaryTool`** — получение краткой сводки по текущему git‑состоянию (например, изменения, ветка).
@@ -131,3 +132,28 @@
 - затем расширенный список передаётся в сессионную конфигурацию агента, не изменяя базовый конфиг (`cloneForSession`).
 
 Подробности о skills и todolist см. в `docs/skills.md` и `docs/todolist.md`.
+
+### `TodoGotoTool` (`todo_goto`)
+
+Назначение:
+
+- дать LLM явный инструмент для изменения порядка выполнения списка TodoList;
+- не делать "прыжок" сразу в инструменте, а безопасно передать запрос в run-state.
+
+Параметры:
+
+- `target_point` (integer, required) — номер пункта TodoList в **1-based** нумерации;
+- `reason` (string, optional) — краткая причина перехода.
+
+Поведение:
+
+- инструмент читает активный `RunStateDto` через `ConfigurationAgent::getExistRunStateDto()`;
+- при валидном вызове пишет `goto_requested_todo_index` (0-based) в checkpoint;
+- сам переход выполняется в `TodoList::execute()` после завершения текущего todo;
+- если run-state отсутствует (например, вне запуска TodoList), инструмент возвращает `success=false`.
+
+Пример псевдо-вызова:
+
+```json
+{"tool":"todo_goto","args":{"target_point":2,"reason":"вернуться к проверке"}}
+```

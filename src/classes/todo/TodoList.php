@@ -37,10 +37,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
     use HasNeedSkillsTrait;
     use AttachesSkillToolsTrait;
 
-    /**
-     * Имя команды переключения агента в тексте todo.
-     */
-    private const CMD_AGENT = 'agent';
+    private const MAX_GOTO_TRANSITIONS = 100;
 
     /**
      * Очередь заданий в порядке FIFO.
@@ -161,30 +158,34 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                 $runStateDto->write();
             }
 
-            $todos = $this->getTodos();
-            $stepsExecuted = 0;
-            $effectiveParams = $this->buildEffectiveParams(
+            $todos            = $this->getTodos();
+            $todoCount        = count($todos);
+            $stepsExecuted    = 0;
+            $currentTodoIndex = max(0, $startFromTodoIndex);
+            $effectiveParams  = $this->buildEffectiveParams(
                 $params,
                 $sessionParams?->toArray()
             );
-            foreach ($todos as $todoIndex => $todo) {
-                if ($todoIndex < $startFromTodoIndex) {
-                    continue;
-                }
+            while ($currentTodoIndex < $todoCount) {
+                $todoIndex      = $currentTodoIndex;
+                $todo           = $todos[$todoIndex];
                 $todoTextRaw    = $todo->getTodo($effectiveParams);
                 $todoTextToSend = $todoTextRaw;
-                $todoSessionCfg = $sessionCfg; // агент конкретно этой todo
+                $todoSessionCfg = $sessionCfg;  // агент конкретно этой todo
 
                 if ($todo instanceof Todo) {
                     $switchToAgentDto = $todo->getSwitchToAgent();
                     if ($switchToAgentDto) {
+                        /**
+                         * В пункте списка Todo задан агент через @@agent - его надо найти и использовать при исполнении этого $todo
+                         */
                         $resolvedAgent = $configApp->getAgent($switchToAgentDto->getAgentName());
                         if ($resolvedAgent) {
                             // такой агент есть
                             // агент должен работать с той же историей что и $sessionCfg
                             $r = $resolvedAgent->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY); // агент с пустой историей
                             $r->setChatHistory($sessionCfg->getChatHistory()); // передаем ему историю текущего контекста исполнения
-                            $r->tools       = $sessionCfg->getTools(); // и интструменты
+                            $r->tools       = $sessionCfg->getTools(); // и инструменты
                             $todoSessionCfg = $r;
                         } else {
                             // агента нет
@@ -220,6 +221,12 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                      * Здесь мы записываем какой пункт списка выполнили
                      */
                     if ($runStateDto !== null) {
+                        $latestStateDto = $sessionCfg->getExistRunStateDto();
+                        if ($latestStateDto !== null) {
+                            $runStateDto
+                                ->setGotoRequestedTodoIndex($latestStateDto->getGotoRequestedTodoIndex())
+                                ->setGotoTransitionsCount($latestStateDto->getGotoTransitionsCount());
+                        }
                         $runStateDto->setLastCompletedTodoIndex($todoIndex);
                         $runStateDto->setHistoryMessageCount(
                             ChatHistoryTruncateHelper::getMessageCount($todoSessionCfg->getChatHistory())
@@ -231,7 +238,56 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                     $logger->error('Ошибка выполнения todo', array_merge($baseContext, ['todo_index' => $todoIndex, 'exception' => $e]));
                     throw $e;
                 }
-            }
+
+                if ($runStateDto) {
+                    $runStateDto = $sessionCfg->getExistRunStateDto() ?? $runStateDto;
+                    $gotoRequestedTodoIndex = $runStateDto->getGotoRequestedTodoIndex();
+                    if ($gotoRequestedTodoIndex) {
+                        // есть переход на пункт задачи
+                        $gotoTransitionsCount = $runStateDto->getGotoTransitionsCount() + 1;
+
+                        // сбросим факт перехода
+                        $runStateDto
+                            ->setGotoRequestedTodoIndex(null)
+                            ->setGotoTransitionsCount($gotoTransitionsCount);
+
+                        if ($gotoTransitionsCount > self::MAX_GOTO_TRANSITIONS) {
+                            $logger->warning('TodoList завершён: превышен лимит goto-переходов', array_merge($baseContext, [
+                                'todo_index'             => $todoIndex,
+                                'goto_target_index'      => $gotoRequestedTodoIndex,
+                                'goto_transitions_count' => $gotoTransitionsCount,
+                                'goto_transitions_limit' => self::MAX_GOTO_TRANSITIONS,
+                            ]));
+                            $runStateDto->write();
+                            break;
+                        }
+        
+                        if ($gotoRequestedTodoIndex < 0 || $gotoRequestedTodoIndex >= $todoCount) {
+                            $logger->warning('TodoList завершён: запрошен несуществующий пункт goto', array_merge($baseContext, [
+                                'todo_index'        => $todoIndex,
+                                'goto_target_index' => $gotoRequestedTodoIndex,
+                                'todo_count'        => $todoCount,
+                            ]));
+                            $runStateDto->write();
+                            break;
+                        }
+        
+                        $logger->info('TodoList goto переход', array_merge($baseContext, [
+                            'todo_index'             => $todoIndex,
+                            'goto_target_index'      => $gotoRequestedTodoIndex,
+                            'goto_transitions_count' => $gotoTransitionsCount,
+                        ]));
+
+                        $runStateDto->write();
+                        $currentTodoIndex = $gotoRequestedTodoIndex; // устанавливаем целевой пункт
+
+                    } else {
+                        ++$currentTodoIndex;
+                    }
+                } else {
+                    ++$currentTodoIndex;
+                }
+            } // end while
 
             if ($runStateDto !== null) {
                 $runStateDto->delete();

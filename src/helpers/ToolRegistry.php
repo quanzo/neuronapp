@@ -14,6 +14,7 @@ use app\modules\neuron\tools\IntermediateDeleteTool;
 use app\modules\neuron\tools\IntermediatePadTool;
 use app\modules\neuron\tools\WikiSearchTool;
 use app\modules\neuron\tools\RuWikiSearchTool;
+use app\modules\neuron\tools\TodoGotoTool;
 use app\modules\neuron\tools\UniSearchTool;
 use NeuronAI\Tools\ToolInterface;
 
@@ -52,6 +53,7 @@ final class ToolRegistry
             'intermediate_exist'  => new IntermediateExistTool(),
             'intermediate_delete' => new IntermediateDeleteTool(),
             'intermediate_pad'    => new IntermediatePadTool(),
+            'todo_goto'           => new TodoGotoTool(),
             default => null,
         };
     }

@@ -24,6 +24,8 @@ final class RunStateDto
     private string $startedAt = '';
     private int $lastCompletedTodoIndex = -1;
     private ?int $historyMessageCount = null;
+    private ?int $gotoRequestedTodoIndex = null;
+    private int $gotoTransitionsCount = 0;
     private bool $finished = false;
 
     /**
@@ -167,6 +169,46 @@ final class RunStateDto
     }
 
     /**
+     * Возвращает индекс todo, к которому запрошен переход, или null, если переход не запрошен.
+     */
+    public function getGotoRequestedTodoIndex(): ?int
+    {
+        return $this->gotoRequestedTodoIndex;
+    }
+
+    /**
+     * Устанавливает индекс запрошенного перехода по todo.
+     *
+     * @param int|null $gotoRequestedTodoIndex Индекс (0-based) или null для сброса перехода.
+     * @return self
+     */
+    public function setGotoRequestedTodoIndex(?int $gotoRequestedTodoIndex): self
+    {
+        $this->gotoRequestedTodoIndex = $gotoRequestedTodoIndex;
+        return $this;
+    }
+
+    /**
+     * Возвращает количество применённых goto-переходов в рамках текущего запуска.
+     */
+    public function getGotoTransitionsCount(): int
+    {
+        return $this->gotoTransitionsCount;
+    }
+
+    /**
+     * Устанавливает количество применённых goto-переходов.
+     *
+     * @param int $gotoTransitionsCount Количество переходов.
+     * @return self
+     */
+    public function setGotoTransitionsCount(int $gotoTransitionsCount): self
+    {
+        $this->gotoTransitionsCount = $gotoTransitionsCount;
+        return $this;
+    }
+
+    /**
      * Возвращает признак успешного завершения всего списка (TodoList completed).
      */
     public function isFinished(): bool
@@ -221,6 +263,8 @@ final class RunStateDto
             'started_at'                => $this->startedAt,
             'last_completed_todo_index' => $this->lastCompletedTodoIndex,
             'history_message_count'     => $this->historyMessageCount,
+            'goto_requested_todo_index' => $this->gotoRequestedTodoIndex,
+            'goto_transitions_count'    => $this->gotoTransitionsCount,
             'finished'                  => $this->finished,
         ];
     }
@@ -243,6 +287,12 @@ final class RunStateDto
         $dto->historyMessageCount    = isset($data['history_message_count'])
             ? (int) $data['history_message_count']
             :  null;
+        $dto->gotoRequestedTodoIndex = isset($data['goto_requested_todo_index'])
+            ? (int) $data['goto_requested_todo_index']
+            : null;
+        $dto->gotoTransitionsCount   = isset($data['goto_transitions_count'])
+            ? (int) $data['goto_transitions_count']
+            : 0;
         $dto->finished = (bool) ($data['finished'] ?? false);
         return $dto;
     }

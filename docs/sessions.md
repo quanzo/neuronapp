@@ -25,6 +25,11 @@ LLM может вызывать инструменты просмотра ист
 - `.sessions/neuron_<sessionKey>.chat` — история диалога (см. `FileFullChatHistory`).
 - `.store/run_state_<sessionKey>_<agent>.json` — чекпоинт статуса выполнения run (см. `RunStateCheckpointHelper` и `RunStateDto`).
 
+Дополнительно в checkpoint TodoList могут храниться поля управления переходами:
+
+- `goto_requested_todo_index` — индекс пункта, куда нужно перейти после текущего шага (записывается `todo_goto`);
+- `goto_transitions_count` — число уже применённых переходов в текущем запуске.
+
 Рабочие директории разрешаются через `DirPriority` (см. `docs/directories.md`).
 
 ### API `SessionConfigAppService`

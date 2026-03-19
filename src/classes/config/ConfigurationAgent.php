@@ -627,6 +627,8 @@ class ConfigurationAgent implements IDependConfigApp
             ->setStartedAt((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
             ->setLastCompletedTodoIndex(-1)
             ->setHistoryMessageCount(null)
+            ->setGotoRequestedTodoIndex(null)
+            ->setGotoTransitionsCount(0)
             ->setFinished(false);
         return $runStateDto;
     }

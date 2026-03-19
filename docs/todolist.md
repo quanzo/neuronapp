@@ -101,6 +101,7 @@ public function execute(
 - если включена история чата, создаётся/обновляется `RunStateDto` в директории `.store` через `ConfigurationApp::getStoreDir()` и `RunStateCheckpointHelper`;
 - формируется общий набор параметров (`effectiveParams`) и последовательно выполняются todos:
   - текст задачи = `Todo::getTodo($effectiveParams)`;
+  - если в конфигурации доступен инструмент `todo_goto`, LLM может вызвать его и запросить переход к другому пункту списка;
   - в тексте todo может встречаться команда `@@agent("agent-name")`:
     - переключает выполнение **только этого todo** на указанного агента;
     - имя агента разрешается через `ConfigurationApp::getAgent($name)`;
@@ -109,6 +110,10 @@ public function execute(
   - из текста извлекаются @‑ссылки на файлы (`AttachmentHelper::buildContextAttachments()`), учитывая настройки `context_files.*` из `config.jsonc`;
   - сообщение отправляется в LLM через `ConfigurationAgent::sendMessageWithAttachments()`;
   - по завершении задачи обновляется чекпоинт (`last_completed_todo_index`, `history_message_count`);
+  - после каждого шага цикл проверяет `goto_requested_todo_index` в `RunStateDto`:
+    - если индекс валиден (`0..count-1`) — выполнение продолжается с указанного пункта;
+    - если индекс невалиден — цикл завершается;
+    - при превышении лимита `100` переходов `goto` за запуск — цикл завершается (защита от зацикливания);
 - после успешного выполнения всех задач чекпоинт удаляется, а в качестве результата возвращается клон истории чата (`ChatHistoryInterface`).
 
 Каждый запуск логируется через `RunLogger` (тип `todolist`, имя списка, количество выполненных шагов).
@@ -120,6 +125,11 @@ public function execute(
 - `ConfigurationAgent::getBlankRunStateDto()` / `getExistRunStateDto()` и `RunStateDto` описывают состояние запущенного списка;
 - `RunStateCheckpointHelper` читает/записывает файлы чекпоинтов в `.store`;
 - `ChatHistoryTruncateHelper` позволяет обрезать историю сообщений до указанного количества при resume.
+
+Поля run-state, связанные с goto:
+
+- `goto_requested_todo_index` — отложенный запрос перехода (0-based), который пишет `TodoGotoTool`;
+- `goto_transitions_count` — количество уже применённых переходов в текущем запуске (для ограничения циклов).
 
 Команда `todolist`:
 

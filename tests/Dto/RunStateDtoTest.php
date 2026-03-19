@@ -31,6 +31,8 @@ class RunStateDtoTest extends TestCase
             ->setStartedAt('2025-03-08T12:00:00+00:00')
             ->setLastCompletedTodoIndex(2)
             ->setHistoryMessageCount(10)
+            ->setGotoRequestedTodoIndex(1)
+            ->setGotoTransitionsCount(3)
             ->setFinished(false);
 
         $this->assertSame('20250308-120000-1', $dto->getSessionKey());
@@ -40,6 +42,8 @@ class RunStateDtoTest extends TestCase
         $this->assertSame('2025-03-08T12:00:00+00:00', $dto->getStartedAt());
         $this->assertSame(2, $dto->getLastCompletedTodoIndex());
         $this->assertSame(10, $dto->getHistoryMessageCount());
+        $this->assertSame(1, $dto->getGotoRequestedTodoIndex());
+        $this->assertSame(3, $dto->getGotoTransitionsCount());
         $this->assertFalse($dto->isFinished());
 
         $dto->setFinished(true);
@@ -83,6 +87,8 @@ class RunStateDtoTest extends TestCase
             ->setStartedAt('2025-01-01T00:00:00+00:00')
             ->setLastCompletedTodoIndex(0)
             ->setHistoryMessageCount(5)
+            ->setGotoRequestedTodoIndex(2)
+            ->setGotoTransitionsCount(4)
             ->setFinished(true);
 
         $arr = $dto->toArray();
@@ -93,6 +99,8 @@ class RunStateDtoTest extends TestCase
         $this->assertSame('2025-01-01T00:00:00+00:00', $arr['started_at']);
         $this->assertSame(0, $arr['last_completed_todo_index']);
         $this->assertSame(5, $arr['history_message_count']);
+        $this->assertSame(2, $arr['goto_requested_todo_index']);
+        $this->assertSame(4, $arr['goto_transitions_count']);
         $this->assertTrue($arr['finished']);
     }
 
@@ -109,6 +117,8 @@ class RunStateDtoTest extends TestCase
             'started_at' => '2025-06-01T12:00:00+00:00',
             'last_completed_todo_index' => 3,
             'history_message_count' => 20,
+            'goto_requested_todo_index' => 1,
+            'goto_transitions_count' => 6,
             'finished' => false,
         ];
         $dto = RunStateDto::fromArray($arr);
@@ -119,6 +129,8 @@ class RunStateDtoTest extends TestCase
         $this->assertSame('2025-06-01T12:00:00+00:00', $dto->getStartedAt());
         $this->assertSame(3, $dto->getLastCompletedTodoIndex());
         $this->assertSame(20, $dto->getHistoryMessageCount());
+        $this->assertSame(1, $dto->getGotoRequestedTodoIndex());
+        $this->assertSame(6, $dto->getGotoTransitionsCount());
         $this->assertFalse($dto->isFinished());
     }
 
@@ -150,6 +162,8 @@ class RunStateDtoTest extends TestCase
         $this->assertSame('', $dto->getAgentName());
         $this->assertSame(-1, $dto->getLastCompletedTodoIndex());
         $this->assertNull($dto->getHistoryMessageCount());
+        $this->assertNull($dto->getGotoRequestedTodoIndex());
+        $this->assertSame(0, $dto->getGotoTransitionsCount());
         $this->assertFalse($dto->isFinished());
     }
 
@@ -166,6 +180,8 @@ class RunStateDtoTest extends TestCase
             ->setStartedAt('2025-03-08T10:00:00+00:00')
             ->setLastCompletedTodoIndex(1)
             ->setHistoryMessageCount(7)
+            ->setGotoRequestedTodoIndex(0)
+            ->setGotoTransitionsCount(8)
             ->setFinished(false);
 
         $restored = RunStateDto::fromArray($dto->toArray());
@@ -173,6 +189,8 @@ class RunStateDtoTest extends TestCase
         $this->assertSame($dto->getAgentName(), $restored->getAgentName());
         $this->assertSame($dto->getLastCompletedTodoIndex(), $restored->getLastCompletedTodoIndex());
         $this->assertSame($dto->getHistoryMessageCount(), $restored->getHistoryMessageCount());
+        $this->assertSame($dto->getGotoRequestedTodoIndex(), $restored->getGotoRequestedTodoIndex());
+        $this->assertSame($dto->getGotoTransitionsCount(), $restored->getGotoTransitionsCount());
         $this->assertSame($dto->isFinished(), $restored->isFinished());
     }
 }

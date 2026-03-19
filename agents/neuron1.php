@@ -13,6 +13,7 @@ use NeuronAI\Tools\Toolkits\Calculator\FactorialTool;
 use app\modules\neuron\tools\ChatHistorySizeTool;
 use app\modules\neuron\tools\ChatHistoryMetaTool;
 use app\modules\neuron\tools\ChatHistoryMessageTool;
+use app\modules\neuron\tools\TodoGotoTool;
 
 /**
  * Концепция агента
@@ -84,6 +85,7 @@ return [
         [ChatHistorySizeTool::class, 'make'],
         [ChatHistoryMetaTool::class, 'make'],
         [ChatHistoryMessageTool::class, 'make'],
+        [TodoGotoTool::class, 'make'],
     ],
 
     'vectorStore' => [
