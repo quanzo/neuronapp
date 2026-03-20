@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Helpers;
 
+use app\modules\neuron\classes\dto\tools\MarkdownChunksResultDto;
 use app\modules\neuron\helpers\MarkdownHelper;
+use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -121,5 +124,150 @@ class MarkdownHelperTest extends TestCase
         $input = "before\n   \nafter";
         $expected = "before\n\nafter";
         $this->assertSame($expected, MarkdownHelper::safeMarkdownWhitespace($input));
+    }
+
+    /**
+     * Проверяет семантическое разбиение markdown в наборе разнообразных сценариев.
+     *
+     * @param string $markdown       Исходный markdown.
+     * @param int    $targetChars    Целевой размер чанка.
+     * @param int    $expectedChunks Ожидаемое количество чанков.
+     * @param bool   $expectOversize Ожидается ли oversized чанк.
+     */
+    #[DataProvider('chunkBySemanticBlocksDatasetProvider')]
+    public function testChunkBySemanticBlocksDataset(
+        string $markdown,
+        int $targetChars,
+        int $expectedChunks,
+        bool $expectOversize,
+    ): void {
+        $result = MarkdownHelper::chunkBySemanticBlocks($markdown, $targetChars);
+
+        $this->assertInstanceOf(MarkdownChunksResultDto::class, $result);
+        $this->assertSame($targetChars, $result->targetChars);
+        $this->assertCount($expectedChunks, $result->chunks);
+
+        $hasOversized = false;
+        foreach ($result->chunks as $chunk) {
+            $this->assertNotSame('', $chunk->text);
+            $this->assertGreaterThan(0, $chunk->lengthChars);
+            $this->assertSame(mb_strlen($chunk->text), $chunk->lengthChars);
+            if ($chunk->isOversized) {
+                $hasOversized = true;
+            }
+        }
+
+        $this->assertSame($expectOversize, $hasOversized);
+    }
+
+    /**
+     * Возвращает набор данных для проверки разных форматов markdown.
+     *
+     * @return array<string, array{markdown: string, targetChars: int, expectedChunks: int, expectOversize: bool}>
+     */
+    public static function chunkBySemanticBlocksDatasetProvider(): array
+    {
+        return [
+            // 1. Один короткий абзац.
+            'single short paragraph' => [
+                'markdown' => 'Короткий абзац без разбиения.',
+                'targetChars' => 200,
+                'expectedChunks' => 1,
+                'expectOversize' => false,
+            ],
+            // 2. Два абзаца, делятся на два чанка.
+            'two paragraphs split' => [
+                'markdown' => "Первый абзац с текстом для проверки.\n\nВторой абзац с независимым смыслом.",
+                'targetChars' => 35,
+                'expectedChunks' => 2,
+                'expectOversize' => true,
+            ],
+            // 3. Таблица должна остаться целой.
+            'table remains whole' => [
+                'markdown' => "| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n\nПосле таблицы текст.",
+                'targetChars' => 30,
+                'expectedChunks' => 2,
+                'expectOversize' => true,
+            ],
+            // 4. Кодовый fenced-блок не должен дробиться.
+            'fenced code remains whole' => [
+                'markdown' => "```php\n\$a = 1;\n\$b = 2;\necho \$a + \$b;\n```\n\nТекст после кода.",
+                'targetChars' => 20,
+                'expectedChunks' => 2,
+                'expectOversize' => true,
+            ],
+            // 5. Длинный абзац делится по предложениям.
+            'long paragraph split by sentences' => [
+                'markdown' => 'Первое предложение достаточно длинное для теста.'
+                    . ' Второе предложение тоже длинное и независимое.'
+                    . ' Третье предложение завершает пример.',
+                'targetChars' => 70,
+                'expectedChunks' => 3,
+                'expectOversize' => false,
+            ],
+            // 6. Список обрабатывается как единый логический блок.
+            'list block' => [
+                'markdown' => "- Первый пункт списка.\n- Второй пункт списка.\n- Третий пункт списка.",
+                'targetChars' => 200,
+                'expectedChunks' => 1,
+                'expectOversize' => false,
+            ],
+            // 7. Заголовок и текст после него.
+            'heading and paragraphs' => [
+                'markdown' => "# Раздел\n\nАбзац один.\n\nАбзац два.",
+                'targetChars' => 18,
+                'expectedChunks' => 3,
+                'expectOversize' => false,
+            ],
+            // 8. Пустой markdown.
+            'empty markdown' => [
+                'markdown' => '',
+                'targetChars' => 100,
+                'expectedChunks' => 0,
+                'expectOversize' => false,
+            ],
+            // 9. Один огромный неделимый кусок (без пунктуации) остаётся oversized.
+            'oversized no sentence boundaries' => [
+                'markdown' => 'Сверхдлинныйтекстбеззнаковпрепинания'
+                    . 'иконцовпредложенийкоторыйневозможноразделитьсемантически',
+                'targetChars' => 20,
+                'expectedChunks' => 1,
+                'expectOversize' => true,
+            ],
+            // 10. Смешанный markdown.
+            'mixed blocks markdown' => [
+                'markdown' => "## Заголовок\n\nАбзац перед таблицей.\n\n| X | Y |\n|---|---|\n| 1 | 9 |"
+                    . "\n\nФинальный абзац.",
+                'targetChars' => 45,
+                'expectedChunks' => 3,
+                'expectOversize' => false,
+            ],
+        ];
+    }
+
+    /**
+     * Проверяет, что некорректный targetChars приводит к исключению.
+     */
+    public function testChunkBySemanticBlocksThrowsForInvalidTarget(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        MarkdownHelper::chunkBySemanticBlocks('text', 0);
+    }
+
+    /**
+     * Проверяет корректность сериализации результирующего DTO.
+     */
+    public function testChunkBySemanticBlocksToArrayStructure(): void
+    {
+        $result = MarkdownHelper::chunkBySemanticBlocks(
+            "Абзац один.\n\nАбзац два.",
+            20,
+        );
+
+        $array = $result->toArray();
+        $this->assertArrayHasKey('targetChars', $array);
+        $this->assertArrayHasKey('totalChunks', $array);
+        $this->assertArrayHasKey('totalChars', $array);
+        $this->assertArrayHasKey('chunks', $array);
     }
 }

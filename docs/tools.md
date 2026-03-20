@@ -157,3 +157,30 @@
 ```json
 {"tool":"todo_goto","args":{"target_point":2,"reason":"вернуться к проверке"}}
 ```
+
+### Семантическое чанкование Markdown
+
+В `src/helpers/MarkdownHelper.php` добавлен метод:
+
+- `chunkBySemanticBlocks(string $markdown, int $targetChars): MarkdownChunksResultDto`
+
+Назначение:
+
+- разбивает markdown-текст на чанки, ориентируясь на целевой размер в символах;
+- сохраняет семантические блоки целыми (таблицы, fenced code block, абзацы, списки, заголовки);
+- для длинных текстовых блоков допускает деление по предложениям без разрыва слов;
+- допускает недобор/перебор относительно `targetChars`, если это требуется для читаемости.
+
+Формат результата:
+
+- `MarkdownChunksResultDto`:
+  - `targetChars` — целевой размер чанка;
+  - `totalChunks` — количество чанков;
+  - `totalChars` — суммарный размер текста в чанках;
+  - `chunks` — массив `MarkdownChunkDto`.
+- `MarkdownChunkDto`:
+  - `index` — индекс чанка (0-based);
+  - `text` — текст чанка;
+  - `lengthChars` — длина текста в символах;
+  - `blockKinds` — типы блоков, вошедших в чанк;
+  - `isOversized` — чанк превышает `targetChars`.
