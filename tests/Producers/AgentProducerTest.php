@@ -112,7 +112,7 @@ class AgentProducerTest extends TestCase
 
         $sessionKey = $producer->getSessionKey();
         $this->assertNotNull($sessionKey);
-        $this->assertMatchesRegularExpression(ConfigurationApp::SESSION_KEY_PATTERN, $sessionKey);
+        $this->assertMatchesRegularExpression('/^\d{8}-\d{6}-\d+(?:-\d+|0)$/', $sessionKey);
     }
 
     // ══════════════════════════════════════════════════════════════

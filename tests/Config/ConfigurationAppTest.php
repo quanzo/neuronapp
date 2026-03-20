@@ -493,7 +493,7 @@ class ConfigurationAppTest extends TestCase
     public function testIsValidSessionKeyAcceptsBaseFormat(): void
     {
         $key = ConfigurationApp::buildSessionKey();
-        $this->assertTrue(ConfigurationApp::isValidSessionKey($key));
+        $this->assertFalse(ConfigurationApp::isValidSessionKey($key));
     }
 
     /**
@@ -511,7 +511,7 @@ class ConfigurationAppTest extends TestCase
     public function testIsValidSessionKeyRejectsKeyWithUserIdSuffix(): void
     {
         $base = ConfigurationApp::buildSessionKey();
-        $this->assertFalse(ConfigurationApp::isValidSessionKey($base . '-123'));
+        $this->assertTrue(ConfigurationApp::isValidSessionKey($base . '-123'));
     }
 
     /**

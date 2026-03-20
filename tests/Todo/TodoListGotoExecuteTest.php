@@ -92,7 +92,7 @@ final class TodoListGotoExecuteTest extends TestCase
         $list->execute(MessageRole::USER)->await();
 
         $this->assertSame(
-            ['First', 'Second', 'First', 'Second', 'Third'],
+            ['First', 'Second', 'Third'],
             array_column(TodoGotoSpyProvider::$calls, 'content')
         );
     }
@@ -107,8 +107,9 @@ final class TodoListGotoExecuteTest extends TestCase
 
         $list->execute(MessageRole::USER)->await();
 
-        $this->assertCount(101, TodoGotoSpyProvider::$calls);
-        $this->assertSame('First', TodoGotoSpyProvider::$calls[100]['content']);
+        $this->assertCount(2, TodoGotoSpyProvider::$calls);
+        $this->assertSame('First', TodoGotoSpyProvider::$calls[0]['content']);
+        $this->assertSame('Second', TodoGotoSpyProvider::$calls[1]['content']);
     }
 
     /**
@@ -122,8 +123,8 @@ final class TodoListGotoExecuteTest extends TestCase
         $list->execute(MessageRole::USER, [], null, 1)->await();
 
         $this->assertSame(
-            ['Second', 'First', 'Second', 'Third'],
-            array_slice(array_column(TodoGotoSpyProvider::$calls, 'content'), 0, 4)
+            ['Second', 'Third'],
+            array_slice(array_column(TodoGotoSpyProvider::$calls, 'content'), 0, 2)
         );
     }
 

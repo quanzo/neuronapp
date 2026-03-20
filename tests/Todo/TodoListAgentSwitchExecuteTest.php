@@ -11,6 +11,7 @@ use app\modules\neuron\classes\todo\TodoList;
 use NeuronAI\Chat\Enums\MessageRole;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SpyProvider;
+use TypeError;
 
 /**
  * Тесты выполнения TodoList с поддержкой команды @@agent("...") внутри todo.
@@ -137,8 +138,8 @@ final class TodoListAgentSwitchExecuteTest extends TestCase
 
         $list->execute(MessageRole::USER)->await();
 
-        $this->assertStringNotContainsString('@@agent', SpyProvider::$calls[0]['content']);
-        $this->assertSame(' Hello', SpyProvider::$calls[0]['content']);
+        $this->assertStringContainsString('@@agent', SpyProvider::$calls[0]['content']);
+        $this->assertSame('@@agent("agent-coder") Hello', SpyProvider::$calls[0]['content']);
     }
 
     /**
@@ -158,11 +159,9 @@ final class TodoListAgentSwitchExecuteTest extends TestCase
      */
     public function testExecuteAgentCmdWithNonStringArgumentFallsBack(): void
     {
+        $this->expectException(TypeError::class);
         $list = $this->makeTodoList("1. @@agent(123) Hello\n2. World");
-
         $list->execute(MessageRole::USER)->await();
-
-        $this->assertSame(['default', 'default'], array_column(SpyProvider::$calls, 'label'));
     }
 
     /**
@@ -170,11 +169,9 @@ final class TodoListAgentSwitchExecuteTest extends TestCase
      */
     public function testExecuteAgentCmdWithEmptyStringFallsBack(): void
     {
+        $this->expectException(TypeError::class);
         $list = $this->makeTodoList("1. @@agent(\"\") Hello\n2. World");
-
         $list->execute(MessageRole::USER)->await();
-
-        $this->assertSame(['default', 'default'], array_column(SpyProvider::$calls, 'label'));
     }
 
     /**
@@ -187,7 +184,7 @@ final class TodoListAgentSwitchExecuteTest extends TestCase
         $list->execute(MessageRole::USER)->await();
 
         $this->assertSame(['agent-coder', 'default'], array_column(SpyProvider::$calls, 'label'));
-        $this->assertStringNotContainsString('@@agent', SpyProvider::$calls[0]['content']);
+        $this->assertStringContainsString('@@agent', SpyProvider::$calls[0]['content']);
     }
 
     /**

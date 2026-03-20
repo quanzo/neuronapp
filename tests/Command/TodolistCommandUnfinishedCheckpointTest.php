@@ -42,8 +42,8 @@ class TodolistCommandUnfinishedCheckpointTest extends TestCase
             '{"enableChatHistory":false,"contextWindow":5000}'
         );
         file_put_contents($this->tmpDir . '/todos/list1.md', "1. First task.\n");
-        $sessionKey = '20250101-120000-1';
-        file_put_contents($this->tmpDir . '/.sessions/neuron_' . $sessionKey . '-default.chat', '[]');
+        $sessionKey = '20250101-120000-1-0';
+        file_put_contents($this->tmpDir . '/.sessions/neuron_' . $sessionKey . '.chat', '[]');
         $this->resetConfigurationAppSingleton();
         $dp = new DirPriority([$this->tmpDir]);
         ConfigurationApp::init($dp);
@@ -101,7 +101,7 @@ class TodolistCommandUnfinishedCheckpointTest extends TestCase
         $input = new ArrayInput([
             '--todolist' => 'list1',
             '--agent' => 'default',
-            '--session_id' => '20250101-120000-1',
+            '--session_id' => '20250101-120000-1-0',
         ]);
         $input->setInteractive(false);
 

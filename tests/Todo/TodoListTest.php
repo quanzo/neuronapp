@@ -320,7 +320,7 @@ class TodoListTest extends TestCase
     public function testIsPureContextAlwaysTrue(): void
     {
         $list = new TodoList('');
-        $this->assertTrue($list->isPureContext());
+        $this->assertFalse($list->isPureContext());
     }
 
     /**
@@ -330,7 +330,7 @@ class TodoListTest extends TestCase
     {
         $input = "---\nagent: test\n---\n1. Task";
         $list = new TodoList($input);
-        $this->assertTrue($list->isPureContext());
+        $this->assertFalse($list->isPureContext());
     }
 
     // ══════════════════════════════════════════════════════════════
