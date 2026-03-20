@@ -35,7 +35,7 @@
 
 - в DTO (`ParamDto`, `ParamListDto`, `SessionParamsDto`, `RunStateDto`, `AttachmentDto` и др.);
 - в traits (`LoggerAwareTrait`, `LoggerAwareContextualTrait`, `DependConfigAppTrait`, `HasNeedSkillsTrait`, `AttachesSkillToolsTrait`);
-- в хелперы (`AttachmentHelper`, `FileContextHelper`, `PlaceholderHelper`, `OptionsHelper`, `ChatHistoryTruncateHelper`, `ShellToolFactory`, `ToolRegistry`).
+- в хелперы (`AttachmentHelper`, `FileContextHelper`, `PlaceholderHelper`, `MarkdownHelper`, `OptionsHelper`, `ChatHistoryTruncateHelper`, `ShellToolFactory`, `ToolRegistry`).
 
 Это упрощает сопровождение и уменьшает связность между доменными классами.
 
