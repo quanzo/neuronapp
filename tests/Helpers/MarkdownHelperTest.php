@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Helpers;
 
 use app\modules\neuron\classes\dto\tools\MarkdownChunksResultDto;
+use app\modules\neuron\helpers\MarkdownChunckHelper;
 use app\modules\neuron\helpers\MarkdownHelper;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -141,7 +142,7 @@ class MarkdownHelperTest extends TestCase
         int $expectedChunks,
         bool $expectOversize,
     ): void {
-        $result = MarkdownHelper::chunkBySemanticBlocks($markdown, $targetChars);
+        $result = MarkdownChunckHelper::chunkBySemanticBlocks($markdown, $targetChars);
 
         $this->assertInstanceOf(MarkdownChunksResultDto::class, $result);
         $this->assertSame($targetChars, $result->targetChars);
@@ -216,8 +217,8 @@ class MarkdownHelperTest extends TestCase
             'heading and paragraphs' => [
                 'markdown' => "# Раздел\n\nАбзац один.\n\nАбзац два.",
                 'targetChars' => 18,
-                'expectedChunks' => 3,
-                'expectOversize' => false,
+                'expectedChunks' => 2,
+                'expectOversize' => true,
             ],
             // 8. Пустой markdown.
             'empty markdown' => [
@@ -242,6 +243,27 @@ class MarkdownHelperTest extends TestCase
                 'expectedChunks' => 3,
                 'expectOversize' => false,
             ],
+            // 11. Абзац перед таблицей должен быть в том же чанке.
+            'paragraph before table same chunk' => [
+                'markdown' => "Текст перед таблицей должен идти вместе с таблицей.\n\n| A | B |\n|---|---|\n| 1 | 2 |",
+                'targetChars' => 25,
+                'expectedChunks' => 1,
+                'expectOversize' => true,
+            ],
+            // 12. Заголовок и следующий абзац должны быть в одном чанке.
+            'heading with paragraph same chunk' => [
+                'markdown' => "# Заголовок\n\nТекст абзаца сразу после заголовка.",
+                'targetChars' => 10,
+                'expectedChunks' => 1,
+                'expectOversize' => true,
+            ],
+            // 13. Заголовок перед таблицей должен быть в одном чанке с таблицей.
+            'heading with table same chunk' => [
+                'markdown' => "## Таблица\n\n| A | B |\n|---|---|\n| 1 | 2 |",
+                'targetChars' => 10,
+                'expectedChunks' => 1,
+                'expectOversize' => true,
+            ],
         ];
     }
 
@@ -251,7 +273,7 @@ class MarkdownHelperTest extends TestCase
     public function testChunkBySemanticBlocksThrowsForInvalidTarget(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        MarkdownHelper::chunkBySemanticBlocks('text', 0);
+        MarkdownChunckHelper::chunkBySemanticBlocks('text', 0);
     }
 
     /**
@@ -259,7 +281,7 @@ class MarkdownHelperTest extends TestCase
      */
     public function testChunkBySemanticBlocksToArrayStructure(): void
     {
-        $result = MarkdownHelper::chunkBySemanticBlocks(
+        $result = MarkdownChunckHelper::chunkBySemanticBlocks(
             "Абзац один.\n\nАбзац два.",
             20,
         );

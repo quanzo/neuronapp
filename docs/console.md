@@ -117,7 +117,7 @@
 Поведение:
 
 - использует тот же общий пайплайн конвертации, что и `convert:markdown`;
-- для разбивки применяет `MarkdownHelper::chunkBySemanticBlocks($markdown, $chunkSize)`;
+- для разбивки применяет `MarkdownChunckHelper::chunkBySemanticBlocks($markdown, $chunkSize)`;
 - если `directory` не задан, создаётся директория рядом с исходным файлом: `<имя_файла>_chunck`;
 - чанки сохраняются как `1.md`, `2.md`, `3.md` и т.д.
 

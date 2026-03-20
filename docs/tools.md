@@ -160,7 +160,7 @@
 
 ### Семантическое чанкование Markdown
 
-В `src/helpers/MarkdownHelper.php` добавлен метод:
+В `src/helpers/MarkdownChunckHelper.php` добавлен метод:
 
 - `chunkBySemanticBlocks(string $markdown, int $targetChars): MarkdownChunksResultDto`
 
