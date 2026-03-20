@@ -7,6 +7,8 @@ use app\modules\neuron\classes\command\InteractiveCommand;
 use app\modules\neuron\classes\command\RuwikiCommand;
 use app\modules\neuron\classes\command\SimpleMessageCommand;
 use app\modules\neuron\classes\command\TodolistCommand;
+use app\modules\neuron\classes\command\ConvertToMarkdownChunksCommand;
+use app\modules\neuron\classes\command\ConvertToMarkdownCommand;
 use app\modules\neuron\classes\command\WikiCommand;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
@@ -98,6 +100,8 @@ $app->add(new SimpleMessageCommand());
 $app->add(new TodolistCommand());
 $app->add(new WikiCommand());
 $app->add(new RuwikiCommand());
+$app->add(new ConvertToMarkdownCommand());
+$app->add(new ConvertToMarkdownChunksCommand());
 
 // Можно также добавить встроенную команду list, которая уже есть в Symfony,
 // поэтому отдельная HelpCommand не требуется, но при желании можно добавить.
