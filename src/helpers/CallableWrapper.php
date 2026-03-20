@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\helpers;
 
 use app\modules\neuron\exceptions\InvalidTypeException;
+use Closure;
 
 /**
  * Расширение типа callable в виде массива для вызова методов объектов с параметрами
@@ -99,6 +100,9 @@ class CallableWrapper
      */
     public static function isCallable($call): bool
     {
+        if ($call instanceof Closure) {
+            return true;
+        }
         if (is_object($call)) {
             return false;
         }
