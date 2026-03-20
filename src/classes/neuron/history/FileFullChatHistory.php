@@ -110,7 +110,7 @@ final class FileFullChatHistory extends AbstractFullChatHistory
      */
     protected function persistFullHistory(): void
     {
-        $content = json_encode($this->jsonSerialize(), JSON_UNESCAPED_UNICODE);
+        $content = json_encode($this->jsonSerialize(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         $filePath = $this->getFilePath();
 
         $result = @file_put_contents($filePath, $content, LOCK_EX);
