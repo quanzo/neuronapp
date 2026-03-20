@@ -141,5 +141,4 @@ skills: helper/prepare_context, helper/summarize
 
 ### Где посмотреть примеры
 
-- Базовые примеры навыков находятся в `samples/skills`.
-- Примеры для рабочего/тестового окружения находятся в `testapp/skills`.
+- Примеры навыков находятся в `testapp/skills`.
