@@ -94,7 +94,7 @@ skills: helper/prepare_context, helper/summarize
 
 ### Опции `agent` и `pure_context`
 
-- **`agent`** — имя агента‑исполнителя (см. `docs/config.md` и `prompt/agents.md`). Если не указан, используется агент, переданный извне, либо установленный как `default` в приложении.
+- **`agent`** — имя агента‑исполнителя (см. `docs/config.md` и `docs/agents.md`). Если не указан, используется агент, переданный извне, либо установленный как `default` в приложении.
 - **`pure_context`** — управляет использованием истории чата:
   - по умолчанию (`Skill::getDefaultPureContext()` возвращает `false`) навык выполняется **в общем контексте агента** (копия истории не создаётся);
   - при `pure_context: 1` или `true` используется клон сессии через `ChatHistoryCloneMode::RESET_EMPTY` / `COPY_CONTEXT` (см. реализацию в `AbstractPromptWithParams::isPureContext()` и `Skill::execute()`).
@@ -141,5 +141,5 @@ skills: helper/prepare_context, helper/summarize
 
 ### Где посмотреть примеры
 
-- Файлы `prompt/skill.md`, `prompt/execute1.md`, `prompt/execute2.md`, `prompt/execute3.md` содержат примеры форматов и общую идеологию.
-- В `testapp/skills` и `testapp/skills` находятся реальные файлы навыков, которые используются в интеграционных тестах и CLI‑сценариях.
+- Базовые примеры навыков находятся в `samples/skills`.
+- Примеры для рабочего/тестового окружения находятся в `testapp/skills`.

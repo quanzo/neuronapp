@@ -141,8 +141,8 @@ public function execute(
 
 ### Где посмотреть примеры
 
-- Файл `prompt/todolist.md` описывает исходный формат и идеологию TodoList.
-- Реальные сценарии находятся в `testapp/todos` и `testapp/todos` и демонстрируют:
+- Базовые сценарии TodoList находятся в `samples/todos`.
+- Реальные сценарии в `testapp/todos` демонстрируют:
   - использование `params` и значений `default`;
   - сессионные параметры `$date`, `$branch`, `$user`;
   - подключение `@docs/...` файлов как контекста.
