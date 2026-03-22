@@ -154,13 +154,13 @@ class ChunckViewTool extends AChunckTool
             $totalLength += $lineLength;
 
             if (
-                (($maxChars !== null && $effectiveLineLength < $maxChars) || $maxChars === null)
+                ($maxChars === null || ($effectiveLineLength + $lineLength + 1) < $maxChars)
+                && ($maxLines === null || count($chunkLines) < $maxLines)
                 && $currentIndex >= $start
-                && count($chunkLines) < $maxLines
             ) {
                 $effectiveLineLength += $lineLength + 1;
                 $chunkLines[]         = $line;
-                $end = $currentIndex;
+                $end                  = $currentIndex;
             }
 
             $currentIndex++;
