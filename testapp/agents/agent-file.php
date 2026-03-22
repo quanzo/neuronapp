@@ -41,7 +41,7 @@ $url = 'http://localhost:11434/api';
 return [
     'enableChatHistory' => true,
     'contextWindow'     => $contextWindow,
-    'toolMaxTries'      => 5,
+    'toolMaxTries'      => 75,
 
     'provider' => [
         CallableWrapper::class,
