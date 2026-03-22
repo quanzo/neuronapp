@@ -31,10 +31,17 @@
 - **`SearchReplaceTool`** — поиск и замена по проекту с ограничениями.
 - **`GitSummaryTool`** — получение краткой сводки по текущему git‑состоянию (например, изменения, ветка).
 - **`WikiSearchTool` / `RuWikiSearchTool` / `UniSearchTool`** — поиск по Wikipedia/универсальным источникам (в зависимости от реализации).
-- **`HttpFetchTool`** — выполнение HTTP‑запросов к внешним ресурсам (с учётом ограничений среды).
+- **`HttpFetchTool`** — выполнение HTTP‑запросов к внешним ресурсам (GET/HEAD, белый список хостов, лимиты); см. ниже.
 - **`OllamaSearchTool`** — взаимодействие с локальными моделями через Ollama (если настроено).
 
 Конкретное поведение каждого инструмента реализовано в соответствующем классе, опираясь на интерфейсы NeuronAI (`ToolInterface`, `ProviderToolInterface`, `ToolkitInterface`).
+
+### `HttpFetchTool` и исходящие заголовки
+
+- Класс: `app\modules\neuron\tools\HttpFetchTool`. Подключается явным добавлением экземпляра в `ConfigurationAgent::$tools` (в `ToolRegistry` по короткому имени не регистрируется).
+- По умолчанию запросы отправляются с идентичностью **Firefox**: набор задаётся `app\modules\neuron\classes\dto\tools\HttpFetchRequestHeadersDto::firefoxDefaults()` (User-Agent в формате Mozilla/Firefox/Gecko, плюс типичные `Accept` и `Accept-Language`).
+- Дополнительные заголовки передаются через DTO: аргумент конструктора `?HttpFetchRequestHeadersDto $requestHeaders` или метод `setDefaultRequestHeaders()`. Переданный набор **сливается** с дефолтами Firefox; совпадающие по имени (без учёта регистра) заголовки **перекрываются** вашими значениями.
+- Пример только добавления заголовка: `HttpFetchRequestHeadersDto::empty()->withHeader('Authorization', 'Bearer …')` в конструкторе `HttpFetchTool` или в `setDefaultRequestHeaders()`.
 
 ### Инструменты просмотра истории (`chat_history.*`)
 

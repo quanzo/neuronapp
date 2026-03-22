@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\classes\dto\tools\HttpFetchRequestHeadersDto;
 use app\modules\neuron\classes\dto\tools\HttpFetchResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
@@ -30,6 +31,15 @@ use const JSON_UNESCAPED_UNICODE;
  * Поддерживает методы GET и HEAD, ограничение списка доменов, а также лимиты
  * по времени и размеру тела ответа. Возвращает структурированный результат
  * через {@see HttpFetchResultDto}.
+ *
+ * Пример с дополнительным заголовком:
+ *
+ * ```php
+ * $tool = new HttpFetchTool(
+ *     requestHeaders: HttpFetchRequestHeadersDto::firefoxDefaults()
+ *         ->withHeader('Authorization', 'Bearer secret')
+ * );
+ * ```
  */
 class HttpFetchTool extends ATool
 {
@@ -58,11 +68,18 @@ class HttpFetchTool extends ATool
     protected int $defaultMaxBodySize = 262144;
 
     /**
+     * Исходящие HTTP-заголовки (после слияния с дефолтами Firefox, если переданы свои).
+     */
+    protected HttpFetchRequestHeadersDto $defaultRequestHeaders;
+
+    /**
      * @param string   $name        Имя инструмента
      * @param string   $description Описание инструмента
      * @param string[] $allowedHosts Белый список хостов (опционально)
      * @param int      $defaultTimeout Таймаут по умолчанию (секунды)
      * @param int      $defaultMaxBodySize Лимит тела по умолчанию (байты)
+     * @param HttpFetchRequestHeadersDto|null $requestHeaders Дополнительные заголовки; сливаются с
+     *        {@see HttpFetchRequestHeadersDto::firefoxDefaults()}, перекрывая совпадающие имена
      */
     public function __construct(
         string $name = 'http_fetch',
@@ -70,11 +87,15 @@ class HttpFetchTool extends ATool
         array $allowedHosts = [],
         int $defaultTimeout = 10,
         int $defaultMaxBodySize = 262144,
+        ?HttpFetchRequestHeadersDto $requestHeaders = null,
     ) {
         parent::__construct(name: $name, description: $description);
         $this->allowedHosts = $allowedHosts;
         $this->defaultTimeout = $defaultTimeout;
         $this->defaultMaxBodySize = $defaultMaxBodySize;
+        $this->defaultRequestHeaders = $requestHeaders === null
+            ? HttpFetchRequestHeadersDto::firefoxDefaults()
+            : HttpFetchRequestHeadersDto::firefoxDefaults()->merge($requestHeaders);
     }
 
     /**
@@ -159,6 +180,7 @@ class HttpFetchTool extends ATool
                     'max_redirects' => 5,
                     'timeout' => $effectiveTimeout,
                     'ignore_errors' => true,
+                    'header' => $this->defaultRequestHeaders->toStreamHeaderString(),
                 ],
             ]
         );
@@ -245,6 +267,20 @@ class HttpFetchTool extends ATool
     public function setDefaultMaxBodySize(int $defaultMaxBodySize): self
     {
         $this->defaultMaxBodySize = $defaultMaxBodySize;
+
+        return $this;
+    }
+
+    /**
+     * Задаёт исходящие HTTP-заголовки, объединяя их с дефолтами Firefox (перекрытие по имени).
+     *
+     * @param HttpFetchRequestHeadersDto $requestHeaders Набор заголовков для слияния с Firefox
+     *
+     * @return self
+     */
+    public function setDefaultRequestHeaders(HttpFetchRequestHeadersDto $requestHeaders): self
+    {
+        $this->defaultRequestHeaders = HttpFetchRequestHeadersDto::firefoxDefaults()->merge($requestHeaders);
 
         return $this;
     }
