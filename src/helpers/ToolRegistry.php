@@ -15,6 +15,7 @@ use app\modules\neuron\tools\IntermediatePadTool;
 use app\modules\neuron\tools\WikiSearchTool;
 use app\modules\neuron\tools\RuWikiSearchTool;
 use app\modules\neuron\tools\TodoGotoTool;
+use app\modules\neuron\tools\TodoCompletedTool;
 use app\modules\neuron\tools\UniSearchTool;
 use NeuronAI\Tools\ToolInterface;
 
@@ -54,6 +55,7 @@ final class ToolRegistry
             'intermediate_delete' => new IntermediateDeleteTool(),
             'intermediate_pad'    => new IntermediatePadTool(),
             'todo_goto'           => new TodoGotoTool(),
+            'todo_completed'      => new TodoCompletedTool(),
             default => null,
         };
     }

@@ -78,6 +78,38 @@
 
 Подробности по каждому такому классу можно посмотреть в `src/classes/command`.
 
+### Команда `orchestrate`
+
+Класс: `OrchestrateCommand`.
+
+**Назначение**: запуск внешнего оркестратора циклов `init -> step -> finish` поверх `TodoList`.
+
+Поддерживаемые опции:
+
+- `--agent` (обязательно) — имя агента;
+- `--init` (обязательно) — имя init-todolist;
+- `--step` (обязательно) — имя step-todolist;
+- `--finish` (обязательно) — имя finish-todolist;
+- `--session_id` (опционально) — ключ существующей сессии;
+- `--max_iters` (опционально, default: `100`) — максимум итераций step;
+- `--restart_on_fail` (флаг) — разрешить перезапуск цикла при ошибках;
+- `--max_restarts` (опционально, default: `0`) — максимум перезапусков;
+- `--log_level` (опционально) — `off|minimal|normal|debug`;
+- `--quiet_logs` (флаг) — отключить логи оркестратора;
+- `--date`, `--branch`, `--user` — сессионные параметры для плейсхолдеров.
+
+Поведение:
+
+- команда загружает три `TodoList` из `todos/`;
+- передает сценарии в `TodoListOrchestrator`;
+- оркестратор принудительно устанавливает `completed=0`, затем крутит `step` до `completed=1` или лимита итераций;
+- в обоих финальных сценариях (успех/лимит) выполняется `finish`;
+- результат печатается в JSON (`success`, `reason`, `iterations`, `restartCount`, `sessionKey`).
+
+Пример:
+
+- `php bin/console orchestrate --agent default --init job-init --step job-step --finish job-finish --max_iters 200`
+
 ### Команда `convert:markdown`
 
 Класс: `ConvertToMarkdownCommand` (базовый класс: `AbstractConvertToMarkdownCommand`).

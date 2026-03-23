@@ -27,6 +27,7 @@
 - **`chat_history.*`** — просмотр полной истории сообщений (размер, метаданные, получение сообщения по индексу).
 - **`IntermediateSaveTool` / `IntermediateLoadTool` / `IntermediateListTool` / `IntermediateExistTool`** — сохранение/загрузка/список/проверка промежуточных результатов в рамках `sessionKey` в `.store`.
 - **`TodoGotoTool`** (`todo_goto`) — запрос перехода к пункту TodoList по номеру (`point`, 1-based), переход применяется циклом `TodoList::execute()`.
+- **`TodoCompletedTool`** (`todo_completed`) — установить флаг `completed` в `.store` для внешнего оркестратора (`done/not_done`, `1/0`, `исполнено/не исполнено`).
 - **`FileTreeTool`** — обзор структуры каталогов.
 - **`SearchReplaceTool`** — поиск и замена по проекту с ограничениями.
 - **`GitSummaryTool`** — получение краткой сводки по текущему git‑состоянию (например, изменения, ветка).
@@ -171,6 +172,32 @@
 
 ```json
 {"tool":"todo_goto","args":{"point":2,"reason":"вернуться к проверке"}}
+```
+
+### `TodoCompletedTool` (`todo_completed`)
+
+Назначение:
+
+- дать шагу `step` в сценарии TodoList явный механизм выставления флага завершения;
+- сохранить в `.store` каноничное значение `completed = 1|0`, чтобы внешний оркестратор завершал/продолжал цикл детерминированно.
+
+Параметры:
+
+- `status` (string, required) — одно из значений:
+  - завершено: `done`, `1`, `true`, `исполнено`;
+  - не завершено: `not_done`, `0`, `false`, `не исполнено`.
+- `reason` (string, optional) — краткая причина изменения статуса.
+
+Поведение:
+
+- инструмент нормализует `status` к `1|0`;
+- записывает значение в `IntermediateStorage` под меткой `completed`;
+- возвращает LLM-friendly JSON через `IntermediateToolResultDto` (`action=todo_completed`).
+
+Пример псевдо-вызова:
+
+```json
+{"tool":"todo_completed","args":{"status":"done","reason":"обработка файла завершена"}}
 ```
 
 ### Семантическое чанкование Markdown
