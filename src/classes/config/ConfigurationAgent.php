@@ -27,6 +27,7 @@ use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\run\RunStateDto;
 use app\modules\neuron\classes\logger\ContextualLogger;
+use app\modules\neuron\classes\neuron\providers\LoggingAIProviderDecorator;
 use app\modules\neuron\classes\neuron\history\FileFullChatHistory;
 use app\modules\neuron\classes\neuron\trimmers\FluidContextWindowTrimmer;
 use app\modules\neuron\helpers\AttachmentHelper;
@@ -163,6 +164,21 @@ class ConfigurationAgent implements IDependConfigApp
      * Сколько раз можно вызвать инструмент
      */
     public $toolMaxTries = 5;
+
+    /**
+     * Включает логирование системного промпта и payload запроса к LLM.
+     *
+     * @var bool
+     */
+    public bool $enableLlmPayloadLogging = false;
+
+    /**
+     * Режим детализации логирования payload.
+     * Поддерживаются значения: summary|debug.
+     *
+     * @var string
+     */
+    public string $llmPayloadLogMode = 'summary';
 
     /**
      * MCP серверы.
@@ -391,12 +407,43 @@ class ConfigurationAgent implements IDependConfigApp
     public function getProvider(): AIProviderInterface
     {
         if ($this->provider instanceof AIProviderInterface) {
-            return $this->provider;
+            return $this->wrapProviderWithLogging($this->provider);
         }
         if (CallableWrapper::isCallable($this->provider)) {
-            return CallableWrapper::call($this->provider);
+            /** @var AIProviderInterface $provider */
+            $provider = CallableWrapper::call($this->provider);
+            return $this->wrapProviderWithLogging($provider);
         }
-        return $this->_provider;
+
+        if ($this->_provider === null) {
+            throw new RuntimeException('LLM provider is not configured.');
+        }
+
+        return $this->wrapProviderWithLogging($this->_provider);
+    }
+
+    /**
+     * Оборачивает провайдер декоратором логирования payload, если это включено в конфигурации.
+     *
+     * @param AIProviderInterface $provider Базовый провайдер.
+     *
+     * @return AIProviderInterface
+     */
+    private function wrapProviderWithLogging(AIProviderInterface $provider): AIProviderInterface
+    {
+        if (!$this->enableLlmPayloadLogging) {
+            return $provider;
+        }
+
+        if ($provider instanceof LoggingAIProviderDecorator) {
+            return $provider;
+        }
+
+        return new LoggingAIProviderDecorator(
+            $provider,
+            $this->getLoggerWithContext(),
+            $this->llmPayloadLogMode
+        );
     }
 
     /**
@@ -735,6 +782,8 @@ class ConfigurationAgent implements IDependConfigApp
      *  - instructions (string|Stringable|callable)
      *  - tools (array|callable)
      *  - toolMaxTries (int)
+     *  - enableLlmPayloadLogging (bool)
+     *  - llmPayloadLogMode (string: summary|debug)
      *  - mcp (array)
      *  - embeddingProvider (EmbeddingsProviderInterface|callable|null)
      *  - embeddingChunkSize (int)
@@ -792,6 +841,15 @@ class ConfigurationAgent implements IDependConfigApp
 
         if (array_key_exists('toolMaxTries', $cfg)) {
             $config->toolMaxTries = (int) $cfg['toolMaxTries'];
+        }
+
+        if (array_key_exists('enableLlmPayloadLogging', $cfg)) {
+            $config->enableLlmPayloadLogging = (bool) $cfg['enableLlmPayloadLogging'];
+        }
+
+        if (array_key_exists('llmPayloadLogMode', $cfg)) {
+            $mode = (string) $cfg['llmPayloadLogMode'];
+            $config->llmPayloadLogMode = $mode === 'debug' ? 'debug' : 'summary';
         }
 
         if (array_key_exists('mcp', $cfg)) {

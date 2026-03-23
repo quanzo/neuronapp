@@ -52,6 +52,8 @@
   - `instructions` — системный промпт (строка, `Stringable` или `callable`);
   - `tools` — базовый набор инструментов (`ToolInterface`/`ToolkitInterface` и пр.);
   - `toolMaxTries` — лимит попыток использования инструмента;
+  - `enableLlmPayloadLogging` — включение диагностического логирования payload к LLM;
+  - `llmPayloadLogMode` — режим payload-логов: `summary` (без payload сообщений) или `debug` (с payload сообщений);
   - `mcp` — конфигурация MCP‑коннекторов;
   - `embeddingProvider`, `vectorStore`, `preProcessors`, `postProcessors` — для RAG;
   - `sessionKey` — базовый ключ сессии (без имени агента), синхронизируется с `ConfigurationApp::getSessionKey()`;
@@ -71,6 +73,11 @@
     - тем же `sessionKey`.
 
 Экземпляры агентов создаются производителем `AgentProducer` и используются консольными командами, skills и todolist.
+
+При включённом `enableLlmPayloadLogging` провайдер автоматически оборачивается в `LoggingAIProviderDecorator`, а узел чата заменяется на `LoggingChatNode`, поэтому в обычный файловый лог попадают события:
+
+- `llm.inference.prepared` — что агент подготовил перед отправкой (`instructions`, tools summary);
+- `llm.request.payload` — что было сериализовано в payload к провайдеру (`system`, `messages`, `tools`).
 
 ### Файлы агентов (`agents/*.php`, `agents/*.jsonc`)
 

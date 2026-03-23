@@ -77,3 +77,32 @@
   - `TodoList started`, `Todo started`, `Todo completed`, `TodoList completed` с контекстом `{todolist, todo_index, ...}`.
 
 Подробнее о том, как включается логгер и где создаются файлы, см. `docs/config.md`.
+
+### Логирование payload LLM (system prompt + tools)
+
+Для диагностики вызовов инструментов добавлено двухуровневое логирование LLM-запроса через `ConfigurationAgent`:
+
+- событие `llm.inference.prepared`:
+  - пишется в кастомном узле `LoggingChatNode` (`src/classes/neuron/nodes/LoggingChatNode.php`);
+  - содержит `instructions_preview`, `instructions_length`, `tools_count`, `tools_names`, `tool_required_params`;
+  - использует контекст `agent`/`session` через `ContextualLogger`.
+- событие `llm.request.payload`:
+  - пишется в декораторе `LoggingAIProviderDecorator` (`src/classes/neuron/providers/LoggingAIProviderDecorator.php`);
+  - содержит информацию о подготовленном payload перед отправкой к провайдеру:
+    - `provider_class`,
+    - `system_present`, `system_length`, `system_preview`,
+    - `messages_count`,
+    - `tools_payload`,
+    - `messages_payload` (только в `debug`-режиме).
+
+Включение и режим:
+
+- `ConfigurationAgent::$enableLlmPayloadLogging` — включает/выключает payload-логирование;
+- `ConfigurationAgent::$llmPayloadLogMode` — режим `summary` или `debug`.
+
+Безопасность логов:
+
+- перед записью используется `LlmPayloadLogSanitizer` (`src/helpers/LlmPayloadLogSanitizer.php`);
+- маскируются чувствительные ключи (`api_key`, `token`, `authorization`, `password`, `cookie` и т.д.);
+- длинные строки обрезаются с маркером `...[truncated]`;
+- ограничивается глубина рекурсивной сериализации (`[DEPTH_LIMIT_REACHED]`).
