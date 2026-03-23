@@ -21,7 +21,7 @@ use NeuronAI\Tools\ToolInterface;
  * Тестовый провайдер, имитирующий вызов инструмента `todo_goto` со стороны LLM.
  *
  * Пример:
- * - `setGotoPlan([1 => 3])` — на первом user-сообщении вызовет `todo_goto(target_point=3)`;
+ * - `setGotoPlan([1 => 3])` — на первом user-сообщении вызовет `todo_goto(point=3)`;
  * - далее вернёт обычный assistant-ответ с echo-контентом.
  */
 final class TodoGotoSpyProvider implements AIProviderInterface
@@ -48,7 +48,7 @@ final class TodoGotoSpyProvider implements AIProviderInterface
     }
 
     /**
-     * Устанавливает план вызова goto: [номер_вызова => target_point].
+     * Устанавливает план вызова goto: [номер_вызова => point].
      *
      * @param array<int,int> $plan
      */

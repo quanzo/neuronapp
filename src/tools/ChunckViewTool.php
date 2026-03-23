@@ -45,7 +45,7 @@ class ChunckViewTool extends AChunckTool
      *
      * @var integer|null
      */
-    protected ?int $maxRuns = 50;
+    protected ?int $maxRuns = 100;
 
     /**
      * @param string $basePath    Базовая директория
@@ -54,15 +54,15 @@ class ChunckViewTool extends AChunckTool
      * @param string $description Описание инструмента
      */
     public function __construct(
-        string $basePath = '',
-        int $maxFileSize = 10485760,
-        string $name = 'view_chunk',
+        string $basePath    = '',
+        int    $maxFileSize = 10485760,
+        string $name        = 'chunk_view',
         string $description = 'Чтение текстового файла чанком строк с ограничением по строкам и размеру чанка в символах.',
     ) {
         parent::__construct(
-            basePath: $basePath,
+            basePath   : $basePath,
             maxFileSize: $maxFileSize,
-            name: $name,
+            name       : $name,
             description: $description,
         );
     }
@@ -77,22 +77,22 @@ class ChunckViewTool extends AChunckTool
         return [
             $this->makePathProperty(),
             ToolProperty::make(
-                name: 'start_line',
-                type: PropertyType::INTEGER,
+                name       : 'start_line',
+                type       : PropertyType::INTEGER,
                 description: 'Номер первой строки чанка (0-based). По умолчанию 0.',
-                required: false,
+                required   : false,
             ),
             ToolProperty::make(
-                name: 'lines',
-                type: PropertyType::INTEGER,
+                name       : 'lines',
+                type       : PropertyType::INTEGER,
                 description: 'Максимальное количество строк в чанке. По умолчанию — без ограничения.',
-                required: false,
+                required   : false,
             ),
             ToolProperty::make(
-                name: 'max_chars',
-                type: PropertyType::INTEGER,
+                name       : 'max_chars',
+                type       : PropertyType::INTEGER,
                 description: 'Максимальный размер чанка в символах (суммарно по всем строкам). По умолчанию — без ограничения.',
-                required: false,
+                required   : false,
             ),
         ];
     }

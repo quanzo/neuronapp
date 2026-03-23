@@ -34,7 +34,7 @@ class ChunckSizeTool extends AChunckTool
      */
     public function __construct(
         string $basePath = '',
-        string $name = 'size_chunk',
+        string $name = 'chunk_size',
         string $description = 'Получение размера текстового файла в символах и строках.',
     ) {
         parent::__construct(

@@ -21,7 +21,7 @@ use const JSON_UNESCAPED_UNICODE;
  * текущего шага.
  *
  * Пример вызова из LLM:
- * `{"tool":"todo_goto","args":{"target_point":2,"reason":"вернуться к подготовке данных"}}`
+ * `{"tool":"todo_goto","args":{"point":2,"reason":"вернуться к подготовке данных"}}`
  */
 final class TodoGotoTool extends ATool
 {
@@ -33,8 +33,9 @@ final class TodoGotoTool extends ATool
     protected ?int $maxRuns = 50;
 
     public function __construct(
-        string $name        = 'todo_goto',
-        string $description = 'Запрашивает переход к пункту списка по номеру (1-based). Переход применится после завершения текущего шага.',
+        string $name = 'todo_goto',
+        string $description = 'Запрашивает переход к пункту списка по номеру (1-based). '
+        . 'Переход применится после завершения текущего шага.',
     ) {
         parent::__construct(name: $name, description: $description);
     }
@@ -48,7 +49,7 @@ final class TodoGotoTool extends ATool
     {
         return [
             ToolProperty::make(
-                name       : 'target_point',
+                name       : 'point',
                 type       : PropertyType::INTEGER,
                 description: 'Номер целевого пункта списка (1-based). Пример: 1 = первый пункт.',
                 required   : true,
@@ -65,55 +66,54 @@ final class TodoGotoTool extends ATool
     /**
      * Записывает запрос перехода в run-state.
      *
-     * @param int         $target_point Номер целевого пункта (1-based).
-     * @param string|null $reason       Причина перехода.
+     * @param int         $point Номер целевого пункта (1-based).
+     * @param string|null $reason Причина перехода.
      *
      * @return string JSON-ответ для LLM.
      */
-    public function __invoke(int $target_point, ?string $reason = null): string
+    public function __invoke(int $point, ?string $reason = null): string
     {
         $agentCfg = $this->getAgentCfg();
         if ($agentCfg === null) {
             return $this->resultJson(new TodoGotoResultDto(
-                success    : false,
-                message    : 'Инструмент todo_goto не привязан к конфигурации агента.',
-                targetPoint: $target_point,
-                reason     : $reason,
+                success: false,
+                message: 'Инструмент todo_goto не привязан к конфигурации агента.',
+                toPoint: $point,
+                reason : $reason,
             ));
         }
 
-        if ($target_point < 1) {
+        if ($point < 1) {
             return $this->resultJson(new TodoGotoResultDto(
-                success    : false,
-                message    : 'target_point должен быть >= 1.',
-                targetPoint: $target_point,
-                reason     : $reason,
+                success: false,
+                message: 'point должен быть >= 1.',
+                toPoint: $point,
+                reason : $reason,
             ));
         }
 
         $runStateDto = $agentCfg->getExistRunStateDto();
         if ($runStateDto === null) {
             return $this->resultJson(new TodoGotoResultDto(
-                success    : false,
-                message    : 'Переход недоступен: активный TodoList run-state не найден.',
-                targetPoint: $target_point,
-                reason     : $reason,
+                success: false,
+                message: 'Переход недоступен: активный TodoList run-state не найден.',
+                toPoint: $point,
+                reason : $reason,
             ));
         }
 
-        $targetIndex = $target_point - 1;
-        $fromIndex  = $runStateDto->getLastCompletedTodoIndex() + 1;
+        $targetIndex = $point - 1;
+        $fromPoint = $runStateDto->getLastCompletedTodoIndex() + 1;
         $runStateDto
             ->setGotoRequestedTodoIndex($targetIndex)
             ->write();
 
         return $this->resultJson(new TodoGotoResultDto(
-            success    : true,
-            message    : 'Запрос перехода сохранён.',
-            fromIndex  : $fromIndex,
-            toIndex    : $targetIndex,
-            targetPoint: $target_point,
-            reason     : $this->normalizeReason($reason),
+            success  : true,
+            message  : 'Запрос перехода сохранён.',
+            fromPoint: $fromPoint,
+            toPoint  : $point,
+            reason   : $this->normalizeReason($reason),
         ));
     }
 

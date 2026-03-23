@@ -26,7 +26,7 @@
 - **`EditTool`** — безопасное редактирование файлов проекта (используется только по запросу пользователя).
 - **`chat_history.*`** — просмотр полной истории сообщений (размер, метаданные, получение сообщения по индексу).
 - **`IntermediateSaveTool` / `IntermediateLoadTool` / `IntermediateListTool` / `IntermediateExistTool`** — сохранение/загрузка/список/проверка промежуточных результатов в рамках `sessionKey` в `.store`.
-- **`TodoGotoTool`** (`todo_goto`) — запрос перехода к пункту TodoList по номеру (`target_point`, 1-based), переход применяется циклом `TodoList::execute()`.
+- **`TodoGotoTool`** (`todo_goto`) — запрос перехода к пункту TodoList по номеру (`point`, 1-based), переход применяется циклом `TodoList::execute()`.
 - **`FileTreeTool`** — обзор структуры каталогов.
 - **`SearchReplaceTool`** — поиск и замена по проекту с ограничениями.
 - **`GitSummaryTool`** — получение краткой сводки по текущему git‑состоянию (например, изменения, ветка).
@@ -149,7 +149,7 @@
 
 Параметры:
 
-- `target_point` (integer, required) — номер пункта TodoList в **1-based** нумерации;
+- `point` (integer, required) — номер пункта TodoList в **1-based** нумерации;
 - `reason` (string, optional) — краткая причина перехода.
 
 Поведение:
@@ -159,10 +159,18 @@
 - сам переход выполняется в `TodoList::execute()` после завершения текущего todo;
 - если run-state отсутствует (например, вне запуска TodoList), инструмент возвращает `success=false`.
 
+Формат ответа (`TodoGotoResultDto`):
+
+- `success` (bool) — признак успешности запроса;
+- `message` (string) — пояснение результата;
+- `fromPoint` (int|null) — текущий пункт в 1-based нумерации или `null`, если определить нельзя;
+- `toPoint` (int|null) — целевой пункт в 1-based нумерации, как передан в инструмент;
+- `reason` (string|null) — нормализованная причина перехода.
+
 Пример псевдо-вызова:
 
 ```json
-{"tool":"todo_goto","args":{"target_point":2,"reason":"вернуться к проверке"}}
+{"tool":"todo_goto","args":{"point":2,"reason":"вернуться к проверке"}}
 ```
 
 ### Семантическое чанкование Markdown

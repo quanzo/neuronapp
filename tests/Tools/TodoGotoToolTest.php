@@ -61,7 +61,7 @@ final class TodoGotoToolTest extends TestCase
     }
 
     /**
-     * Невалидный target_point = 0 отклоняется.
+     * Невалидный point = 0 отклоняется.
      */
     public function testRejectsZeroTargetPoint(): void
     {
@@ -70,7 +70,7 @@ final class TodoGotoToolTest extends TestCase
     }
 
     /**
-     * Невалидный отрицательный target_point отклоняется.
+     * Невалидный отрицательный point отклоняется.
      */
     public function testRejectsNegativeTargetPoint(): void
     {
@@ -89,7 +89,7 @@ final class TodoGotoToolTest extends TestCase
     }
 
     /**
-     * Валидный target_point записывает goto-запрос в checkpoint.
+     * Валидный point записывает goto-запрос в checkpoint.
      */
     public function testWritesGotoRequestedIndex(): void
     {
@@ -97,8 +97,7 @@ final class TodoGotoToolTest extends TestCase
 
         $data = json_decode(($this->tool)(3, 'вернуться к шагу проверки'), true);
         $this->assertTrue($data['success']);
-        $this->assertSame(2, $data['toIndex']);
-        $this->assertSame(3, $data['targetPoint']);
+        $this->assertSame(3, $data['toPoint']);
 
         $state = RunStateCheckpointHelper::read($this->sessionKey);
         $this->assertInstanceOf(RunStateDto::class, $state);
@@ -106,15 +105,15 @@ final class TodoGotoToolTest extends TestCase
     }
 
     /**
-     * fromIndex рассчитывается как lastCompletedTodoIndex + 1.
+     * fromPoint рассчитывается как lastCompletedTodoIndex + 1.
      */
-    public function testResponseContainsFromIndex(): void
+    public function testResponseContainsFromPoint(): void
     {
         $this->writeRunState(lastCompletedIndex: 4);
 
         $data = json_decode(($this->tool)(2), true);
         $this->assertTrue($data['success']);
-        $this->assertSame(5, $data['fromIndex']);
+        $this->assertSame(5, $data['fromPoint']);
     }
 
     /**
@@ -159,19 +158,20 @@ final class TodoGotoToolTest extends TestCase
     }
 
     /**
-     * Граничный случай: target_point = 1 приводит к переходу на индекс 0.
+     * Граничный случай: point = 1 возвращается в ответе как toPoint=1.
      */
-    public function testFirstPointMapsToZeroIndex(): void
+    public function testFirstPointIsReturnedAsOneBasedPoint(): void
     {
         $this->writeRunState(lastCompletedIndex: 0);
 
         $data = json_decode(($this->tool)(1), true);
         $this->assertTrue($data['success']);
-        $this->assertSame(0, $data['toIndex']);
+        $this->assertSame(1, $data['toPoint']);
     }
 
     /**
-     * Граничный случай: большой номер пункта сохраняется как есть, проверка диапазона делегирована TodoList.
+     * Граничный случай: большой номер пункта возвращается как есть (1-based),
+     * проверка диапазона делегирована TodoList.
      */
     public function testLargeTargetPointIsStoredForTodoListValidation(): void
     {
@@ -179,7 +179,7 @@ final class TodoGotoToolTest extends TestCase
 
         $data = json_decode(($this->tool)(999), true);
         $this->assertTrue($data['success']);
-        $this->assertSame(998, $data['toIndex']);
+        $this->assertSame(999, $data['toPoint']);
     }
 
     /**
