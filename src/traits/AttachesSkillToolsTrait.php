@@ -76,9 +76,13 @@ trait AttachesSkillToolsTrait
                     /**
                      * В инструмент пробрасываем конфиг агента и его логгер
                      */
+                    /*
                     $a = $skill->getConfigurationAgent();
                     $tool->setAgentCfg($a);
                     $tool->setLogger($a->getLoggerWithContext());
+                    */
+                    $tool->setAgentCfg($sessionCfg);
+                    $tool->setLogger($sessionCfg->getLoggerWithContext());
                 }
                 $sessionTools[] = $tool;
             }
