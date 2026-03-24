@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\events;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO события TodoList.
  *
@@ -17,7 +19,7 @@ namespace app\modules\neuron\classes\dto\events;
  *     ->setTodo('Check logs');
  * ```
  */
-class TodoEventDto extends BaseEventDto
+class TodoEventDto extends BaseEventDto implements IArrayable
 {
     private string $todoListName       = '';
     private int $todoIndex             = 0;
@@ -110,13 +112,13 @@ class TodoEventDto extends BaseEventDto
     public function toArray(): array
     {
         return parent::toArray() + [
-            'todoListName' => $this->todoListName,
-            'todoIndex' => $this->todoIndex,
-            'todo' => $this->todo,
-            'todoAgent' => $this->todoAgent,
-            'gotoTargetIndex' => $this->gotoTargetIndex,
+            'todoListName'         => $this->todoListName,
+            'todoIndex'            => $this->todoIndex,
+            'todo'                 => $this->todo,
+            'todoAgent'            => $this->todoAgent,
+            'gotoTargetIndex'      => $this->gotoTargetIndex,
             'gotoTransitionsCount' => $this->gotoTransitionsCount,
-            'reason' => $this->reason,
+            'reason'               => $this->reason,
         ];
     }
 }

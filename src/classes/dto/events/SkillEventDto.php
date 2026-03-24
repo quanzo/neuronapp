@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\events;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO события Skill.
  *
@@ -16,11 +18,11 @@ namespace app\modules\neuron\classes\dto\events;
  *     ->setSuccess(true);
  * ```
  */
-class SkillEventDto extends BaseEventDto
+class SkillEventDto extends BaseEventDto implements IArrayable
 {
-    private string $skillName = '';
-    private bool $success = false;
-    private ?string $errorClass = null;
+    private string $skillName     = '';
+    private bool $success         = false;
+    private ?string $errorClass   = null;
     private ?string $errorMessage = null;
 
     public function getSkillName(): string

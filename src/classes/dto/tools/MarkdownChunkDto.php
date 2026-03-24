@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO одного семантического markdown-чанка.
  *
@@ -13,7 +15,7 @@ namespace app\modules\neuron\classes\dto\tools;
  * Пример использования:
  * `$chunkDto = new MarkdownChunkDto(0, 'Text', 4, ['paragraph'], false);`
  */
-final class MarkdownChunkDto
+final class MarkdownChunkDto implements IArrayable
 {
     /**
      * @param int      $index      Индекс чанка (0-based)

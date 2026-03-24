@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO результата работы инструмента поиска файлов по glob-шаблону ({@see \app\modules\neuron\tools\GlobTool}).
  *
@@ -23,7 +25,7 @@ namespace app\modules\neuron\classes\dto\tools;
  * ]
  * ```
  */
-final class GlobResultDto
+final class GlobResultDto implements IArrayable
 {
     /**
      * @param string   $pattern    Glob-шаблон, по которому выполнялся поиск
@@ -49,10 +51,10 @@ final class GlobResultDto
     public function toArray(): array
     {
         return [
-            'pattern' => $this->pattern,
-            'basePath' => $this->basePath,
-            'files' => $this->files,
-            'truncated' => $this->truncated,
+            'pattern'    => $this->pattern,
+            'basePath'   => $this->basePath,
+            'files'      => $this->files,
+            'truncated'  => $this->truncated,
             'totalFound' => $this->totalFound,
         ];
     }

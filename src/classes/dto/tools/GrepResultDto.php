@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO результата работы инструмента поиска текста в файлах ({@see \app\modules\neuron\tools\GrepTool}).
  *
@@ -23,7 +25,7 @@ namespace app\modules\neuron\classes\dto\tools;
  * ]
  * ```
  */
-final class GrepResultDto
+final class GrepResultDto implements IArrayable
 {
     /**
      * @param string         $pattern       Паттерн (regex или текст), по которому выполнялся поиск

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\events;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO события оркестратора.
  *
@@ -17,7 +19,7 @@ namespace app\modules\neuron\classes\dto\events;
  *     ->setReason('completed');
  * ```
  */
-class OrchestratorEventDto extends BaseEventDto
+class OrchestratorEventDto extends BaseEventDto implements IArrayable
 {
     private int $iterations           = 0;
     private int $restartCount         = 0;
@@ -122,14 +124,14 @@ class OrchestratorEventDto extends BaseEventDto
     public function toArray(): array
     {
         return parent::toArray() + [
-            'iterations' => $this->iterations,
-            'restartCount' => $this->restartCount,
+            'iterations'          => $this->iterations,
+            'restartCount'        => $this->restartCount,
             'completedNormalized' => $this->completedNormalized,
-            'completedRaw' => $this->completedRaw,
-            'reason' => $this->reason,
-            'success' => $this->success,
-            'errorClass' => $this->errorClass,
-            'errorMessage' => $this->errorMessage,
+            'completedRaw'        => $this->completedRaw,
+            'reason'              => $this->reason,
+            'success'             => $this->success,
+            'errorClass'          => $this->errorClass,
+            'errorMessage'        => $this->errorMessage,
         ];
     }
 }

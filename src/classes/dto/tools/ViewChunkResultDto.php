@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO результата чтения текстового файла чанком строк ({@see \app\modules\neuron\tools\ChunckViewTool}).
  *
@@ -22,7 +24,7 @@ namespace app\modules\neuron\classes\dto\tools;
  *     'totalLength'  => int,    // полное количество символов в файле
  * ]
  */
-final class ViewChunkResultDto
+final class ViewChunkResultDto implements IArrayable
 {
     /**
      * @param string $filePath    Путь к файлу

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\events;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * Базовый DTO события.
  *
@@ -17,7 +19,7 @@ namespace app\modules\neuron\classes\dto\events;
  *     ->setRunId('abc123');
  * ```
  */
-class BaseEventDto
+class BaseEventDto implements IArrayable
 {
     private string $sessionKey = '';
     private string $runId = '';

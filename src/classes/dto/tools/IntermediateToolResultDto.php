@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 use function array_map;
 use function is_array;
 use function is_string;
@@ -41,7 +43,7 @@ use function is_string;
  * ]
  * ```
  */
-final class IntermediateToolResultDto
+final class IntermediateToolResultDto implements IArrayable
 {
     /**
      * @param string                     $action     Операция.

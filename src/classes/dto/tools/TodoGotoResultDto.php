@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO результата инструмента перехода по TodoList ({@see \app\modules\neuron\tools\TodoGotoTool}).
  *
@@ -11,7 +13,7 @@ namespace app\modules\neuron\classes\dto\tools;
  * - инструмент получает `point` (1-based);
  * - возвращает сериализованный результат для LLM.
  */
-final class TodoGotoResultDto
+final class TodoGotoResultDto implements IArrayable
 {
     /**
      * @param bool        $success     Успешность операции.

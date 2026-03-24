@@ -5,12 +5,13 @@
 namespace app\modules\neuron\classes\dto\wiki;
 
 use app\modules\neuron\enums\ContentSourceType;
+use app\modules\neuron\interfaces\IArrayable;
 
 /**
  * Data Transfer Object (DTO) для представления полного содержимого статьи.
  * Содержит полный текст статьи и метаданные.
  */
-final class ArticleContentDto
+final class ArticleContentDto implements IArrayable
 {
     /**
      * Полное содержимое статьи в формате HTML

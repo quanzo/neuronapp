@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO результата работы инструмента FileTreeTool.
  *
@@ -25,7 +27,7 @@ namespace app\modules\neuron\classes\dto\tools;
  *     'totalNodes' => int,
  * ]
  */
-final class FileTreeResultDto
+final class FileTreeResultDto implements IArrayable
 {
     /**
      * @param string $basePath   Базовая директория обхода

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO результата работы инструмента SearchReplaceTool.
  *
@@ -20,7 +22,7 @@ namespace app\modules\neuron\classes\dto\tools;
  *     'errors'       => string[],                   // сообщения об ошибках по файлам
  * ]
  */
-final class SearchReplaceResultDto
+final class SearchReplaceResultDto implements IArrayable
 {
     /**
      * @param string              $pattern      Паттерн для поиска

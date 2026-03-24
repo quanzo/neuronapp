@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\dto\run;
 
 use app\modules\neuron\helpers\RunStateCheckpointHelper;
+use app\modules\neuron\interfaces\IArrayable;
 
 /**
  * DTO состояния выполнения run (чекпоинт) списка заданий TodoList в рамках сессии.
@@ -13,7 +14,7 @@ use app\modules\neuron\helpers\RunStateCheckpointHelper;
  * количество сообщений в истории чата на момент последнего завершённого todo (для отката при resume)
  * и признак завершения всего списка.
  */
-final class RunStateDto
+final class RunStateDto implements IArrayable
 {
     const DEF_AGENT_NAME = 'session';
 

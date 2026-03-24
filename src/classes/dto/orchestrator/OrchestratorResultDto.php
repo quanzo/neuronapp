@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\orchestrator;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO результата выполнения оркестратора TodoList-циклов.
  *
@@ -18,7 +20,7 @@ namespace app\modules\neuron\classes\dto\orchestrator;
  *     ->setIterations(12);
  * ```
  */
-final class OrchestratorResultDto
+final class OrchestratorResultDto implements IArrayable
 {
     private bool $success = false;
     private string $reason = '';

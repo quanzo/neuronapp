@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO сводки состояния git-репозитория для инструмента GitSummaryTool.
  *
@@ -21,7 +23,7 @@ namespace app\modules\neuron\classes\dto\tools;
  *     'log'          => string, // вывод git log --oneline -N (может быть пустым)
  * ]
  */
-final class GitSummaryResultDto
+final class GitSummaryResultDto implements IArrayable
 {
     /**
      * @param string $workingDir  Рабочая директория репозитория

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO результата инструмента получения размера текстового файла
  * ({@see \app\modules\neuron\tools\ChunckSizeTool}).
@@ -17,7 +19,7 @@ namespace app\modules\neuron\classes\dto\tools;
  *     'totalLength' => int,    // количество символов
  * ]
  */
-final class SizeChunkResultDto
+final class SizeChunkResultDto implements IArrayable
 {
     /**
      * @param string $filePath    Путь к файлу

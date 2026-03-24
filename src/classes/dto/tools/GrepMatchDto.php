@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO одного совпадения при поиске текста в файлах ({@see \app\modules\neuron\tools\GrepTool}).
  *
@@ -22,7 +24,7 @@ namespace app\modules\neuron\classes\dto\tools;
  * ]
  * ```
  */
-final class GrepMatchDto
+final class GrepMatchDto implements IArrayable
 {
     /**
      * @param string $filePath    Путь к файлу с совпадением (относительный)

@@ -2,11 +2,13 @@
 
 namespace app\modules\neuron\classes\dto\wiki;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * Data Transfer Object (DTO) для представления результата работы инструмента поиска.
  * Инкапсулирует список статей и отвечает за преобразование их в массив для сериализации.
  */
-final class SearchToolResultDto
+final class SearchToolResultDto implements IArrayable
 {
     /**
      * Массив найденных статей.

@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\params;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO сессионных параметров для подстановки в плейсхолдеры.
  *
  * Инкапсулирует значения, которые приходят сверху (например, из CLI)
  * и могут использоваться в текстовых шаблонах как $date, $branch, $user.
  */
-final class SessionParamsDto
+final class SessionParamsDto implements IArrayable
 {
     private ?string $date = null;
     private ?string $branch = null;

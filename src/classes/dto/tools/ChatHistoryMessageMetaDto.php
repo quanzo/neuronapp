@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO метаданных сообщения из истории чата без загрузки текста.
  *
@@ -18,7 +20,7 @@ namespace app\modules\neuron\classes\dto\tools;
  *     'toolSignature' => array|null,       // ToolSignatureDto::toArray() или null
  * ]
  */
-final class ChatHistoryMessageMetaDto
+final class ChatHistoryMessageMetaDto implements IArrayable
 {
     /**
      * @param int                  $index Индекс сообщения (0-based).

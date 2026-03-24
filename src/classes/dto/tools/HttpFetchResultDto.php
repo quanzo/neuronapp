@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO результата HTTP-запроса инструмента FetchTool.
  *
@@ -19,7 +21,7 @@ namespace app\modules\neuron\classes\dto\tools;
  *     'truncated'  => bool,            // было ли тело усечено по лимиту
  * ]
  */
-final class HttpFetchResultDto
+final class HttpFetchResultDto implements IArrayable
 {
     /**
      * @param string              $url        Итоговый URL запроса
@@ -51,11 +53,11 @@ final class HttpFetchResultDto
     public function toArray(): array
     {
         return [
-            'url' => $this->url,
+            'url'        => $this->url,
             'statusCode' => $this->statusCode,
-            'headers' => $this->headers,
-            'body' => $this->body,
-            'truncated' => $this->truncated,
+            'headers'    => $this->headers,
+            'body'       => $this->body,
+            'truncated'  => $this->truncated,
         ];
     }
 }

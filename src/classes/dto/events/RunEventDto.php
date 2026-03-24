@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\events;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO события уровня run.
  *
@@ -17,13 +19,13 @@ namespace app\modules\neuron\classes\dto\events;
  *     ->setSteps(3);
  * ```
  */
-class RunEventDto extends BaseEventDto
+class RunEventDto extends BaseEventDto implements IArrayable
 {
-    private string $type = '';
-    private string $name = '';
-    private int $steps = 0;
-    private bool $success = false;
-    private ?string $errorClass = null;
+    private string $type          = '';
+    private string $name          = '';
+    private int $steps            = 0;
+    private bool $success         = false;
+    private ?string $errorClass   = null;
     private ?string $errorMessage = null;
 
     /**
@@ -134,11 +136,11 @@ class RunEventDto extends BaseEventDto
     public function toArray(): array
     {
         return parent::toArray() + [
-            'type' => $this->type,
-            'name' => $this->name,
-            'steps' => $this->steps,
-            'success' => $this->success,
-            'errorClass' => $this->errorClass,
+            'type'         => $this->type,
+            'name'         => $this->name,
+            'steps'        => $this->steps,
+            'success'      => $this->success,
+            'errorClass'   => $this->errorClass,
             'errorMessage' => $this->errorMessage,
         ];
     }

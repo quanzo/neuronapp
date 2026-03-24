@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO результата чтения содержимого файла ({@see \app\modules\neuron\tools\ViewTool}).
  *
@@ -25,7 +27,7 @@ namespace app\modules\neuron\classes\dto\tools;
  * ]
  * ```
  */
-final class ViewResultDto
+final class ViewResultDto implements IArrayable
 {
     /**
      * @param string $filePath   Путь к файлу

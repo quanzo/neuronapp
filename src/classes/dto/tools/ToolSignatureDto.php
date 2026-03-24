@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO сигнатуры вызова инструмента в истории сообщений.
  *
@@ -21,7 +23,7 @@ namespace app\modules\neuron\classes\dto\tools;
  *     'raw'       => mixed|null,
  * ]
  */
-final class ToolSignatureDto
+final class ToolSignatureDto implements IArrayable
 {
     /**
      * @param string|null $name Имя инструмента.

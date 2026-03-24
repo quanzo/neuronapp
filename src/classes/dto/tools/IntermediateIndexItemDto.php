@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO элемента индекса промежуточных результатов (IntermediateStorage).
  *
@@ -22,7 +24,7 @@ namespace app\modules\neuron\classes\dto\tools;
  * ]
  * ```
  */
-final class IntermediateIndexItemDto
+final class IntermediateIndexItemDto implements IArrayable
 {
     /**
      * @param string $label     Метка результата.

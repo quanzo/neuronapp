@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 use function array_map;
 use function is_array;
 use function is_int;
@@ -24,7 +26,7 @@ use function is_string;
  * ]
  * ```
  */
-final class IntermediateIndexDto
+final class IntermediateIndexDto implements IArrayable
 {
     /**
      * @param string                    $schema     Версия схемы индекса.

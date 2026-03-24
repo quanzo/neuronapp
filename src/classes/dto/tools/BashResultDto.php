@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO результата выполнения shell-команды ({@see \app\modules\neuron\tools\BashTool}).
  *
@@ -23,7 +25,7 @@ namespace app\modules\neuron\classes\dto\tools;
  * ]
  * ```
  */
-final class BashResultDto
+final class BashResultDto implements IArrayable
 {
     /**
      * @param string $command  Выполненная команда

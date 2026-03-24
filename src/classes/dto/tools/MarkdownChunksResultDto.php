@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 use function array_map;
 
 /**
@@ -15,7 +17,7 @@ use function array_map;
  * Пример использования:
  * `$result = new MarkdownChunksResultDto(800, [$chunkDto]);`
  */
-final class MarkdownChunksResultDto
+final class MarkdownChunksResultDto implements IArrayable
 {
     /**
      * @param int                $targetChars Целевой размер чанка в символах

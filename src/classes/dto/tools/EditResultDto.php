@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\interfaces\IArrayable;
+
 /**
  * DTO результата редактирования файла ({@see \app\modules\neuron\tools\EditTool}).
  *
@@ -22,7 +24,7 @@ namespace app\modules\neuron\classes\dto\tools;
  * ]
  * ```
  */
-final class EditResultDto
+final class EditResultDto implements IArrayable
 {
     /**
      * @param string $filePath     Путь к файлу
