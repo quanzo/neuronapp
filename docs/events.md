@@ -58,6 +58,7 @@ Payload события передаётся как DTO:
 - `SkillEventDto` (`src/classes/dto/events/SkillEventDto.php`)
 - `OrchestratorEventDto` (`src/classes/dto/events/OrchestratorEventDto.php`)
 - `ToolEventDto` (`src/classes/dto/events/ToolEventDto.php`)
+- `AgentMessageEventDto` (`src/classes/dto/events/AgentMessageEventDto.php`)
 
 Это позволяет уйти от неструктурированных массивов и стабилизировать контракт данных.
 
@@ -78,6 +79,9 @@ Payload события передаётся как DTO:
 - `tool.started`
 - `tool.completed`
 - `tool.failed`
+- `agent.message.started`
+- `agent.message.completed`
+- `agent.message.failed`
 - `orchestrator.cycle_started`
 - `orchestrator.step_completed`
 - `orchestrator.completed`

@@ -6,6 +6,9 @@ namespace Tests\Config;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\attachments\TextAttachmentDto;
+use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
+use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\enums\EventNameEnum;
 use NeuronAI\Agent\AgentHandler;
 use NeuronAI\Agent\AgentInterface;
 use NeuronAI\Chat\Enums\MessageRole;
@@ -23,6 +26,18 @@ use PHPUnit\Framework\TestCase;
  */
 final class ConfigurationAgentAttachmentsTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        EventBus::clear();
+    }
+
+    protected function tearDown(): void
+    {
+        EventBus::clear();
+        parent::tearDown();
+    }
+
     public function testSendMessageWithAttachmentsAddsBlocksAndCallsChat(): void
     {
         $handler = $this->createMock(AgentHandler::class);
@@ -112,5 +127,78 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
         $this->assertCount(2, $captured->getContentBlocks());
         $this->assertSame('hi', $captured->getContentBlocks()[0]->content);
         $this->assertSame('from-dto', $captured->getContentBlocks()[1]->content);
+    }
+
+    public function testSendMessageWithAttachmentsEmitsStartedAndCompletedEvents(): void
+    {
+        $handler = $this->createMock(AgentHandler::class);
+        $handler->method('getMessage')->willReturn(new Message(MessageRole::ASSISTANT, 'ok'));
+
+        $agent = $this->createMock(AgentInterface::class);
+        $agent->method('chat')->willReturn($handler);
+
+        $cfg = new class ($agent) extends ConfigurationAgent {
+            public function __construct(private AgentInterface $agent)
+            {
+            }
+
+            public function getAgent(): AgentInterface
+            {
+                return $this->agent;
+            }
+        };
+        $cfg->agentName = 'assistant';
+        $cfg->setSessionKey('s1');
+
+        $events = [];
+        EventBus::on(EventNameEnum::AGENT_MESSAGE_STARTED->value, static function (mixed $payload) use (&$events): void {
+            $events[] = ['type' => 'started', 'payload' => $payload];
+        }, '*');
+        EventBus::on(EventNameEnum::AGENT_MESSAGE_COMPLETED->value, static function (mixed $payload) use (&$events): void {
+            $events[] = ['type' => 'completed', 'payload' => $payload];
+        }, '*');
+
+        $cfg->sendMessageWithAttachments(new Message(MessageRole::USER, 'hi'), [new TextAttachmentDto('a1')]);
+
+        $this->assertCount(2, $events);
+        $this->assertSame('started', $events[0]['type']);
+        $this->assertSame('completed', $events[1]['type']);
+        $this->assertInstanceOf(AgentMessageEventDto::class, $events[0]['payload']);
+        $this->assertSame(1, $events[0]['payload']->getAttachmentsCount());
+        $this->assertTrue($events[1]['payload']->isSuccess());
+    }
+
+    public function testSendMessageWithAttachmentsEmitsFailedEventOnException(): void
+    {
+        $agent = $this->createMock(AgentInterface::class);
+        $agent->method('chat')->willThrowException(new \RuntimeException('boom'));
+
+        $cfg = new class ($agent) extends ConfigurationAgent {
+            public function __construct(private AgentInterface $agent)
+            {
+            }
+
+            public function getAgent(): AgentInterface
+            {
+                return $this->agent;
+            }
+        };
+        $cfg->setSessionKey('s1');
+
+        $failedPayload = null;
+        EventBus::on(EventNameEnum::AGENT_MESSAGE_FAILED->value, static function (mixed $payload) use (&$failedPayload): void {
+            $failedPayload = $payload;
+        }, '*');
+
+        try {
+            $cfg->sendMessageWithAttachments(new Message(MessageRole::USER, 'hi'), []);
+            $this->fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('boom', $e->getMessage());
+        }
+
+        $this->assertInstanceOf(AgentMessageEventDto::class, $failedPayload);
+        $this->assertFalse($failedPayload->isSuccess());
+        $this->assertSame(\RuntimeException::class, $failedPayload->getErrorClass());
     }
 }

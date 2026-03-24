@@ -36,10 +36,10 @@ final class RunLogger
         $runId = $this->generateRunId();
 
         $payload = [
-            'event' => 'run_started',
-            'runId' => $runId,
-            'type' => $type,
-            'name' => $name,
+            'event'     => 'run_started',
+            'runId'     => $runId,
+            'type'      => $type,
+            'name'      => $name,
             'timestamp' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
         ] + $context;
 
@@ -58,15 +58,15 @@ final class RunLogger
     public function finishRun(string $runId, array $metrics = [], ?\Throwable $error = null): void
     {
         $payload = [
-            'event' => 'run_finished',
-            'runId' => $runId,
+            'event'      => 'run_finished',
+            'runId'      => $runId,
             'finishedAt' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
-            'success' => $error === null,
+            'success'    => $error === null,
         ] + $metrics;
 
         if ($error !== null) {
             $payload['error'] = [
-                'class' => $error::class,
+                'class'   => $error::class,
                 'message' => $error->getMessage(),
             ];
             $this->logger->error('Run finished with error', $payload);

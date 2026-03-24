@@ -25,13 +25,16 @@ use NeuronAI\Providers\AIProviderInterface;
 use NeuronAI\RAG\Embeddings\EmbeddingsProviderInterface;
 use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
 use app\modules\neuron\classes\dto\run\RunStateDto;
+use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\logger\ContextualLogger;
 use app\modules\neuron\classes\neuron\providers\LoggingAIProviderDecorator;
 use app\modules\neuron\classes\neuron\history\FileFullChatHistory;
 use app\modules\neuron\classes\neuron\trimmers\FluidContextWindowTrimmer;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\RunStateCheckpointHelper;
+use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\interfaces\IAttachmentFile;
 use app\modules\neuron\interfaces\IDependConfigApp;
 use app\modules\neuron\classes\storage\IntermediateStorage;
@@ -265,14 +268,23 @@ class ConfigurationAgent implements IDependConfigApp
      */
     public function sendMessageWithAttachments(NeuronMessage $message, array $attachments = []): mixed
     {
-        $attachments = AttachmentHelper::deduplicateAttachments($attachments);
-        $agent       = $this->getAgent();
+        $attachments      = AttachmentHelper::deduplicateAttachments($attachments);
+        $agent            = $this->getAgent();
+        $attachmentsCount = count($attachments);
+        $isStructured     = $this->reponseStructClass !== null && $this->reponseStructClass !== '';
 
         /**
          * @var Agent|RAG $agent
          */
 
         $start = microtime(true);
+        EventBus::trigger(
+            EventNameEnum::AGENT_MESSAGE_STARTED->value,
+            $this,
+            $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
+                ->setSuccess(true)
+                ->setDurationSeconds(0.0)
+        );
 
         try {
             // В NeuronAI вложения прикрепляются к сообщению через content blocks.
@@ -299,6 +311,16 @@ class ConfigurationAgent implements IDependConfigApp
                 $response = $handler->getMessage();
             }
         } catch (\Throwable $e) {
+            $duration = round(microtime(true) - $start, 2);
+            EventBus::trigger(
+                EventNameEnum::AGENT_MESSAGE_FAILED->value,
+                $this,
+                $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
+                    ->setSuccess(false)
+                    ->setDurationSeconds($duration)
+                    ->setErrorClass($e::class)
+                    ->setErrorMessage($e->getMessage())
+            );
             $this->getLogger()->error('Ошибка при отправке сообщения агенту', array_merge(
                 $this->getLogContext(),
                 ['exception' => $e]
@@ -307,6 +329,13 @@ class ConfigurationAgent implements IDependConfigApp
         }
 
         $duration = round(microtime(true) - $start, 2);
+        EventBus::trigger(
+            EventNameEnum::AGENT_MESSAGE_COMPLETED->value,
+            $this,
+            $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
+                ->setSuccess(true)
+                ->setDurationSeconds($duration)
+        );
 
         /**
          * @var Agent|RAG $agent
@@ -322,6 +351,20 @@ class ConfigurationAgent implements IDependConfigApp
             unset($chatHistory);
         }
         return $response;
+    }
+
+    /**
+     * Создаёт DTO события отправки сообщения агентом.
+     */
+    private function buildAgentMessageEventDto(int $attachmentsCount, bool $isStructured): AgentMessageEventDto
+    {
+        return (new AgentMessageEventDto())
+            ->setSessionKey($this->getSessionKey() ?? '')
+            ->setRunId('')
+            ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setAgent($this)
+            ->setAttachmentsCount($attachmentsCount)
+            ->setStructured($isStructured);
     }
 
     protected function makeListObjects($arCfg)

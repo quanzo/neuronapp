@@ -33,6 +33,10 @@ enum EventNameEnum: string
     case TOOL_COMPLETED = 'tool.completed';
     case TOOL_FAILED    = 'tool.failed';
 
+    case AGENT_MESSAGE_STARTED   = 'agent.message.started';
+    case AGENT_MESSAGE_COMPLETED = 'agent.message.completed';
+    case AGENT_MESSAGE_FAILED    = 'agent.message.failed';
+
     case ORCHESTRATOR_CYCLE_STARTED  = 'orchestrator.cycle_started';
     case ORCHESTRATOR_STEP_COMPLETED = 'orchestrator.step_completed';
     case ORCHESTRATOR_COMPLETED      = 'orchestrator.completed';

@@ -228,7 +228,6 @@ class Skill extends AbstractPromptWithParams implements ISkill
             try {
                 $message = new NeuronMessage($role, $text);
                 $result = $sessionCfg->sendMessageWithAttachments($message, $attachments);
-                $agentCfg->getLogger()->info('Skill completed', array_merge($agentCfg->getLogContext(), ['skill' => $this->getName()]));
                 EventBus::trigger(
                     EventNameEnum::SKILL_COMPLETED->value,
                     $this,
