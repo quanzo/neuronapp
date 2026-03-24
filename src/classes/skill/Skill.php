@@ -159,7 +159,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 EventBus::trigger(
                     EventNameEnum::SKILL_FAILED->value,
                     $this,
-                    $this->buildSkillEventDto('', '')
+                    $this->buildSkillEventDto($this->getConfigurationAgent(), '')
                         ->setSkillName($skillName)
                         ->setSuccess(false)
                         ->setErrorClass($e::class)
@@ -193,12 +193,12 @@ class Skill extends AbstractPromptWithParams implements ISkill
         EventBus::trigger(
             EventNameEnum::RUN_STARTED->value,
             $this,
-            $this->buildRunEventDto($agentCfg->getSessionKey() ?? '', $runId, 0)->setSuccess(true)
+            $this->buildRunEventDto($agentCfg, $runId, 0)->setSuccess(true)
         );
         EventBus::trigger(
             EventNameEnum::SKILL_STARTED->value,
             $this,
-            $this->buildSkillEventDto($agentCfg->getSessionKey() ?? '', $runId)->setSuccess(true)
+            $this->buildSkillEventDto($agentCfg, $runId)->setSuccess(true)
         );
 
         $text = $this->getSkill($params ?? []);
@@ -232,19 +232,19 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 EventBus::trigger(
                     EventNameEnum::SKILL_COMPLETED->value,
                     $this,
-                    $this->buildSkillEventDto($agentCfg->getSessionKey() ?? '', $runId)->setSuccess(true)
+                    $this->buildSkillEventDto($agentCfg, $runId)->setSuccess(true)
                 );
                 EventBus::trigger(
                     EventNameEnum::RUN_FINISHED->value,
                     $this,
-                    $this->buildRunEventDto($agentCfg->getSessionKey() ?? '', $runId, 1)->setSuccess(true)
+                    $this->buildRunEventDto($agentCfg, $runId, 1)->setSuccess(true)
                 );
                 return $result;
             } catch (\Throwable $e) {
                 EventBus::trigger(
                     EventNameEnum::SKILL_FAILED->value,
                     $this,
-                    $this->buildSkillEventDto($agentCfg->getSessionKey() ?? '', $runId)
+                    $this->buildSkillEventDto($agentCfg, $runId)
                         ->setSuccess(false)
                         ->setErrorClass($e::class)
                         ->setErrorMessage($e->getMessage())
@@ -252,7 +252,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 EventBus::trigger(
                     EventNameEnum::RUN_FAILED->value,
                     $this,
-                    $this->buildRunEventDto($agentCfg->getSessionKey() ?? '', $runId, 0)
+                    $this->buildRunEventDto($agentCfg, $runId, 0)
                         ->setSuccess(false)
                         ->setErrorClass($e::class)
                         ->setErrorMessage($e->getMessage())
@@ -277,13 +277,13 @@ class Skill extends AbstractPromptWithParams implements ISkill
     /**
      * Создает DTO run-события для Skill.
      */
-    private function buildRunEventDto(string $sessionKey, string $runId, int $steps): RunEventDto
+    private function buildRunEventDto(ConfigurationAgent $agentCfg, string $runId, int $steps): RunEventDto
     {
         return (new RunEventDto())
-            ->setSessionKey($sessionKey)
+            ->setSessionKey($agentCfg->getSessionKey() ?? '')
             ->setRunId($runId)
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
-            ->setAgent($this->getConfigurationAgent())
+            ->setAgent($agentCfg)
             ->setType('skill')
             ->setName($this->getName())
             ->setSteps($steps);
@@ -292,13 +292,13 @@ class Skill extends AbstractPromptWithParams implements ISkill
     /**
      * Создает DTO skill-события.
      */
-    private function buildSkillEventDto(string $sessionKey, string $runId): SkillEventDto
+    private function buildSkillEventDto(ConfigurationAgent $agentCfg, string $runId): SkillEventDto
     {
         return (new SkillEventDto())
-            ->setSessionKey($sessionKey)
+            ->setSessionKey($agentCfg->getSessionKey() ?? '')
             ->setRunId($runId)
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
-            ->setAgent($this->getConfigurationAgent())
+            ->setAgent($agentCfg)
             ->setSkillName($this->getName());
     }
 
