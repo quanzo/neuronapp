@@ -145,7 +145,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) : $agentCfg;
             EventBus::trigger(
                 EventNameEnum::RUN_STARTED->value,
-                static::class,
+                $this,
                 $this->buildRunEventDto($sessionCfg->getSessionKey() ?? '', $runId, 0)->setSuccess(true)
             );
 
@@ -193,7 +193,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                             $todoSessionCfg = $r;
                             EventBus::trigger(
                                 EventNameEnum::TODO_AGENT_SWITCHED->value,
-                                static::class,
+                                $this,
                                 $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
                                     ->setTodoAgent($todoSessionCfg->getAgentName())
                                     ->setReason('agent_switched')
@@ -201,7 +201,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                         } else {
                             EventBus::trigger(
                                 EventNameEnum::TODO_AGENT_SWITCHED->value,
-                                static::class,
+                                $this,
                                 $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
                                     ->setTodoAgent($switchToAgentDto->getAgentName())
                                     ->setReason('agent_not_found_use_default')
@@ -212,7 +212,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
 
                 EventBus::trigger(
                     EventNameEnum::TODO_STARTED->value,
-                    static::class,
+                    $this,
                     $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
                         ->setTodoAgent($todoSessionCfg->getAgentName())
                 );
@@ -249,21 +249,21 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                     }
                     EventBus::trigger(
                         EventNameEnum::TODO_COMPLETED->value,
-                        static::class,
+                        $this,
                         $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
                             ->setTodoAgent($todoSessionCfg->getAgentName())
                     );
                 } catch (\Throwable $e) {
                     EventBus::trigger(
                         EventNameEnum::TODO_FAILED->value,
-                        static::class,
+                        $this,
                         $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
                             ->setTodoAgent($todoSessionCfg->getAgentName())
                             ->setReason($e->getMessage())
                     );
                     EventBus::trigger(
                         EventNameEnum::RUN_FAILED->value,
-                        static::class,
+                        $this,
                         $this->buildRunEventDto($sessionCfg->getSessionKey() ?? '', $runId, $stepsExecuted)
                             ->setType('todolist')
                             ->setName($this->getName())
@@ -280,7 +280,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                     if ($gotoRequestedTodoIndex) {
                         EventBus::trigger(
                             EventNameEnum::TODO_GOTO_REQUESTED->value,
-                            static::class,
+                            $this,
                             $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
                                 ->setGotoTargetIndex($gotoRequestedTodoIndex)
                                 ->setGotoTransitionsCount($runStateDto->getGotoTransitionsCount())
@@ -296,7 +296,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                         if ($gotoTransitionsCount > self::MAX_GOTO_TRANSITIONS) {
                             EventBus::trigger(
                                 EventNameEnum::TODO_GOTO_REJECTED->value,
-                                static::class,
+                                $this,
                                 $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
                                     ->setGotoTargetIndex($gotoRequestedTodoIndex)
                                     ->setGotoTransitionsCount($gotoTransitionsCount)
@@ -309,7 +309,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                         if ($gotoRequestedTodoIndex < 0 || $gotoRequestedTodoIndex >= $todoCount) {
                             EventBus::trigger(
                                 EventNameEnum::TODO_GOTO_REJECTED->value,
-                                static::class,
+                                $this,
                                 $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
                                     ->setGotoTargetIndex($gotoRequestedTodoIndex)
                                     ->setGotoTransitionsCount($gotoTransitionsCount)
@@ -333,7 +333,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             }
             EventBus::trigger(
                 EventNameEnum::RUN_FINISHED->value,
-                static::class,
+                $this,
                 $this->buildRunEventDto($sessionCfg->getSessionKey() ?? '', $runId, $stepsExecuted)
                     ->setType('todolist')
                     ->setName($this->getName())

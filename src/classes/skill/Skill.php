@@ -158,7 +158,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
             } catch (\Throwable $e) {
                 EventBus::trigger(
                     EventNameEnum::SKILL_FAILED->value,
-                    static::class,
+                    $this,
                     $this->buildSkillEventDto('', '')
                         ->setSkillName($skillName)
                         ->setSuccess(false)
@@ -192,12 +192,12 @@ class Skill extends AbstractPromptWithParams implements ISkill
         $runId     = $this->generateRunId();
         EventBus::trigger(
             EventNameEnum::RUN_STARTED->value,
-            static::class,
+            $this,
             $this->buildRunEventDto($agentCfg->getSessionKey() ?? '', $runId, 0)->setSuccess(true)
         );
         EventBus::trigger(
             EventNameEnum::SKILL_STARTED->value,
-            static::class,
+            $this,
             $this->buildSkillEventDto($agentCfg->getSessionKey() ?? '', $runId)->setSuccess(true)
         );
 
@@ -231,19 +231,19 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 $agentCfg->getLogger()->info('Skill completed', array_merge($agentCfg->getLogContext(), ['skill' => $this->getName()]));
                 EventBus::trigger(
                     EventNameEnum::SKILL_COMPLETED->value,
-                    static::class,
+                    $this,
                     $this->buildSkillEventDto($agentCfg->getSessionKey() ?? '', $runId)->setSuccess(true)
                 );
                 EventBus::trigger(
                     EventNameEnum::RUN_FINISHED->value,
-                    static::class,
+                    $this,
                     $this->buildRunEventDto($agentCfg->getSessionKey() ?? '', $runId, 1)->setSuccess(true)
                 );
                 return $result;
             } catch (\Throwable $e) {
                 EventBus::trigger(
                     EventNameEnum::SKILL_FAILED->value,
-                    static::class,
+                    $this,
                     $this->buildSkillEventDto($agentCfg->getSessionKey() ?? '', $runId)
                         ->setSuccess(false)
                         ->setErrorClass($e::class)
@@ -251,7 +251,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 );
                 EventBus::trigger(
                     EventNameEnum::RUN_FAILED->value,
-                    static::class,
+                    $this,
                     $this->buildRunEventDto($agentCfg->getSessionKey() ?? '', $runId, 0)
                         ->setSuccess(false)
                         ->setErrorClass($e::class)

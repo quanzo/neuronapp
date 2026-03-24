@@ -53,9 +53,9 @@ class TodoListOrchestrator
         TodoList $initTodoList,
         TodoList $stepTodoList,
         TodoList $finishTodoList,
-        int $maxIterations = 100,
-        bool $restartOnFail = false,
-        int $maxRestarts = 0,
+        int               $maxIterations = 100,
+        bool              $restartOnFail = false,
+        int               $maxRestarts   = 0,
         ?SessionParamsDto $sessionParams = null
     ): OrchestratorResultDto {
 
@@ -72,7 +72,7 @@ class TodoListOrchestrator
             try {
                 EventBus::trigger(
                     EventNameEnum::ORCHESTRATOR_CYCLE_STARTED->value,
-                    static::class,
+                    $this,
                     $this->buildOrchestratorEventDto($restartCount)
                 );
 
@@ -93,7 +93,7 @@ class TodoListOrchestrator
 
                     EventBus::trigger(
                         EventNameEnum::ORCHESTRATOR_STEP_COMPLETED->value,
-                        static::class,
+                        $this,
                         $this->buildOrchestratorEventDto($restartCount)
                             ->setIterations($i)
                             ->setCompletedRaw($completedRaw)
@@ -141,7 +141,7 @@ class TodoListOrchestrator
                 ++$restartCount;
                 EventBus::trigger(
                     EventNameEnum::ORCHESTRATOR_RESTARTED->value,
-                    static::class,
+                    $this,
                     $this->buildOrchestratorEventDto($restartCount)
                         ->setReason('restart_after_error')
                         ->setSuccess(false)
@@ -161,7 +161,7 @@ class TodoListOrchestrator
     {
         EventBus::trigger(
             EventNameEnum::ORCHESTRATOR_COMPLETED->value,
-            static::class,
+            $this,
             $this->buildOrchestratorEventDto($result->getRestartCount())
                 ->setIterations($result->getIterations())
                 ->setCompletedRaw($result->getCompletedRaw())
@@ -193,7 +193,7 @@ class TodoListOrchestrator
 
         EventBus::trigger(
             EventNameEnum::ORCHESTRATOR_FAILED->value,
-            static::class,
+            $this,
             $event
         );
     }
