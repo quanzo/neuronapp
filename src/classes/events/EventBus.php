@@ -137,7 +137,7 @@ class EventBus
                 }
 
                 foreach (static::$events[$eventNameLevel][$eventKey] as $callback) {
-                    $result = $callback($eventData);
+                    $result = call_user_func($callback, $eventData, $_class);
                     if ($result !== null && $result == false) {
                         return;
                     }

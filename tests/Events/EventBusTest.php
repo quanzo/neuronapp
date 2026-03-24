@@ -317,4 +317,40 @@ class EventBusTest extends TestCase
 
         $this->assertSame(['skill.completed'], $calls);
     }
+
+    /**
+     * Callback может принять вторым аргументом инициатор события.
+     */
+    public function testTriggerPassesInitiatorAsSecondCallbackArgument(): void
+    {
+        $subject = new \stdClass();
+        $receivedInitiator = null;
+
+        \app\modules\neuron\classes\events\EventBus::on('event.initiator', static function (mixed $payload, object|string $initiator) use (&$receivedInitiator): void {
+            $receivedInitiator = $initiator;
+        }, '*');
+
+        \app\modules\neuron\classes\events\EventBus::trigger('event.initiator', $subject, ['ok' => true]);
+
+        $this->assertSame($subject, $receivedInitiator);
+    }
+
+    /**
+     * Callback без аргумента инициатора остаётся рабочим.
+     */
+    public function testTriggerDoesNotBreakCallbackWithoutInitiatorArgument(): void
+    {
+        $calls = 0;
+
+        \app\modules\neuron\classes\events\EventBus::on('event.no-initiator', static function (): void {
+            // Проверяем, что дополнительный аргумент не ломает вызов обработчика.
+        }, '*');
+        \app\modules\neuron\classes\events\EventBus::on('event.no-initiator', static function () use (&$calls): void {
+            $calls++;
+        }, '*');
+
+        \app\modules\neuron\classes\events\EventBus::trigger('event.no-initiator', '*', null);
+
+        $this->assertSame(1, $calls);
+    }
 }
