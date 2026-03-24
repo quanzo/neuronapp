@@ -35,7 +35,8 @@ final class ToolLoggingSubscriber
                     return;
                 }
 
-                $logger->info('Tool event: started', $payload->toArray());
+                $effectiveLogger = self::resolveLogger($payload, $logger);
+                $effectiveLogger->info('Tool event: started', $payload->toArray());
             },
             '*'
         );
@@ -47,7 +48,8 @@ final class ToolLoggingSubscriber
                     return;
                 }
 
-                $logger->info('Tool event: completed', $payload->toArray());
+                $effectiveLogger = self::resolveLogger($payload, $logger);
+                $effectiveLogger->info('Tool event: completed', $payload->toArray());
             },
             '*'
         );
@@ -59,7 +61,8 @@ final class ToolLoggingSubscriber
                     return;
                 }
 
-                $logger->error('Tool event: failed', $payload->toArray());
+                $effectiveLogger = self::resolveLogger($payload, $logger);
+                $effectiveLogger->error('Tool event: failed', $payload->toArray());
             },
             '*'
         );
@@ -73,5 +76,18 @@ final class ToolLoggingSubscriber
     public static function reset(): void
     {
         self::$isRegistered = false;
+    }
+
+    /**
+     * Возвращает логгер из конфигурации агента события или fallback-логгер.
+     */
+    private static function resolveLogger(ToolEventDto $payload, LoggerInterface $fallbackLogger): LoggerInterface
+    {
+        $agentCfg = $payload->getAgent();
+        if ($agentCfg !== null) {
+            return $agentCfg->getLoggerWithContext();
+        }
+
+        return $fallbackLogger;
     }
 }

@@ -40,7 +40,8 @@ final class RunLoggingSubscriber
                     return;
                 }
 
-                $logger->info('Run event: started', $payload->toArray());
+                $effectiveLogger = self::resolveLogger($payload, $logger);
+                $effectiveLogger->info('Run event: started', $payload->toArray());
             },
             '*'
         );
@@ -52,7 +53,8 @@ final class RunLoggingSubscriber
                     return;
                 }
 
-                $logger->info('Run event: finished', $payload->toArray());
+                $effectiveLogger = self::resolveLogger($payload, $logger);
+                $effectiveLogger->info('Run event: finished', $payload->toArray());
             },
             '*'
         );
@@ -64,7 +66,8 @@ final class RunLoggingSubscriber
                     return;
                 }
 
-                $logger->error('Run event: failed', $payload->toArray());
+                $effectiveLogger = self::resolveLogger($payload, $logger);
+                $effectiveLogger->error('Run event: failed', $payload->toArray());
             },
             '*'
         );
@@ -78,5 +81,18 @@ final class RunLoggingSubscriber
     public static function reset(): void
     {
         self::$isRegistered = false;
+    }
+
+    /**
+     * Возвращает логгер из конфигурации агента события или fallback-логгер.
+     */
+    private static function resolveLogger(RunEventDto $payload, LoggerInterface $fallbackLogger): LoggerInterface
+    {
+        $agentCfg = $payload->getAgent();
+        if ($agentCfg !== null) {
+            return $agentCfg->getLoggerWithContext();
+        }
+
+        return $fallbackLogger;
     }
 }

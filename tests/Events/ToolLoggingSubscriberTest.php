@@ -17,6 +17,31 @@ use Psr\Log\AbstractLogger;
  */
 final class ToolLoggingSubscriberTest extends TestCase
 {
+    /**
+     * Создает in-memory logger для тестов.
+     */
+    private function createMemoryLogger(): AbstractLogger
+    {
+        return new class () extends AbstractLogger {
+            /** @var list<array{level:string,message:string,context:array<string,mixed>}> */
+            public array $records = [];
+
+            /**
+             * @param mixed $level
+             * @param string|\Stringable $message
+             * @param array<string,mixed> $context
+             */
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->records[] = [
+                    'level' => (string) $level,
+                    'message' => (string) $message,
+                    'context' => $context,
+                ];
+            }
+        };
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -36,28 +61,14 @@ final class ToolLoggingSubscriberTest extends TestCase
      */
     public function testSubscriberLogsToolLifecycleEvents(): void
     {
-        $logger = new class () extends AbstractLogger {
-            /** @var list<array{level:string,message:string,context:array<string,mixed>}> */
-            public array $records = [];
-
-            /**
-             * @param mixed $level
-             * @param string|\Stringable $message
-             * @param array<string,mixed> $context
-             */
-            public function log($level, string|\Stringable $message, array $context = []): void
-            {
-                $this->records[] = [
-                    'level' => (string) $level,
-                    'message' => (string) $message,
-                    'context' => $context,
-                ];
-            }
-        };
+        $logger = $this->createMemoryLogger();
+        $agentLogger = $this->createMemoryLogger();
 
         ToolLoggingSubscriber::register($logger);
         $agentCfg = new ConfigurationAgent();
         $agentCfg->agentName = 'assistant';
+        $agentCfg->setSessionKey('s1');
+        $agentCfg->setLogger($agentLogger);
 
         $event = (new ToolEventDto())
             ->setSessionKey('s1')
@@ -75,13 +86,67 @@ final class ToolLoggingSubscriberTest extends TestCase
             $event->setSuccess(false)->setErrorClass(\RuntimeException::class)->setErrorMessage('boom')
         );
 
-        $this->assertCount(3, $logger->records);
-        $this->assertSame('info', $logger->records[0]['level']);
-        $this->assertSame('Tool event: started', $logger->records[0]['message']);
-        $this->assertSame('info', $logger->records[1]['level']);
-        $this->assertSame('Tool event: completed', $logger->records[1]['message']);
-        $this->assertSame('error', $logger->records[2]['level']);
-        $this->assertSame('Tool event: failed', $logger->records[2]['message']);
-        $this->assertSame('assistant', $logger->records[0]['context']['agentName'] ?? null);
+        $this->assertCount(0, $logger->records);
+        $this->assertCount(3, $agentLogger->records);
+        $this->assertSame('info', $agentLogger->records[0]['level']);
+        $this->assertSame('Tool event: started', $agentLogger->records[0]['message']);
+        $this->assertSame('info', $agentLogger->records[1]['level']);
+        $this->assertSame('Tool event: completed', $agentLogger->records[1]['message']);
+        $this->assertSame('error', $agentLogger->records[2]['level']);
+        $this->assertSame('Tool event: failed', $agentLogger->records[2]['message']);
+        $this->assertSame('assistant', $agentLogger->records[0]['context']['agentName'] ?? null);
+    }
+
+    /**
+     * Если в payload передан agent cfg с логгером, подписчик использует его.
+     */
+    public function testSubscriberUsesLoggerFromAgentConfigurationWhenAvailable(): void
+    {
+        $fallbackLogger = $this->createMemoryLogger();
+        $agentLogger = $this->createMemoryLogger();
+
+        ToolLoggingSubscriber::register($fallbackLogger);
+
+        $agentCfg = new ConfigurationAgent();
+        $agentCfg->agentName = 'assistant';
+        $agentCfg->setSessionKey('s1');
+        $agentCfg->setLogger($agentLogger);
+
+        $event = (new ToolEventDto())
+            ->setSessionKey('s1')
+            ->setRunId('r1')
+            ->setTimestamp('2026-03-24T12:00:00+00:00')
+            ->setAgent($agentCfg)
+            ->setToolName('bash')
+            ->setSuccess(true);
+
+        EventBus::trigger(EventNameEnum::TOOL_STARTED->value, '*', $event);
+
+        $this->assertCount(0, $fallbackLogger->records);
+        $this->assertCount(1, $agentLogger->records);
+        $this->assertSame('Tool event: started', $agentLogger->records[0]['message']);
+        $this->assertSame('assistant', $agentLogger->records[0]['context']['agentName'] ?? null);
+    }
+
+    /**
+     * Если agent cfg отсутствует, подписчик использует fallback logger.
+     */
+    public function testSubscriberUsesFallbackLoggerWhenAgentMissing(): void
+    {
+        $fallbackLogger = $this->createMemoryLogger();
+        ToolLoggingSubscriber::register($fallbackLogger);
+
+        $event = (new ToolEventDto())
+            ->setSessionKey('s1')
+            ->setRunId('r1')
+            ->setTimestamp('2026-03-24T12:00:00+00:00')
+            ->setAgent(null)
+            ->setToolName('bash')
+            ->setSuccess(true);
+
+        EventBus::trigger(EventNameEnum::TOOL_STARTED->value, '*', $event);
+
+        $this->assertCount(1, $fallbackLogger->records);
+        $this->assertSame('Tool event: started', $fallbackLogger->records[0]['message']);
     }
 }

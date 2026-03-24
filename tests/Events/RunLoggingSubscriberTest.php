@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Events;
 
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\events\RunEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\events\subscribers\RunLoggingSubscriber;
@@ -16,6 +17,23 @@ use Psr\Log\AbstractLogger;
  */
 final class RunLoggingSubscriberTest extends TestCase
 {
+    private function createMemoryLogger(): AbstractLogger
+    {
+        return new class () extends AbstractLogger {
+            /** @var list<array{level:string,message:string,context:array<string,mixed>}> */
+            public array $records = [];
+
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->records[] = [
+                    'level' => (string) $level,
+                    'message' => (string) $message,
+                    'context' => $context,
+                ];
+            }
+        };
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -35,31 +53,20 @@ final class RunLoggingSubscriberTest extends TestCase
      */
     public function testSubscriberLogsRunLifecycleEvents(): void
     {
-        $logger = new class () extends AbstractLogger {
-            /** @var list<array{level:string,message:string,context:array<string,mixed>}> */
-            public array $records = [];
-
-            /**
-             * @param mixed $level
-             * @param string|\Stringable $message
-             * @param array<string,mixed> $context
-             */
-            public function log($level, string|\Stringable $message, array $context = []): void
-            {
-                $this->records[] = [
-                    'level' => (string) $level,
-                    'message' => (string) $message,
-                    'context' => $context,
-                ];
-            }
-        };
+        $logger = $this->createMemoryLogger();
+        $agentLogger = $this->createMemoryLogger();
 
         RunLoggingSubscriber::register($logger);
+        $agentCfg = new ConfigurationAgent();
+        $agentCfg->agentName = 'assistant';
+        $agentCfg->setSessionKey('s1');
+        $agentCfg->setLogger($agentLogger);
 
         $event = (new RunEventDto())
             ->setSessionKey('s1')
             ->setRunId('r1')
             ->setTimestamp('2026-03-24T12:00:00+00:00')
+            ->setAgent($agentCfg)
             ->setType('skill')
             ->setName('search')
             ->setSteps(1)
@@ -73,12 +80,13 @@ final class RunLoggingSubscriberTest extends TestCase
             $event->setSuccess(false)->setErrorClass(\RuntimeException::class)->setErrorMessage('boom')
         );
 
-        $this->assertCount(3, $logger->records);
-        $this->assertSame('info', $logger->records[0]['level']);
-        $this->assertSame('Run event: started', $logger->records[0]['message']);
-        $this->assertSame('info', $logger->records[1]['level']);
-        $this->assertSame('Run event: finished', $logger->records[1]['message']);
-        $this->assertSame('error', $logger->records[2]['level']);
-        $this->assertSame('Run event: failed', $logger->records[2]['message']);
+        $this->assertCount(0, $logger->records);
+        $this->assertCount(3, $agentLogger->records);
+        $this->assertSame('info', $agentLogger->records[0]['level']);
+        $this->assertSame('Run event: started', $agentLogger->records[0]['message']);
+        $this->assertSame('info', $agentLogger->records[1]['level']);
+        $this->assertSame('Run event: finished', $agentLogger->records[1]['message']);
+        $this->assertSame('error', $agentLogger->records[2]['level']);
+        $this->assertSame('Run event: failed', $agentLogger->records[2]['message']);
     }
 }

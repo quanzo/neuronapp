@@ -85,6 +85,8 @@ Payload события передаётся как DTO:
 
 - `RunLoggingSubscriber` — логирует `run.*` события в PSR-3 логгер.
 - `ToolLoggingSubscriber` — логирует `tool.*` события в PSR-3 логгер.
+- `SkillLoggingSubscriber` — логирует `skill.*` события в PSR-3 логгер.
+- `TodoListLoggingSubscriber` — логирует `todo.*` события в PSR-3 логгер.
 
 ## Поле agentName в DTO
 
