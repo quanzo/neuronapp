@@ -6,6 +6,7 @@ namespace app\modules\neuron\classes\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\events\subscribers\RunLoggingSubscriber;
+use app\modules\neuron\classes\events\subscribers\ToolLoggingSubscriber;
 use app\modules\neuron\classes\logger\FileLogger;
 use app\modules\neuron\classes\todo\TodoList;
 use app\modules\neuron\helpers\ConsoleHelper;
@@ -33,5 +34,6 @@ class AbstractAgentCommand extends Command
         $logger = new FileLogger($logDir . DIRECTORY_SEPARATOR . $fn);
         $appCfg->setLogger($logger);
         RunLoggingSubscriber::register($logger);
+        ToolLoggingSubscriber::register($logger);
     }
 }

@@ -29,6 +29,10 @@ enum EventNameEnum: string
     case SKILL_COMPLETED = 'skill.completed';
     case SKILL_FAILED    = 'skill.failed';
 
+    case TOOL_STARTED   = 'tool.started';
+    case TOOL_COMPLETED = 'tool.completed';
+    case TOOL_FAILED    = 'tool.failed';
+
     case ORCHESTRATOR_CYCLE_STARTED  = 'orchestrator.cycle_started';
     case ORCHESTRATOR_STEP_COMPLETED = 'orchestrator.step_completed';
     case ORCHESTRATOR_COMPLETED      = 'orchestrator.completed';

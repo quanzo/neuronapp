@@ -285,6 +285,7 @@ class TodoListOrchestrator
         return (new OrchestratorEventDto())
             ->setSessionKey($this->configApp->getSessionKey())
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setAgent(null)
             ->setRestartCount($restartCount);
     }
 }

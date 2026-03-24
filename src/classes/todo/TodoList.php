@@ -427,6 +427,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             ->setSessionKey($sessionKey)
             ->setRunId($runId)
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setAgent($this->getConfigurationAgent())
             ->setType('todolist')
             ->setName($this->getName())
             ->setSteps($stepsExecuted);
@@ -441,6 +442,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             ->setSessionKey($sessionKey)
             ->setRunId($runId)
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setAgent($this->getConfigurationAgent())
             ->setTodoListName($this->getName())
             ->setTodoIndex($todoIndex)
             ->setTodo($todoText);

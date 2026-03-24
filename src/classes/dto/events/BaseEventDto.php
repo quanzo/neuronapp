@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\events;
 
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\interfaces\IArrayable;
 
 /**
@@ -24,6 +25,7 @@ class BaseEventDto implements IArrayable
     private string $sessionKey = '';
     private string $runId = '';
     private string $timestamp = '';
+    private ?ConfigurationAgent $agent = null;
 
     /**
      * Возвращает ключ сессии.
@@ -77,6 +79,23 @@ class BaseEventDto implements IArrayable
     }
 
     /**
+     * Возвращает имя агента (если доступно).
+     */
+    public function getAgent(): ?ConfigurationAgent
+    {
+        return $this->agent;
+    }
+
+    /**
+     * Устанавливает конфигурацию агента.
+     */
+    public function setAgent(?ConfigurationAgent $agent): self
+    {
+        $this->agent = $agent;
+        return $this;
+    }
+
+    /**
      * Преобразует DTO в массив для логирования/сериализации.
      *
      * @return array<string, mixed>
@@ -85,8 +104,9 @@ class BaseEventDto implements IArrayable
     {
         return [
             'sessionKey' => $this->sessionKey,
-            'runId' => $this->runId,
-            'timestamp' => $this->timestamp,
+            'runId'      => $this->runId,
+            'timestamp'  => $this->timestamp,
+            'agentName'  => $this->agent?->getAgentName(),
         ];
     }
 }

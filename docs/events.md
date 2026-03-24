@@ -50,6 +50,7 @@ Payload события передаётся как DTO:
 - `TodoEventDto` (`src/classes/dto/events/TodoEventDto.php`)
 - `SkillEventDto` (`src/classes/dto/events/SkillEventDto.php`)
 - `OrchestratorEventDto` (`src/classes/dto/events/OrchestratorEventDto.php`)
+- `ToolEventDto` (`src/classes/dto/events/ToolEventDto.php`)
 
 Это позволяет уйти от неструктурированных массивов и стабилизировать контракт данных.
 
@@ -67,6 +68,9 @@ Payload события передаётся как DTO:
 - `skill.started`
 - `skill.completed`
 - `skill.failed`
+- `tool.started`
+- `tool.completed`
+- `tool.failed`
 - `orchestrator.cycle_started`
 - `orchestrator.step_completed`
 - `orchestrator.completed`
@@ -80,5 +84,14 @@ Payload события передаётся как DTO:
 Текущий подписчик:
 
 - `RunLoggingSubscriber` — логирует `run.*` события в PSR-3 логгер.
+- `ToolLoggingSubscriber` — логирует `tool.*` события в PSR-3 логгер.
+
+## Поле agentName в DTO
+
+Базовый `BaseEventDto` содержит поле `agentName`.
+
+- В самом DTO хранится ссылка на объект `ConfigurationAgent` (если доступен).
+- В `toArray()` выводится только имя агента (`agentName`).
+- Полный объект конфигурации агента (`agent cfg`) в payload не сериализуется.
 
 Регистрация подписчиков выполняется напрямую в `AbstractAgentCommand::resolveFileLogger()`.

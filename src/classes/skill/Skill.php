@@ -283,6 +283,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
             ->setSessionKey($sessionKey)
             ->setRunId($runId)
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setAgent($this->getConfigurationAgent())
             ->setType('skill')
             ->setName($this->getName())
             ->setSteps($steps);
@@ -297,6 +298,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
             ->setSessionKey($sessionKey)
             ->setRunId($runId)
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setAgent($this->getConfigurationAgent())
             ->setSkillName($this->getName());
     }
 
