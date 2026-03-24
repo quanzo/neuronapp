@@ -254,4 +254,67 @@ class EventBusTest extends TestCase
 
         $this->assertSame(['global'], $calls);
     }
+
+    /**
+     * trigger дочернего имени вызывает обработчики в порядке:
+     * event.child -> event -> *.
+     */
+    public function testTriggerEventNameHierarchyUsesSpecificParentAndWildcardOrder(): void
+    {
+        $calls = [];
+
+        \app\modules\neuron\classes\events\EventBus::on('skill.completed', static function () use (&$calls): void {
+            $calls[] = 'skill.completed';
+        }, '*');
+        \app\modules\neuron\classes\events\EventBus::on('skill', static function () use (&$calls): void {
+            $calls[] = 'skill';
+        }, '*');
+        \app\modules\neuron\classes\events\EventBus::on('*', static function () use (&$calls): void {
+            $calls[] = '*';
+        }, '*');
+
+        \app\modules\neuron\classes\events\EventBus::trigger('skill.completed', '*', null);
+
+        $this->assertSame(['skill.completed', 'skill', '*'], $calls);
+    }
+
+    /**
+     * Обработчик на "родительском" событии ловит дочерние события.
+     */
+    public function testParentEventHandlerCatchesChildEvent(): void
+    {
+        $calls = 0;
+
+        \app\modules\neuron\classes\events\EventBus::on('skill', static function () use (&$calls): void {
+            $calls++;
+        }, '*');
+
+        \app\modules\neuron\classes\events\EventBus::trigger('skill.failed', '*', null);
+        \app\modules\neuron\classes\events\EventBus::trigger('skill.completed', '*', null);
+
+        $this->assertSame(2, $calls);
+    }
+
+    /**
+     * Возврат false останавливает всю цепочку иерархии имен событий.
+     */
+    public function testFalseReturnStopsEventNameHierarchyChain(): void
+    {
+        $calls = [];
+
+        \app\modules\neuron\classes\events\EventBus::on('skill.completed', static function () use (&$calls): bool {
+            $calls[] = 'skill.completed';
+            return false;
+        }, '*');
+        \app\modules\neuron\classes\events\EventBus::on('skill', static function () use (&$calls): void {
+            $calls[] = 'skill';
+        }, '*');
+        \app\modules\neuron\classes\events\EventBus::on('*', static function () use (&$calls): void {
+            $calls[] = '*';
+        }, '*');
+
+        \app\modules\neuron\classes\events\EventBus::trigger('skill.completed', '*', null);
+
+        $this->assertSame(['skill.completed'], $calls);
+    }
 }

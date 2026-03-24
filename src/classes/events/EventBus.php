@@ -123,23 +123,58 @@ class EventBus
         object|string $_class = self::GLOBAL_EVENT_KEY,
         mixed $eventData = null
     ): void {
-        if (empty(static::$events[$eventName])) {
-            return;
-        }
-
+        $eventNames = static::resolveTriggerEventNames($eventName);
         $eventKeys = static::resolveTriggerEventKeys($_class);
-        foreach ($eventKeys as $eventKey) {
-            if (!isset(static::$events[$eventName][$eventKey])) {
+
+        foreach ($eventNames as $eventNameLevel) {
+            if (empty(static::$events[$eventNameLevel])) {
                 continue;
             }
 
-            foreach (static::$events[$eventName][$eventKey] as $callback) {
-                $result = $callback($eventData);
-                if ($result !== null && $result == false) {
-                    return;
+            foreach ($eventKeys as $eventKey) {
+                if (!isset(static::$events[$eventNameLevel][$eventKey])) {
+                    continue;
+                }
+
+                foreach (static::$events[$eventNameLevel][$eventKey] as $callback) {
+                    $result = $callback($eventData);
+                    if ($result !== null && $result == false) {
+                        return;
+                    }
                 }
             }
         }
+    }
+
+    /**
+     * Разрешить иерархию имен событий для trigger().
+     *
+     * Пример:
+     * - `skill.completed` => [`skill.completed`, `skill`, `*`]
+     * - `skill` => [`skill`, `*`]
+     * - `*` => [`*`]
+     *
+     * @param string $eventName Исходное имя события.
+     * @return array<int, string> Имена событий в порядке вызова.
+     */
+    protected static function resolveTriggerEventNames(string $eventName): array
+    {
+        $eventName = trim($eventName);
+        if ($eventName === '' || $eventName === static::GLOBAL_EVENT_KEY) {
+            return [static::GLOBAL_EVENT_KEY];
+        }
+
+        $names = [$eventName];
+        while (str_contains($eventName, '.')) {
+            $eventName = (string) substr($eventName, 0, strrpos($eventName, '.'));
+            if ($eventName === '') {
+                break;
+            }
+            $names[] = $eventName;
+        }
+
+        $names[] = static::GLOBAL_EVENT_KEY;
+        return array_values(array_unique($names));
     }
 
     /**

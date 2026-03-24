@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\helpers;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\tools\ATool;
 use app\modules\neuron\tools\GitSummaryTool;
 use app\modules\neuron\tools\IntermediateExistTool;
 use app\modules\neuron\tools\IntermediateListTool;
@@ -26,7 +27,7 @@ use NeuronAI\Tools\ToolInterface;
  * текстовых компонентов (skills, todolist и др.), в сессионную конфигурацию
  * агента {@see ConfigurationAgent}.
  */
-final class ToolRegistry
+class ToolRegistry
 {
     /**
      * Создаёт экземпляр встроенного инструмента по его имени.
@@ -43,7 +44,7 @@ final class ToolRegistry
             return null;
         }
 
-        return match ($name) {
+        $tool = match ($name) {
             'wiki_search'         => new WikiSearchTool(),
             'ru_wiki_search'      => new RuWikiSearchTool(),
             'uni_search'          => new UniSearchTool(),
@@ -58,5 +59,9 @@ final class ToolRegistry
             'todo_completed'      => new TodoCompletedTool(),
             default => null,
         };
+        if ($tool && $tool instanceof ATool) {
+            $tool->setAgentCfg($agentCfg);
+        }
+        return $tool;
     }
 }
