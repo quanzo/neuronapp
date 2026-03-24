@@ -8,19 +8,15 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\events\ToolEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
-use app\modules\neuron\traits\LoggerAwareTrait;
 use NeuronAI\Tools\Tool;
 
 /**
- * Базовый класс инструментов модуля с поддержкой логирования.
+ * Базовый класс инструментов модуля с публикацией событий.
  *
- * Наследники получают логгер через setLogger() при конфигурировании агента
- * и логируют вызов и завершение (или ошибку) в execute().
+ * Логирование выполняется подписчиками EventBus на события tool.*.
  */
 abstract class ATool extends Tool
 {
-    use LoggerAwareTrait;
-
     private $_agentCfg = null;
 
     /**
@@ -46,13 +42,12 @@ abstract class ATool extends Tool
     }
 
     /**
-     * Выполняет инструмент с логированием начала, успешного завершения и ошибок.
+     * Выполняет инструмент с публикацией событий начала, завершения и ошибок.
      *
-     * @throws \Throwable Пробрасывает исключение после записи в лог
+     * @throws \Throwable Пробрасывает исключение после публикации события ошибки.
      */
     public function execute(): void
     {
-        $logger = $this->getLogger();
         $name   = $this->getName();
 
         EventBus::trigger(
@@ -60,7 +55,6 @@ abstract class ATool extends Tool
             static::class,
             $this->buildToolEventDto()->setSuccess(true)
         );
-        $logger->info('Вызов инструмента', ['tool' => $name]);
 
         try {
             parent::execute();
@@ -69,7 +63,6 @@ abstract class ATool extends Tool
                 static::class,
                 $this->buildToolEventDto()->setSuccess(true)
             );
-            $logger->info('Инструмент завершён', ['tool' => $name]);
         } catch (\Throwable $e) {
             EventBus::trigger(
                 EventNameEnum::TOOL_FAILED->value,
@@ -79,7 +72,6 @@ abstract class ATool extends Tool
                     ->setErrorClass($e::class)
                     ->setErrorMessage($e->getMessage())
             );
-            $logger->error('Ошибка выполнения инструмента', ['tool' => $name, 'exception' => $e]);
             throw $e;
         }
     }

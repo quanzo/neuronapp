@@ -82,7 +82,6 @@ trait AttachesSkillToolsTrait
                     $tool->setLogger($a->getLoggerWithContext());
                     */
                     $tool->setAgentCfg($sessionCfg);
-                    $tool->setLogger($sessionCfg->getLoggerWithContext());
                 }
                 $sessionTools[] = $tool;
             }

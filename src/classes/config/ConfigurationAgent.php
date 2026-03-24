@@ -507,13 +507,11 @@ class ConfigurationAgent implements IDependConfigApp
             }
         }
 
-        $loggerWithContext = $this->getLoggerWithContext();
         foreach ($tools as $tool) {
             if ($tool instanceof ATool) {
                 /**
-                 * В инструмент пробрасываем логгер и агента, который будет его использовать
+                 * В инструмент пробрасываем агента, который будет его использовать.
                  */
-                $tool->setLogger($loggerWithContext);
                 $tool->setAgentCfg($this);
             }
         }

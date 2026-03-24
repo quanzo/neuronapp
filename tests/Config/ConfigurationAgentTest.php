@@ -18,7 +18,6 @@ use NeuronAI\RAG\Embeddings\EmbeddingsProviderInterface;
 use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 use NeuronAI\Providers\AIProviderInterface;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\LoggerInterface;
 
 /**
  * Тесты для {@see ConfigurationAgent}.
@@ -456,7 +455,7 @@ JSONC;
 
     /**
      * getTools() объединяет инструменты из конфигурации и MCP-коннекторов
-     * и проставляет им логгер через setLogger(), если это наследники ATool.
+     * и проставляет им agent cfg через setAgentCfg(), если это наследники ATool.
      */
     public function testGetToolsMcpAndLoggerInjected(): void
     {
@@ -464,18 +463,15 @@ JSONC;
             'tools' => [],
         ], ConfigurationApp::getInstance());
 
-        $logger = $this->createMock(LoggerInterface::class);
-        $cfg->setLogger($logger);
-
         $directTool = $this->createMock(ATool::class);
         $directTool->expects($this->once())
-            ->method('setLogger')
-            ->with($this->isInstanceOf(LoggerInterface::class));
+            ->method('setAgentCfg')
+            ->with($this->identicalTo($cfg));
 
         $mcpTool = $this->createMock(ATool::class);
         $mcpTool->expects($this->once())
-            ->method('setLogger')
-            ->with($this->isInstanceOf(LoggerInterface::class));
+            ->method('setAgentCfg')
+            ->with($this->identicalTo($cfg));
 
         $mcpConnector = $this->createMock(McpConnector::class);
         $mcpConnector->method('tools')->willReturn([$mcpTool]);
