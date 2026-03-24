@@ -39,8 +39,6 @@ final class OrchestrateCommand extends AbstractAgentCommand
             ->addOption('max_iters', null, InputOption::VALUE_OPTIONAL, 'Макс. число итераций step', '100')
             ->addOption('restart_on_fail', null, InputOption::VALUE_NONE, 'Разрешить перезапуск цикла при ошибках')
             ->addOption('max_restarts', null, InputOption::VALUE_OPTIONAL, 'Макс. число перезапусков', '0')
-            ->addOption('log_level', null, InputOption::VALUE_OPTIONAL, 'off|minimal|normal|debug', 'normal')
-            ->addOption('quiet_logs', null, InputOption::VALUE_NONE, 'Отключить логи оркестратора')
             ->addOption('date', null, InputOption::VALUE_OPTIONAL, 'Сессионный параметр date для плейсхолдера $date')
             ->addOption(
                 'branch',
@@ -111,15 +109,8 @@ final class OrchestrateCommand extends AbstractAgentCommand
         $maxIterations = max(1, (int) $input->getOption('max_iters'));
         $restartOnFail = (bool) $input->getOption('restart_on_fail');
         $maxRestarts = max(0, (int) $input->getOption('max_restarts'));
-        $quietLogs = (bool) $input->getOption('quiet_logs');
-        $logLevel = (string) ($input->getOption('log_level') ?? TodoListOrchestrator::LOG_NORMAL);
 
-        $orchestrator = new TodoListOrchestrator(
-            $configApp,
-            $configApp->getLoggerWithContext(),
-            !$quietLogs,
-            $logLevel
-        );
+        $orchestrator = new TodoListOrchestrator($configApp);
 
         try {
             $result = $orchestrator->run(

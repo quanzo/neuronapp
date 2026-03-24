@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\orchestrators;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dto\events\OrchestratorEventDto;
 use app\modules\neuron\classes\dto\orchestrator\OrchestratorResultDto;
 use app\modules\neuron\classes\dto\params\SessionParamsDto;
+use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\classes\todo\TodoList;
 use NeuronAI\Chat\Enums\MessageRole;
-use Psr\Log\LoggerInterface;
 use Revolt\EventLoop;
 
 /**
@@ -31,37 +33,9 @@ use Revolt\EventLoop;
  */
 class TodoListOrchestrator
 {
-    public const LOG_OFF = 'off';
-    public const LOG_MINIMAL = 'minimal';
-    public const LOG_NORMAL = 'normal';
-    public const LOG_DEBUG = 'debug';
-
     public function __construct(
         private readonly ConfigurationApp $configApp,
-        private readonly ?LoggerInterface $logger = null,
-        private bool $enableLogging = true,
-        private string $logLevel = self::LOG_NORMAL,
     ) {
-    }
-
-    /**
-     * Включает/выключает логирование оркестратора.
-     */
-    public function setEnableLogging(bool $enableLogging): self
-    {
-        $this->enableLogging = $enableLogging;
-        return $this;
-    }
-
-    /**
-     * Устанавливает уровень детализации логирования.
-     *
-     * Допустимые уровни: off|minimal|normal|debug.
-     */
-    public function setLogLevel(string $logLevel): self
-    {
-        $this->logLevel = $this->normalizeLogLevel($logLevel);
-        return $this;
     }
 
     /**
@@ -96,11 +70,11 @@ class TodoListOrchestrator
 
         while (true) {
             try {
-                $this->logInfo('orchestrator.start_cycle', [
-                    'restart_count'  => $restartCount,
-                    'max_restarts'   => $maxRestarts,
-                    'max_iterations' => $maxIterations,
-                ], self::LOG_MINIMAL);
+                EventBus::trigger(
+                    EventNameEnum::ORCHESTRATOR_CYCLE_STARTED->value,
+                    static::class,
+                    $this->buildOrchestratorEventDto($restartCount)
+                );
 
                 $this->setCompleted(0, 'orchestrator-start');
                 $this->executeTodoList($initTodoList, $sessionParams);
@@ -117,11 +91,14 @@ class TodoListOrchestrator
                     $completedRaw = $this->readCompletedRaw();
                     $completedNormalized = $this->normalizeCompleted($completedRaw);
 
-                    $this->logInfo('orchestrator.step_state', [
-                        'iteration'            => $i,
-                        'completed_raw'        => $completedRaw,
-                        'completed_normalized' => $completedNormalized,
-                    ], self::LOG_NORMAL);
+                    EventBus::trigger(
+                        EventNameEnum::ORCHESTRATOR_STEP_COMPLETED->value,
+                        static::class,
+                        $this->buildOrchestratorEventDto($restartCount)
+                            ->setIterations($i)
+                            ->setCompletedRaw($completedRaw)
+                            ->setCompletedNormalized($completedNormalized)
+                    );
 
                     if ($completedNormalized === 1) {
                         $completedByLimit = false;
@@ -136,11 +113,6 @@ class TodoListOrchestrator
                     ->setCompletedNormalized($completedNormalized);
 
                 if ($completedByLimit) {
-                    $this->logWarning('orchestrator.max_iterations_reached', [
-                        'iterations'     => $iterations,
-                        'max_iterations' => $maxIterations,
-                    ], self::LOG_MINIMAL);
-
                     $this->executeTodoList($finishTodoList, $sessionParams);
                     $result
                         ->setSuccess(false)
@@ -163,21 +135,19 @@ class TodoListOrchestrator
                 $this->onFail($e, $result);
 
                 if (!$restartOnFail || $restartCount >= $maxRestarts) {
-                    $this->logError('orchestrator.stopped_by_error', [
-                        'restart_on_fail' => $restartOnFail,
-                        'restart_count'   => $restartCount,
-                        'max_restarts'    => $maxRestarts,
-                        'error'           => $e->getMessage(),
-                    ], self::LOG_MINIMAL);
                     throw $e;
                 }
 
                 ++$restartCount;
-                $this->logWarning('orchestrator.restart_after_error', [
-                    'restart_count' => $restartCount,
-                    'max_restarts'  => $maxRestarts,
-                    'error'         => $e->getMessage(),
-                ], self::LOG_MINIMAL);
+                EventBus::trigger(
+                    EventNameEnum::ORCHESTRATOR_RESTARTED->value,
+                    static::class,
+                    $this->buildOrchestratorEventDto($restartCount)
+                        ->setReason('restart_after_error')
+                        ->setSuccess(false)
+                        ->setErrorClass($e::class)
+                        ->setErrorMessage($e->getMessage())
+                );
             }
         }
     }
@@ -189,7 +159,16 @@ class TodoListOrchestrator
      */
     protected function onComplete(OrchestratorResultDto $result): void
     {
-        $this->logInfo('orchestrator.on_complete', $result->toArray(), self::LOG_MINIMAL);
+        EventBus::trigger(
+            EventNameEnum::ORCHESTRATOR_COMPLETED->value,
+            static::class,
+            $this->buildOrchestratorEventDto($result->getRestartCount())
+                ->setIterations($result->getIterations())
+                ->setCompletedRaw($result->getCompletedRaw())
+                ->setCompletedNormalized($result->getCompletedNormalized())
+                ->setReason($result->getReason())
+                ->setSuccess($result->isSuccess())
+        );
     }
 
     /**
@@ -199,13 +178,24 @@ class TodoListOrchestrator
      */
     protected function onFail(\Throwable|string $reason, ?OrchestratorResultDto $result = null): void
     {
-        $payload = $result?->toArray() ?? [];
+        $event = $this->buildOrchestratorEventDto($result?->getRestartCount() ?? 0)
+            ->setIterations($result?->getIterations() ?? 0)
+            ->setCompletedRaw($result?->getCompletedRaw())
+            ->setCompletedNormalized($result?->getCompletedNormalized())
+            ->setReason($reason instanceof \Throwable ? 'error' : (string) $reason)
+            ->setSuccess(false);
+
         if ($reason instanceof \Throwable) {
-            $payload['error'] = $reason->getMessage();
-        } else {
-            $payload['error'] = $reason;
+            $event
+                ->setErrorClass($reason::class)
+                ->setErrorMessage($reason->getMessage());
         }
-        $this->logWarning('orchestrator.on_fail', $payload, self::LOG_MINIMAL);
+
+        EventBus::trigger(
+            EventNameEnum::ORCHESTRATOR_FAILED->value,
+            static::class,
+            $event
+        );
     }
 
     /**
@@ -288,62 +278,13 @@ class TodoListOrchestrator
     }
 
     /**
-     * Приводит уровень логирования к поддерживаемому набору.
+     * Создает DTO оркестраторного события.
      */
-    private function normalizeLogLevel(string $level): string
+    private function buildOrchestratorEventDto(int $restartCount): OrchestratorEventDto
     {
-        $v = strtolower(trim($level));
-        return match ($v) {
-            self::LOG_OFF, self::LOG_MINIMAL, self::LOG_NORMAL, self::LOG_DEBUG => $v,
-            default => self::LOG_NORMAL,
-        };
-    }
-
-    private function shouldLog(string $requiredLevel): bool
-    {
-        if (!$this->enableLogging || $this->logger === null || $this->logLevel === self::LOG_OFF) {
-            return false;
-        }
-
-        $order = [
-            self::LOG_MINIMAL => 1,
-            self::LOG_NORMAL => 2,
-            self::LOG_DEBUG => 3,
-        ];
-
-        $current = $order[$this->logLevel] ?? 2;
-        $required = $order[$requiredLevel] ?? 2;
-
-        return $current >= $required;
-    }
-
-    /**
-     * @param array<string,mixed> $context
-     */
-    private function logInfo(string $message, array $context, string $requiredLevel): void
-    {
-        if ($this->shouldLog($requiredLevel)) {
-            $this->logger?->info($message, $context);
-        }
-    }
-
-    /**
-     * @param array<string,mixed> $context
-     */
-    private function logWarning(string $message, array $context, string $requiredLevel): void
-    {
-        if ($this->shouldLog($requiredLevel)) {
-            $this->logger?->warning($message, $context);
-        }
-    }
-
-    /**
-     * @param array<string,mixed> $context
-     */
-    private function logError(string $message, array $context, string $requiredLevel): void
-    {
-        if ($this->shouldLog($requiredLevel)) {
-            $this->logger?->error($message, $context);
-        }
+        return (new OrchestratorEventDto())
+            ->setSessionKey($this->configApp->getSessionKey())
+            ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setRestartCount($restartCount);
     }
 }

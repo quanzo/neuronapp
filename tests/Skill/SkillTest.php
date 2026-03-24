@@ -6,6 +6,7 @@ namespace Tests\Skill;
 
 use Amp\Future;
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\interfaces\ISkill;
 use app\modules\neuron\helpers\ToolRegistry;
@@ -31,6 +32,18 @@ use PHPUnit\Framework\TestCase;
  */
 class SkillTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        EventBus::clear();
+    }
+
+    protected function tearDown(): void
+    {
+        EventBus::clear();
+        parent::tearDown();
+    }
+
     /**
      * Класс Skill реализует интерфейс ISkill.
      */

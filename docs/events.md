@@ -39,3 +39,46 @@
 - `EventBus::clear('event.name')` удаляет подписки только указанного события.
 
 Эта операция полезна в тестах и long-running процессах для изоляции состояния.
+
+## Имена событий и DTO
+
+Для имен событий используется enum `EventNameEnum` (`src/enums/EventNameEnum.php`).
+
+Payload события передаётся как DTO:
+
+- `RunEventDto` (`src/classes/dto/events/RunEventDto.php`)
+- `TodoEventDto` (`src/classes/dto/events/TodoEventDto.php`)
+- `SkillEventDto` (`src/classes/dto/events/SkillEventDto.php`)
+- `OrchestratorEventDto` (`src/classes/dto/events/OrchestratorEventDto.php`)
+
+Это позволяет уйти от неструктурированных массивов и стабилизировать контракт данных.
+
+## Каталог событий
+
+- `run.started`
+- `run.finished`
+- `run.failed`
+- `todo.started`
+- `todo.completed`
+- `todo.failed`
+- `todo.goto_requested`
+- `todo.goto_rejected`
+- `todo.agent_switched`
+- `skill.started`
+- `skill.completed`
+- `skill.failed`
+- `orchestrator.cycle_started`
+- `orchestrator.step_completed`
+- `orchestrator.completed`
+- `orchestrator.failed`
+- `orchestrator.restarted`
+
+## Подписчики
+
+Подписчики находятся в `src/classes/events/subscribers`.
+
+Текущий подписчик:
+
+- `RunLoggingSubscriber` — логирует `run.*` события в PSR-3 логгер.
+
+Регистрация подписчиков выполняется напрямую в `AbstractAgentCommand::resolveFileLogger()`.

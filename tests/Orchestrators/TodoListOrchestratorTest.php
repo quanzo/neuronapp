@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Tests\Orchestrators;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dto\events\OrchestratorEventDto;
 use app\modules\neuron\classes\dir\DirPriority;
+use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\classes\orchestrators\TodoListOrchestrator;
 use app\modules\neuron\classes\todo\TodoList;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -34,6 +37,7 @@ final class TodoListOrchestratorTest extends TestCase
     protected function setUp(): void
     {
         OrchestratorSpyProvider::reset();
+        EventBus::clear();
 
         $this->tmpDir = sys_get_temp_dir() . '/neuronapp_orchestrator_' . uniqid();
         mkdir($this->tmpDir, 0777, true);
@@ -78,6 +82,7 @@ final class TodoListOrchestratorTest extends TestCase
 
     protected function tearDown(): void
     {
+        EventBus::clear();
         $this->resetConfigurationAppSingleton();
         if (is_dir($this->tmpDir)) {
             $this->removeDir($this->tmpDir);
@@ -91,7 +96,7 @@ final class TodoListOrchestratorTest extends TestCase
     {
         OrchestratorSpyProvider::setCompleteOnStepCall(3);
 
-        $orchestrator = new TestableTodoListOrchestrator($this->configApp, null, false);
+        $orchestrator = new TestableTodoListOrchestrator($this->configApp);
         $result = $orchestrator->run($this->init, $this->step, $this->finish, 10, false, 0);
 
         $this->assertTrue($result->isSuccess());
@@ -108,7 +113,7 @@ final class TodoListOrchestratorTest extends TestCase
     {
         OrchestratorSpyProvider::setCompleteOnStepCall(1000);
 
-        $orchestrator = new TestableTodoListOrchestrator($this->configApp, null, false);
+        $orchestrator = new TestableTodoListOrchestrator($this->configApp);
         $result = $orchestrator->run($this->init, $this->step, $this->finish, 2, false, 0);
 
         $this->assertFalse($result->isSuccess());
@@ -126,7 +131,7 @@ final class TodoListOrchestratorTest extends TestCase
         OrchestratorSpyProvider::setFailOnStepCalls([1]);
         OrchestratorSpyProvider::setCompleteOnStepCall(2);
 
-        $orchestrator = new TestableTodoListOrchestrator($this->configApp, null, false);
+        $orchestrator = new TestableTodoListOrchestrator($this->configApp);
         $result = $orchestrator->run($this->init, $this->step, $this->finish, 5, true, 1);
 
         $this->assertTrue($result->isSuccess());
@@ -144,10 +149,43 @@ final class TodoListOrchestratorTest extends TestCase
         OrchestratorSpyProvider::setFailOnStepCalls([1]);
         OrchestratorSpyProvider::setCompleteOnStepCall(2);
 
-        $orchestrator = new TestableTodoListOrchestrator($this->configApp, null, false);
+        $orchestrator = new TestableTodoListOrchestrator($this->configApp);
 
         $this->expectException(\RuntimeException::class);
         $orchestrator->run($this->init, $this->step, $this->finish, 5, false, 0);
+    }
+
+    /**
+     * Оркестратор публикует события цикла, шагов и успешного завершения.
+     */
+    public function testRunEmitsOrchestratorLifecycleEvents(): void
+    {
+        OrchestratorSpyProvider::setCompleteOnStepCall(2);
+
+        $events = [];
+        EventBus::on(EventNameEnum::ORCHESTRATOR_CYCLE_STARTED->value, static function (mixed $payload) use (&$events): void {
+            if ($payload instanceof OrchestratorEventDto) {
+                $events[] = EventNameEnum::ORCHESTRATOR_CYCLE_STARTED->value;
+            }
+        }, '*');
+        EventBus::on(EventNameEnum::ORCHESTRATOR_STEP_COMPLETED->value, static function (mixed $payload) use (&$events): void {
+            if ($payload instanceof OrchestratorEventDto) {
+                $events[] = EventNameEnum::ORCHESTRATOR_STEP_COMPLETED->value;
+            }
+        }, '*');
+        EventBus::on(EventNameEnum::ORCHESTRATOR_COMPLETED->value, static function (mixed $payload) use (&$events): void {
+            if ($payload instanceof OrchestratorEventDto) {
+                $events[] = EventNameEnum::ORCHESTRATOR_COMPLETED->value;
+            }
+        }, '*');
+
+        $orchestrator = new TestableTodoListOrchestrator($this->configApp);
+        $result = $orchestrator->run($this->init, $this->step, $this->finish, 5, false, 0);
+
+        $this->assertTrue($result->isSuccess());
+        $this->assertContains(EventNameEnum::ORCHESTRATOR_CYCLE_STARTED->value, $events);
+        $this->assertContains(EventNameEnum::ORCHESTRATOR_STEP_COMPLETED->value, $events);
+        $this->assertContains(EventNameEnum::ORCHESTRATOR_COMPLETED->value, $events);
     }
 
     /**
@@ -156,7 +194,7 @@ final class TodoListOrchestratorTest extends TestCase
     #[DataProvider('provideCompletedNormalizationCases')]
     public function testNormalizeCompleted(mixed $raw, ?int $expected): void
     {
-        $orchestrator = new TestableTodoListOrchestrator($this->configApp, null, false);
+        $orchestrator = new TestableTodoListOrchestrator($this->configApp);
         $this->assertSame($expected, $orchestrator->normalizeProxy($raw));
     }
 

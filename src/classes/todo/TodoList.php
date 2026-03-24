@@ -11,8 +11,11 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\cmd\AgentCmdDto;
 use app\modules\neuron\classes\dto\cmd\CmdDto;
+use app\modules\neuron\classes\dto\events\RunEventDto;
+use app\modules\neuron\classes\dto\events\TodoEventDto;
 use app\modules\neuron\classes\dto\params\SessionParamsDto;
-use app\modules\neuron\classes\logger\RunLogger;
+use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
@@ -137,13 +140,14 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
         $agentCfg = $this->getConfigurationAgent();
 
         return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $startFromTodoIndex, $sessionParams): ChatHistoryInterface {
-            $logger      = $agentCfg->getLoggerWithContext();
-            $baseContext = ['todolist' => $this->getName()];
-            $runLogger   = new RunLogger($logger);
-            $runId       = $runLogger->startRun('todolist', $this->getName(), $baseContext);
-            $logger->info('TodoList started', $baseContext);
+            $runId       = $this->generateRunId();
 
             $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) : $agentCfg;
+            EventBus::trigger(
+                EventNameEnum::RUN_STARTED->value,
+                static::class,
+                $this->buildRunEventDto($sessionCfg->getSessionKey() ?? '', $runId, 0)->setSuccess(true)
+            );
 
             // здесь передаем в конфигурацию сессии навыки, указанные в опции skills
             $this->attachSkillToolsToSession($sessionCfg, $role);
@@ -187,21 +191,31 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                             $r->setChatHistory($sessionCfg->getChatHistory()); // передаем ему историю текущего контекста исполнения
                             $r->tools       = $sessionCfg->getTools(); // и инструменты
                             $todoSessionCfg = $r;
+                            EventBus::trigger(
+                                EventNameEnum::TODO_AGENT_SWITCHED->value,
+                                static::class,
+                                $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
+                                    ->setTodoAgent($todoSessionCfg->getAgentName())
+                                    ->setReason('agent_switched')
+                            );
                         } else {
-                            // агента нет
-                            $sessionCfg->getLoggerWithContext()->warning('Агент из @@agent(...) не найден — используется агент по умолчанию', [
-                                'todolist' => $this->getName(),
-                                'agent' => $switchToAgentDto->getAgentName(),
-                            ]);
+                            EventBus::trigger(
+                                EventNameEnum::TODO_AGENT_SWITCHED->value,
+                                static::class,
+                                $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
+                                    ->setTodoAgent($switchToAgentDto->getAgentName())
+                                    ->setReason('agent_not_found_use_default')
+                            );
                         }
                     }
                 }
 
-                $logger->info('Todo started', array_merge($baseContext, [
-                    'todo_index' => $todoIndex,
-                    'todo'       => $todoTextRaw,
-                    'todo_agent' => $todoSessionCfg->getAgentName(),
-                ]));
+                EventBus::trigger(
+                    EventNameEnum::TODO_STARTED->value,
+                    static::class,
+                    $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
+                        ->setTodoAgent($todoSessionCfg->getAgentName())
+                );
                 try {
                     $message = new NeuronMessage($role, $todoTextToSend);
                     $todoAttachments = $attachments;
@@ -233,18 +247,29 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                         );
                         $runStateDto->write();
                     }
-                    $logger->info('Todo completed', array_merge($baseContext, ['todo_index' => $todoIndex]));
+                    EventBus::trigger(
+                        EventNameEnum::TODO_COMPLETED->value,
+                        static::class,
+                        $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
+                            ->setTodoAgent($todoSessionCfg->getAgentName())
+                    );
                 } catch (\Throwable $e) {
-                    $logger->error(
-                        'Ошибка выполнения todo',
-                        array_merge(
-                            $baseContext,
-                            [
-                                'todo_index' => $todoIndex,
-                                'exception'  => $e,
-                                'trace'      => $e->getTraceAsString()
-                            ]
-                        )
+                    EventBus::trigger(
+                        EventNameEnum::TODO_FAILED->value,
+                        static::class,
+                        $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
+                            ->setTodoAgent($todoSessionCfg->getAgentName())
+                            ->setReason($e->getMessage())
+                    );
+                    EventBus::trigger(
+                        EventNameEnum::RUN_FAILED->value,
+                        static::class,
+                        $this->buildRunEventDto($sessionCfg->getSessionKey() ?? '', $runId, $stepsExecuted)
+                            ->setType('todolist')
+                            ->setName($this->getName())
+                            ->setSuccess(false)
+                            ->setErrorClass($e::class)
+                            ->setErrorMessage($e->getMessage())
                     );
                     throw $e;
                 }
@@ -253,6 +278,13 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                     $runStateDto = $sessionCfg->getExistRunStateDto() ?? $runStateDto;
                     $gotoRequestedTodoIndex = $runStateDto->getGotoRequestedTodoIndex();
                     if ($gotoRequestedTodoIndex) {
+                        EventBus::trigger(
+                            EventNameEnum::TODO_GOTO_REQUESTED->value,
+                            static::class,
+                            $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
+                                ->setGotoTargetIndex($gotoRequestedTodoIndex)
+                                ->setGotoTransitionsCount($runStateDto->getGotoTransitionsCount())
+                        );
                         // есть переход на пункт задачи
                         $gotoTransitionsCount = $runStateDto->getGotoTransitionsCount() + 1;
 
@@ -262,35 +294,32 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                             ->setGotoTransitionsCount($gotoTransitionsCount);
 
                         if ($gotoTransitionsCount > self::MAX_GOTO_TRANSITIONS) {
-                            $logger->warning('TodoList завершён: превышен лимит goto-переходов', array_merge($baseContext, [
-                                'todo_index'             => $todoIndex,
-                                'goto_target_index'      => $gotoRequestedTodoIndex,
-                                'goto_transitions_count' => $gotoTransitionsCount,
-                                'goto_transitions_limit' => self::MAX_GOTO_TRANSITIONS,
-                            ]));
+                            EventBus::trigger(
+                                EventNameEnum::TODO_GOTO_REJECTED->value,
+                                static::class,
+                                $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
+                                    ->setGotoTargetIndex($gotoRequestedTodoIndex)
+                                    ->setGotoTransitionsCount($gotoTransitionsCount)
+                                    ->setReason('max_goto_transitions')
+                            );
                             $runStateDto->write();
                             break;
                         }
-        
-                        if ($gotoRequestedTodoIndex < 0 || $gotoRequestedTodoIndex >= $todoCount) {
-                            $logger->warning('TodoList завершён: запрошен несуществующий пункт goto', array_merge($baseContext, [
-                                'todo_index'        => $todoIndex,
-                                'goto_target_index' => $gotoRequestedTodoIndex,
-                                'todo_count'        => $todoCount,
-                            ]));
-                            $runStateDto->write();
-                            break;
-                        }
-        
-                        $logger->info('TodoList goto переход', array_merge($baseContext, [
-                            'todo_index'             => $todoIndex,
-                            'goto_target_index'      => $gotoRequestedTodoIndex,
-                            'goto_transitions_count' => $gotoTransitionsCount,
-                        ]));
 
+                        if ($gotoRequestedTodoIndex < 0 || $gotoRequestedTodoIndex >= $todoCount) {
+                            EventBus::trigger(
+                                EventNameEnum::TODO_GOTO_REJECTED->value,
+                                static::class,
+                                $this->buildTodoEventDto($sessionCfg->getSessionKey() ?? '', $runId, $todoIndex, $todoTextRaw)
+                                    ->setGotoTargetIndex($gotoRequestedTodoIndex)
+                                    ->setGotoTransitionsCount($gotoTransitionsCount)
+                                    ->setReason('goto_target_out_of_range')
+                            );
+                            $runStateDto->write();
+                            break;
+                        }
                         $runStateDto->write();
                         $currentTodoIndex = $gotoRequestedTodoIndex; // устанавливаем целевой пункт
-
                     } else {
                         ++$currentTodoIndex;
                     }
@@ -302,9 +331,14 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             if ($runStateDto !== null) {
                 $runStateDto->delete();
             }
-
-            $logger->info('TodoList completed', $baseContext);
-            $runLogger->finishRun($runId, ['steps' => $stepsExecuted]);
+            EventBus::trigger(
+                EventNameEnum::RUN_FINISHED->value,
+                static::class,
+                $this->buildRunEventDto($sessionCfg->getSessionKey() ?? '', $runId, $stepsExecuted)
+                    ->setType('todolist')
+                    ->setName($this->getName())
+                    ->setSuccess(true)
+            );
 
             return clone $sessionCfg->getChatHistory();
         });
@@ -382,5 +416,41 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
         }
 
         $this->pushTodo(Todo::fromString($text));
+    }
+
+    /**
+     * Создает DTO run-события для TodoList.
+     */
+    private function buildRunEventDto(string $sessionKey, string $runId, int $stepsExecuted): RunEventDto
+    {
+        return (new RunEventDto())
+            ->setSessionKey($sessionKey)
+            ->setRunId($runId)
+            ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setType('todolist')
+            ->setName($this->getName())
+            ->setSteps($stepsExecuted);
+    }
+
+    /**
+     * Создает DTO todo-события.
+     */
+    private function buildTodoEventDto(string $sessionKey, string $runId, int $todoIndex, string $todoText): TodoEventDto
+    {
+        return (new TodoEventDto())
+            ->setSessionKey($sessionKey)
+            ->setRunId($runId)
+            ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setTodoListName($this->getName())
+            ->setTodoIndex($todoIndex)
+            ->setTodo($todoText);
+    }
+
+    /**
+     * Генерирует идентификатор выполнения.
+     */
+    private function generateRunId(): string
+    {
+        return bin2hex(random_bytes(16));
     }
 }

@@ -54,9 +54,9 @@ class ChunckViewTool extends AChunckTool
      * @param string $description Описание инструмента
      */
     public function __construct(
-        string $basePath    = '',
-        int    $maxFileSize = 10485760,
-        string $name        = 'chunk_view',
+        string $basePath = '',
+        int $maxFileSize = 10485760,
+        string $name = 'chunk_view',
         string $description = 'Чтение текстового файла чанком строк с ограничением по строкам и размеру чанка в символах.',
     ) {
         parent::__construct(

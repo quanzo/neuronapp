@@ -121,7 +121,7 @@ final class IntermediatePadTool extends AIntermediateTool
                 sessionKey : $sessionKey,
                 label      : $labelTrimmed,
                 fileName   : $storage->resultFileName($sessionKey, $labelTrimmed),
-                description: is_string($loaded['description'] ?? null) ? (string) $loaded['description']: null,
+                description: is_string($loaded['description'] ?? null) ? (string) $loaded['description'] : null,
                 savedAt    : is_string($loaded['savedAt'] ?? null) ? (string) $loaded['savedAt']        : null,
                 dataType   : is_string($loaded['dataType'] ?? null) ? (string) $loaded['dataType']      : null,
                 exists     : true,
@@ -148,7 +148,7 @@ final class IntermediatePadTool extends AIntermediateTool
         return $this->resultJson(new IntermediateToolResultDto(
             action     : 'pad',
             success    : true,
-            message    : $loaded === null ? 'Создано.': 'Дополнено.',
+            message    : $loaded === null ? 'Создано.' : 'Дополнено.',
             sessionKey : $sessionKey,
             label      : $item->label,
             fileName   : $item->fileName,

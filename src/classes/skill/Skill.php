@@ -10,7 +10,10 @@ use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\params\ParamListDto;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\cmd\CmdDto;
-use app\modules\neuron\classes\logger\RunLogger;
+use app\modules\neuron\classes\dto\events\RunEventDto;
+use app\modules\neuron\classes\dto\events\SkillEventDto;
+use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\helpers\FileContextHelper;
 use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\PlaceholderHelper;
@@ -148,16 +151,20 @@ class Skill extends AbstractPromptWithParams implements ISkill
 
         $skillName = $this->getName();
         $tool->setCallable(function (mixed ...$args) use ($role, $skillName): mixed {
-            $agentCfg = $this->getConfigurationAgent();
-            $logger  = $agentCfg->getLoggerWithContext();
-            $context = ['skill' => $skillName];
-            $logger->info('Skill вызван', $context);
             try {
                 $future = $this->execute($role, [], $args);
                 $result = $future->await();
                 return $result;
             } catch (\Throwable $e) {
-                $logger->error('Ошибка выполнения skill', array_merge($context, ['exception' => $e]));
+                EventBus::trigger(
+                    EventNameEnum::SKILL_FAILED->value,
+                    static::class,
+                    $this->buildSkillEventDto('', '')
+                        ->setSkillName($skillName)
+                        ->setSuccess(false)
+                        ->setErrorClass($e::class)
+                        ->setErrorMessage($e->getMessage())
+                );
                 throw $e;
             }
         });
@@ -182,11 +189,17 @@ class Skill extends AbstractPromptWithParams implements ISkill
         ?array $params = null
     ): Future {
         $agentCfg = $this->getConfigurationAgent();
-        $logger   = $agentCfg->getLogger();
-        $context  = array_merge($agentCfg->getLogContext(), ['skill' => $this->getName()]);
-        $runLogger = new RunLogger($logger);
-        $runId     = $runLogger->startRun('skill', $this->getName(), $context);
-        $logger->info('Skill started', $context);
+        $runId     = $this->generateRunId();
+        EventBus::trigger(
+            EventNameEnum::RUN_STARTED->value,
+            static::class,
+            $this->buildRunEventDto($agentCfg->getSessionKey() ?? '', $runId, 0)->setSuccess(true)
+        );
+        EventBus::trigger(
+            EventNameEnum::SKILL_STARTED->value,
+            static::class,
+            $this->buildSkillEventDto($agentCfg->getSessionKey() ?? '', $runId)->setSuccess(true)
+        );
 
         $text = $this->getSkill($params ?? []);
 
@@ -203,7 +216,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
             }
         }
 
-        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments, $runLogger, $runId): mixed {
+        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments, $runId): mixed {
 
             $sessionCfg = $this->isPureContext()
                 ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) // здесь агент без истории сообщений
@@ -216,11 +229,34 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 $message = new NeuronMessage($role, $text);
                 $result = $sessionCfg->sendMessageWithAttachments($message, $attachments);
                 $agentCfg->getLogger()->info('Skill completed', array_merge($agentCfg->getLogContext(), ['skill' => $this->getName()]));
-                $runLogger->finishRun($runId, ['steps' => 1]);
+                EventBus::trigger(
+                    EventNameEnum::SKILL_COMPLETED->value,
+                    static::class,
+                    $this->buildSkillEventDto($agentCfg->getSessionKey() ?? '', $runId)->setSuccess(true)
+                );
+                EventBus::trigger(
+                    EventNameEnum::RUN_FINISHED->value,
+                    static::class,
+                    $this->buildRunEventDto($agentCfg->getSessionKey() ?? '', $runId, 1)->setSuccess(true)
+                );
                 return $result;
             } catch (\Throwable $e) {
-                $agentCfg->getLogger()->error('Ошибка выполнения skill', array_merge($agentCfg->getLogContext(), ['skill' => $this->getName(), 'exception' => $e]));
-                $runLogger->finishRun($runId, ['steps' => 0], $e);
+                EventBus::trigger(
+                    EventNameEnum::SKILL_FAILED->value,
+                    static::class,
+                    $this->buildSkillEventDto($agentCfg->getSessionKey() ?? '', $runId)
+                        ->setSuccess(false)
+                        ->setErrorClass($e::class)
+                        ->setErrorMessage($e->getMessage())
+                );
+                EventBus::trigger(
+                    EventNameEnum::RUN_FAILED->value,
+                    static::class,
+                    $this->buildRunEventDto($agentCfg->getSessionKey() ?? '', $runId, 0)
+                        ->setSuccess(false)
+                        ->setErrorClass($e::class)
+                        ->setErrorMessage($e->getMessage())
+                );
                 throw $e;
             }
         });
@@ -236,5 +272,39 @@ class Skill extends AbstractPromptWithParams implements ISkill
     protected function getDefaultPureContext(): bool
     {
         return false;
+    }
+
+    /**
+     * Создает DTO run-события для Skill.
+     */
+    private function buildRunEventDto(string $sessionKey, string $runId, int $steps): RunEventDto
+    {
+        return (new RunEventDto())
+            ->setSessionKey($sessionKey)
+            ->setRunId($runId)
+            ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setType('skill')
+            ->setName($this->getName())
+            ->setSteps($steps);
+    }
+
+    /**
+     * Создает DTO skill-события.
+     */
+    private function buildSkillEventDto(string $sessionKey, string $runId): SkillEventDto
+    {
+        return (new SkillEventDto())
+            ->setSessionKey($sessionKey)
+            ->setRunId($runId)
+            ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setSkillName($this->getName());
+    }
+
+    /**
+     * Генерирует идентификатор выполнения.
+     */
+    private function generateRunId(): string
+    {
+        return bin2hex(random_bytes(16));
     }
 }

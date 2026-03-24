@@ -6,8 +6,11 @@ namespace Tests\Todo;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dto\events\TodoEventDto;
 use app\modules\neuron\classes\dir\DirPriority;
+use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\todo\TodoList;
+use app\modules\neuron\enums\EventNameEnum;
 use NeuronAI\Chat\Enums\MessageRole;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\TodoGotoSpyProvider;
@@ -25,6 +28,7 @@ final class TodoListGotoExecuteTest extends TestCase
     protected function setUp(): void
     {
         TodoGotoSpyProvider::reset();
+        EventBus::clear();
 
         $this->tmpDir = sys_get_temp_dir() . '/neuronapp_todolist_goto_' . uniqid();
         mkdir($this->tmpDir, 0777, true);
@@ -51,6 +55,7 @@ final class TodoListGotoExecuteTest extends TestCase
 
     protected function tearDown(): void
     {
+        EventBus::clear();
         $this->resetConfigurationAppSingleton();
         $this->removeDir($this->tmpDir);
     }
@@ -126,6 +131,35 @@ final class TodoListGotoExecuteTest extends TestCase
             ['Second', 'Third'],
             array_slice(array_column(TodoGotoSpyProvider::$calls, 'content'), 0, 2)
         );
+    }
+
+    /**
+     * execute() публикует todo.started/todo.completed и run.finished.
+     */
+    public function testExecuteEmitsTodoLifecycleEvents(): void
+    {
+        TodoGotoSpyProvider::setGotoPlan([]);
+        $events = [];
+        EventBus::on(EventNameEnum::TODO_STARTED->value, static function (mixed $payload) use (&$events): void {
+            if ($payload instanceof TodoEventDto) {
+                $events[] = EventNameEnum::TODO_STARTED->value;
+            }
+        }, '*');
+        EventBus::on(EventNameEnum::TODO_COMPLETED->value, static function (mixed $payload) use (&$events): void {
+            if ($payload instanceof TodoEventDto) {
+                $events[] = EventNameEnum::TODO_COMPLETED->value;
+            }
+        }, '*');
+        EventBus::on(EventNameEnum::RUN_FINISHED->value, static function (mixed $payload) use (&$events): void {
+            $events[] = EventNameEnum::RUN_FINISHED->value;
+        }, '*');
+
+        $list = $this->makeTodoList("1. First\n2. Second");
+        $list->execute(MessageRole::USER)->await();
+
+        $this->assertContains(EventNameEnum::TODO_STARTED->value, $events);
+        $this->assertContains(EventNameEnum::TODO_COMPLETED->value, $events);
+        $this->assertContains(EventNameEnum::RUN_FINISHED->value, $events);
     }
 
     /**
