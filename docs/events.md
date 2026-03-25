@@ -87,17 +87,19 @@ Payload события передаётся как DTO:
 - `orchestrator.completed`
 - `orchestrator.failed`
 - `orchestrator.restarted`
+- `orchestrator.resume_history_missing`
 
 ## Подписчики
 
 Подписчики находятся в `src/classes/events/subscribers`.
 
-Текущий подписчик:
+Текущие подписчики:
 
 - `RunLoggingSubscriber` — логирует `run.*` события в PSR-3 логгер.
 - `ToolLoggingSubscriber` — логирует `tool.*` события в PSR-3 логгер.
 - `SkillLoggingSubscriber` — логирует `skill.*` события в PSR-3 логгер.
 - `TodoListLoggingSubscriber` — логирует `todo.*` события в PSR-3 логгер.
+- `OrchestratorLoggingSubscriber` — логирует события `orchestrator.*` из `TodoListOrchestrator` (цикл, шаг, завершение, ошибка, рестарт, `resume_history_missing`) в PSR-3 логгер.
 
 ## Поле agentName в DTO
 

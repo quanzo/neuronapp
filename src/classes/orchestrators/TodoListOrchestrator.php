@@ -6,11 +6,13 @@ namespace app\modules\neuron\classes\orchestrators;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\events\OrchestratorEventDto;
+use app\modules\neuron\classes\dto\events\OrchestratorResumeHistoryMissingEventDto;
 use app\modules\neuron\classes\dto\orchestrator\OrchestratorResultDto;
 use app\modules\neuron\classes\dto\params\SessionParamsDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\classes\todo\TodoList;
+use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 use Revolt\EventLoop;
 
@@ -42,9 +44,33 @@ use Revolt\EventLoop;
  * - при каждом рестарте публикуется `orchestrator.restarted`.
  *
  * Важно:
- * - оркестратор намеренно не опирается на todo_goto;
- * - источник истины для статуса завершения — ключ `completed` в
- *   {@see \app\modules\neuron\classes\storage\VarStorage}.
+ * - оркестратор намеренно не опирается на todo_goto (переходы между пунктами
+ *   внутри одного запуска {@see \app\modules\neuron\classes\todo\TodoList::execute()}
+ *   обрабатываются там же через {@see \app\modules\neuron\classes\dto\run\RunStateDto});
+ * - источник истины для статуса завершения внешнего цикла — ключ `completed` в
+ *   {@see \app\modules\neuron\classes\storage\IntermediateStorage}.
+ *
+ * Возобновление по чекпоинту RunStateDto (межпроцессный resume):
+ * - перед каждым вызовом {@see \app\modules\neuron\classes\todo\TodoList::execute()}
+ *   вычисляется `startFromTodoIndex` так же по смыслу, как у команды `todolist --resume`:
+ *   читается {@see \app\modules\neuron\classes\config\ConfigurationAgent::getExistRunStateDto()},
+ *   при совпадении {@see \app\modules\neuron\classes\dto\run\RunStateDto::getTodolistName()}
+ *   с именем текущего списка (`TodoList::getName()`), при `finished === false` и совпадении
+ *   ключа сессии с {@see \app\modules\neuron\classes\config\ConfigurationApp::getSessionKey()}
+ *   выполняется откат истории чата
+ *   до {@see \app\modules\neuron\classes\dto\run\RunStateDto::getHistoryMessageCount()}
+ *   (если задано) и передаётся индекс `last_completed_todo_index + 1`;
+ * - если чекпоинта нет, run помечен завершённым, имя списка или сессия не совпадают —
+ *   выполнение списка начинается с пункта 0;
+ * - после успешного прохода списка `TodoList` удаляет чекпоинт, поэтому следующий этап
+ *   (`init` → `step` → `finish`) обычно стартует «с нуля» без конфликта имён;
+ * - при `restartOnFail` новая попытка цикла снова применяет эти правила к каждому списку
+ *   (например, незавершённый `step` может быть продолжен с сохранённого индекса).
+ *
+ * Пример (прервано на втором пункте списка `step`):
+ * - в `.store` остался `RunStateDto` с `todolist_name = step`, `last_completed_todo_index = 0`;
+ * - при следующем запуске оркестратора после `init` для списка `step` будет вызван
+ *   `execute(..., startFromTodoIndex = 1, ...)`, история — усечена по `history_message_count`.
  */
 class TodoListOrchestrator
 {
@@ -320,6 +346,9 @@ class TodoListOrchestrator
      * Синхронно запускает выполнение TodoList через amp/revolt.
      *
      * Реализация:
+     * - определяет {@see \app\modules\neuron\classes\todo\TodoList::execute()} четвёртый аргумент
+     *   (`startFromTodoIndex`) и при необходимости откатывает историю чата по чекпоинту
+     *   {@see resolveStartFromTodoIndexForTodoList()} — см. описание класса;
      * - помещает задачу в очередь EventLoop;
      * - внутри очереди вызывает async-исполнение TodoList и ожидает завершение;
      * - после EventLoop::run() пробрасывает ошибку, если она была поймана.
@@ -335,13 +364,15 @@ class TodoListOrchestrator
     {
         $error = null;
 
-        EventLoop::queue(static function () use ($todoList, $sessionParams, &$error): void {
+        $startFromTodoIndex = $this->resolveStartFromTodoIndexForTodoList($todoList);
+
+        EventLoop::queue(static function () use ($todoList, $sessionParams, $startFromTodoIndex, &$error): void {
             try {
                 $todoList->execute(
                     MessageRole::USER,
                     [],
                     null,
-                    0,
+                    $startFromTodoIndex,
                     $sessionParams
                 )->await();
             } catch (\Throwable $e) {
@@ -354,6 +385,66 @@ class TodoListOrchestrator
         if ($error instanceof \Throwable) {
             throw $error;
         }
+    }
+
+    /**
+     * Вычисляет индекс первого todo и при необходимости откатывает историю чата для resume.
+     *
+     * Логика согласована с {@see \app\modules\neuron\classes\command\TodolistCommand}
+     * (ветка `--resume`): чекпоинт один на сессию (`RunStateDto::DEF_AGENT_NAME`), поле
+     * `todolist_name` должно совпадать с исполняемым списком, иначе resume не применяется
+     * (типичный случай — после успешного `init` чекпоинт удалён, перед `step` файла нет).
+     *
+     * @param TodoList $todoList Список, который будет передан в `execute()`.
+     *
+     * @return int Индекс первого пункта для `TodoList::execute()` (0 = с начала).
+     *
+     * Если resume выполняется без `history_message_count` в чекпоинте, публикуется
+     * {@see EventNameEnum::ORCHESTRATOR_RESUME_HISTORY_MISSING} с
+     * {@see OrchestratorResumeHistoryMissingEventDto}; логирование — у {@see \app\modules\neuron\classes\events\subscribers\OrchestratorLoggingSubscriber}.
+     */
+    protected function resolveStartFromTodoIndexForTodoList(TodoList $todoList): int
+    {
+        $agentCfg    = $todoList->getConfigurationAgent();
+        $runStateDto = $agentCfg->getExistRunStateDto();
+        if ($runStateDto === null) {
+            return 0;
+        }
+        if ($runStateDto->isFinished()) {
+            return 0;
+        }
+        if ($runStateDto->getTodolistName() !== $todoList->getName()) {
+            return 0;
+        }
+        $checkpointSessionKey = $runStateDto->getSessionKey();
+        $appSessionKey      = $this->configApp->getSessionKey();
+        if ($checkpointSessionKey !== '' && $checkpointSessionKey !== $appSessionKey) {
+            return 0;
+        }
+
+        $startFromTodoIndex = max(0, $runStateDto->getLastCompletedTodoIndex() + 1);
+
+        $historyMessageCount = $runStateDto->getHistoryMessageCount();
+        if ($historyMessageCount !== null) {
+            $agentCfg->resetChatHistory();
+            $history = $agentCfg->getChatHistory();
+            ChatHistoryTruncateHelper::truncateToMessageCount($history, $historyMessageCount);
+        } else {
+            EventBus::trigger(
+                EventNameEnum::ORCHESTRATOR_RESUME_HISTORY_MISSING->value,
+                $this,
+                (new OrchestratorResumeHistoryMissingEventDto())
+                    ->setSessionKey($this->configApp->getSessionKey())
+                    ->setRunId($this->configApp->getSessionKey())
+                    ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+                    ->setAgent($agentCfg)
+                    ->setTodolistName($todoList->getName())
+                    ->setLastCompletedTodoIndex($runStateDto->getLastCompletedTodoIndex())
+                    ->setStartFromTodoIndex($startFromTodoIndex)
+            );
+        }
+
+        return $startFromTodoIndex;
     }
 
     /**

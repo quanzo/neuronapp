@@ -3,8 +3,26 @@
 Документ фиксирует события внешнего цикла `TodoListOrchestrator`
 (`src/classes/orchestrators/TodoListOrchestrator.php`).
 
+При подключении `OrchestratorLoggingSubscriber` (см. `AbstractAgentCommand::resolveFileLogger()`)
+все перечисленные ниже события дополнительно пишутся в PSR-3 лог сессии.
+
+## Resume по RunStateDto
+
+Перед каждым вызовом `TodoList::execute()` для списков `init` / `step` / `finish` оркестратор
+вычисляет `startFromTodoIndex` по чекпоинту в `.store` (тот же контракт, что у `todolist --resume`):
+
+- читается `RunStateDto` через `ConfigurationAgent::getExistRunStateDto()`;
+- resume применяется только если `todolist_name` совпадает с `TodoList::getName()` текущего списка,
+  `finished === false`, и `session_key` в DTO совпадает с ключом сессии `ConfigurationApp` (если в DTO ключ непустой);
+- при совпадении история чата усекается до `history_message_count` (если задано), индекс старта =
+  `last_completed_todo_index + 1`.
+
+Это не отменяет внешнюю логику по флагу `completed` в `IntermediateStorage`. Переходы `todo_goto`
+остаются внутренним механизмом одного запуска `TodoList::execute()`.
+
 ## События
 
+- `orchestrator.resume_history_missing` — при resume списка в оркестраторе в `RunStateDto` нет `history_message_count` (возможны дубликаты сообщений); payload: `OrchestratorResumeHistoryMissingEventDto`; логирование через `OrchestratorLoggingSubscriber`.
 - `orchestrator.cycle_started` — старт цикла (до `init` и `step`).
 - `orchestrator.step_completed` — завершение итерации `step`.
 - `orchestrator.completed` — успешное завершение по `completed=1`.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\events\subscribers\OrchestratorLoggingSubscriber;
 use app\modules\neuron\classes\events\subscribers\RunLoggingSubscriber;
 use app\modules\neuron\classes\events\subscribers\SkillLoggingSubscriber;
 use app\modules\neuron\classes\events\subscribers\TodoListLoggingSubscriber;
@@ -31,5 +32,6 @@ class AbstractAgentCommand extends Command
         SkillLoggingSubscriber::register($logger);
         TodoListLoggingSubscriber::register($logger);
         ToolLoggingSubscriber::register($logger);
+        OrchestratorLoggingSubscriber::register($logger);
     }
 }

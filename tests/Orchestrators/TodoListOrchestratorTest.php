@@ -7,10 +7,12 @@ namespace Tests\Orchestrators;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\events\OrchestratorEventDto;
 use app\modules\neuron\classes\dir\DirPriority;
+use app\modules\neuron\classes\dto\run\RunStateDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\classes\orchestrators\TodoListOrchestrator;
 use app\modules\neuron\classes\todo\TodoList;
+use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\TestableTodoListOrchestrator;
@@ -203,6 +205,153 @@ final class TodoListOrchestratorTest extends TestCase
      *
      * @return array<string,array{0:mixed,1:?int}>
      */
+    /**
+     * Проверка {@see TodoListOrchestrator} / resume: индекс старта и фильтрация чекпоинта по имени списка и сессии.
+     */
+    #[DataProvider('provideResolveStartFromTodoIndexCases')]
+    public function testResolveStartFromTodoIndexForTodoList(
+        string $caseComment,
+        ?RunStateDto $checkpoint,
+        string $todoListKey,
+        int $expectedIndex
+    ): void {
+        RunStateCheckpointHelper::delete($this->configApp->getSessionKey(), RunStateDto::DEF_AGENT_NAME);
+        if ($checkpoint !== null) {
+            RunStateCheckpointHelper::write($checkpoint);
+        }
+
+        $map = [
+            'init' => $this->init,
+            'step' => $this->step,
+            'finish' => $this->finish,
+        ];
+        $this->assertArrayHasKey($todoListKey, $map);
+
+        $orchestrator = new TestableTodoListOrchestrator($this->configApp);
+        $actual = $orchestrator->resolveStartFromTodoIndexProxy($map[$todoListKey]);
+        $this->assertSame($expectedIndex, $actual, $caseComment);
+    }
+
+    /**
+     * Данные для {@see testResolveStartFromTodoIndexForTodoList}: граничные индексы, несовпадение имён/сессии, finished.
+     *
+     * @return iterable<string, array{0:string,1:?RunStateDto,2:string,3:int}>
+     */
+    public static function provideResolveStartFromTodoIndexCases(): iterable
+    {
+        $session = '20250101-120000-1-0';
+
+        $baseStep = static function () use ($session): RunStateDto {
+            return (new RunStateDto())
+                ->setSessionKey($session)
+                ->setAgentName(RunStateDto::DEF_AGENT_NAME)
+                ->setRunId('run-test')
+                ->setStartedAt('2025-01-01T00:00:00+00:00')
+                ->setTodolistName('step')
+                ->setLastCompletedTodoIndex(-1)
+                ->setHistoryMessageCount(0)
+                ->setGotoRequestedTodoIndex(null)
+                ->setGotoTransitionsCount(0)
+                ->setFinished(false);
+        };
+
+        // Нет файла чекпоинта — всегда 0.
+        yield 'no_checkpoint_file' => [
+            'без чекпоинта стартуем с пункта 0',
+            null,
+            'step',
+            0,
+        ];
+
+        // Чекпоинт с finished=true не используется для продолжения.
+        yield 'checkpoint_finished_ignored' => [
+            'finished=true — не resume',
+            $baseStep()->setFinished(true),
+            'step',
+            0,
+        ];
+
+        // Имя списка в DTO не совпадает с исполняемым списком.
+        yield 'todolist_name_mismatch_init_vs_step_checkpoint' => [
+            'в файле step, запрашиваем init — индекс 0',
+            $baseStep(),
+            'init',
+            0,
+        ];
+
+        // Несовпадение session_key в чекпоинте с текущей сессией приложения.
+        yield 'session_key_mismatch' => [
+            'другой session_key — не resume',
+            $baseStep()->setSessionKey('other-session-key-xxx'),
+            'step',
+            0,
+        ];
+
+        // last_completed = -1 → следующий пункт 0.
+        yield 'resume_after_minus_one' => [
+            'после -1 следующий индекс 0',
+            $baseStep()->setLastCompletedTodoIndex(-1),
+            'step',
+            0,
+        ];
+
+        // last_completed = 0 → продолжить с 1.
+        yield 'resume_after_zero' => [
+            'после пункта 0 стартуем с 1',
+            $baseStep()->setLastCompletedTodoIndex(0),
+            'step',
+            1,
+        ];
+
+        // Высокий индекс последнего завершённого пункта.
+        yield 'resume_after_large_index' => [
+            'после пункта 11 стартуем с 12',
+            $baseStep()->setLastCompletedTodoIndex(11),
+            'step',
+            12,
+        ];
+
+        // Поля goto в чекпоинте не влияют на вычисление стартового индекса (обрабатываются внутри TodoList).
+        yield 'goto_fields_do_not_change_start_index' => [
+            'goto в dto не меняют startFromTodoIndex',
+            $baseStep()->setLastCompletedTodoIndex(2)->setGotoRequestedTodoIndex(0),
+            'step',
+            3,
+        ];
+
+        // history_message_count = null: индекс всё равно вычисляется (как в TodolistCommand).
+        yield 'resume_without_history_message_count' => [
+            'без history_message_count индекс last+1 сохраняется',
+            $baseStep()->setHistoryMessageCount(null)->setLastCompletedTodoIndex(4),
+            'step',
+            5,
+        ];
+
+        // Чекпоинт для finish и тот же список finish.
+        yield 'finish_list_match' => [
+            'resume для списка finish',
+            $baseStep()->setTodolistName('finish')->setLastCompletedTodoIndex(0),
+            'finish',
+            1,
+        ];
+
+        // Отрицательный last_completed ниже -1: max(0, n+1) даёт 0.
+        yield 'last_completed_strongly_negative_clamped' => [
+            'сильно отрицательный last_completed даёт старт 0',
+            $baseStep()->setLastCompletedTodoIndex(-10),
+            'step',
+            0,
+        ];
+
+        // Чекпоинт step при запросе finish — имя не совпадает.
+        yield 'step_checkpoint_when_running_finish' => [
+            'чекпоинт step не применяется к списку finish',
+            $baseStep()->setLastCompletedTodoIndex(1),
+            'finish',
+            0,
+        ];
+    }
+
     public static function provideCompletedNormalizationCases(): array
     {
         return [
