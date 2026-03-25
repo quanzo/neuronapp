@@ -12,26 +12,26 @@ use function is_int;
 use function is_string;
 
 /**
- * DTO индекса промежуточных результатов для одной сессии.
+ * DTO индекса результатов для одной сессии.
  *
- * Хранится в `.store/intermediate_index_{sessionKey}.json` и позволяет быстро
- * получить список сохранённых промежуточных результатов.
+ * Хранится в `.store/store_index_{sessionKey}.json` и позволяет быстро
+ * получить список сохранённых результатов.
  *
  * Формат сериализации (toArray):
  * ```
  * [
- *   'schema'     => string, // neuronapp.intermediate_index.v1
+ *   'schema'     => string, // neuronapp.store_index.v1
  *   'sessionKey' => string,
- *   'items'      => array<IntermediateIndexItemDto::toArray()>,
+ *   'items'      => array<StoreIndexItemDto::toArray()>,
  * ]
  * ```
  */
-final class IntermediateIndexDto implements IArrayable
+final class StoreIndexDto implements IArrayable
 {
     /**
-     * @param string                    $schema     Версия схемы индекса.
-     * @param string                    $sessionKey Базовый ключ сессии.
-     * @param IntermediateIndexItemDto[] $items      Элементы индекса.
+     * @param string             $schema     Версия схемы индекса.
+     * @param string             $sessionKey Базовый ключ сессии.
+     * @param StoreIndexItemDto[] $items     Элементы индекса.
      */
     public function __construct(
         public readonly string $schema,
@@ -72,7 +72,7 @@ final class IntermediateIndexDto implements IArrayable
                 continue;
             }
 
-            $dtoItems[] = new IntermediateIndexItemDto(
+            $dtoItems[] = new StoreIndexItemDto(
                 label: $label,
                 description: $description,
                 fileName: $fileName,
@@ -92,7 +92,7 @@ final class IntermediateIndexDto implements IArrayable
     /**
      * Преобразует DTO в массив для сериализации.
      *
-     * @return array{schema: string, sessionKey: string, items: array<int, array{label: string, fileName: string, savedAt: string, dataType: string, sizeBytes: int}>}
+     * @return array{schema: string, sessionKey: string, items: array<int, array{label: string, description: string, fileName: string, savedAt: string, dataType: string, sizeBytes: int}>}
      */
     public function toArray(): array
     {
@@ -100,7 +100,7 @@ final class IntermediateIndexDto implements IArrayable
             'schema' => $this->schema,
             'sessionKey' => $this->sessionKey,
             'items' => array_map(
-                static fn(IntermediateIndexItemDto $i): array => $i->toArray(),
+                static fn(StoreIndexItemDto $i): array => $i->toArray(),
                 $this->items,
             ),
         ];

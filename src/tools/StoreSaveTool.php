@@ -4,25 +4,21 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\dto\tools\IntermediateToolResultDto;
-use app\modules\neuron\classes\storage\IntermediateStorage;
-use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dto\tools\StoreToolResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
 use function json_decode;
-use function json_encode;
 use function json_last_error;
 use function trim;
 
 use const JSON_ERROR_NONE;
-use const JSON_UNESCAPED_UNICODE;
 
 /**
- * Инструмент `IntermediateSaveTool`: сохраняет промежуточный результат по метке в `.store`.
+ * Инструмент `StoreSaveTool`: сохраняет результат по метке в `.store`.
  *
  * Назначение:
- * - дать LLM возможность сохранить важный промежуточный результат (план, разобранный JSON, черновик)
+ * - дать LLM возможность сохранить важный результат (план, разобранный JSON, черновик)
  *   под короткой меткой, связанной с текущим `sessionKey`;
  * - данные могут быть как JSON-структурой, так и обычным текстом.
  *
@@ -30,11 +26,11 @@ use const JSON_UNESCAPED_UNICODE;
  * - выберите стабильную и понятную метку (`label`), например `"requirements"`, `"parsed_config"`;
  * - передавайте `data` как JSON-строку, когда это возможно (массив/объект), иначе — как текст.
  */
-final class IntermediateSaveTool extends AIntermediateTool
+final class StoreSaveTool extends AStoreTool
 {
     public function __construct(
-        string $name = 'intermediate_save',
-        string $description = 'Сохраняет промежуточный результат по метке в .store для текущего sessionKey. Пригодно для планов, разобранных структур, заметок.',
+        string $name = 'store_save',
+        string $description = 'Сохраняет результат по метке в .store для текущего sessionKey. Пригодно для планов, разобранных структур, заметок.',
     ) {
         parent::__construct(name: $name, description: $description);
     }
@@ -56,7 +52,7 @@ final class IntermediateSaveTool extends AIntermediateTool
             ToolProperty::make(
                 name: 'description',
                 type: PropertyType::STRING,
-                description: 'Краткое описание (1 строка) того, что сохранено. Обязательна. Пример: "План реализации IntermediateStorage", "Распарсенный конфиг из user input".',
+                description: 'Краткое описание (1 строка) того, что сохранено. Обязательна. Пример: "План реализации StoreStorage", "Распарсенный конфиг из user input".',
                 required: true,
             ),
             ToolProperty::make(
@@ -69,10 +65,11 @@ final class IntermediateSaveTool extends AIntermediateTool
     }
 
     /**
-     * Сохраняет промежуточный результат.
+     * Сохраняет результат.
      *
-     * @param string $label Метка результата.
-     * @param string $data  Данные (JSON-строка или текст).
+     * @param string $label       Метка результата.
+     * @param string $description Описание.
+     * @param string $data        Данные (JSON-строка или текст).
      *
      * @return string JSON-результат.
      */
@@ -84,7 +81,7 @@ final class IntermediateSaveTool extends AIntermediateTool
         $descTrimmed  = trim($description);
 
         if ($labelTrimmed === '') {
-            return $this->resultJson(new IntermediateToolResultDto(
+            return $this->resultJson(new StoreToolResultDto(
                 action    : 'save',
                 success   : false,
                 message   : 'label не может быть пустым.',
@@ -93,7 +90,7 @@ final class IntermediateSaveTool extends AIntermediateTool
         }
 
         if ($descTrimmed === '') {
-            return $this->resultJson(new IntermediateToolResultDto(
+            return $this->resultJson(new StoreToolResultDto(
                 action    : 'save',
                 success   : false,
                 message   : 'description не может быть пустым.',
@@ -107,7 +104,7 @@ final class IntermediateSaveTool extends AIntermediateTool
         try {
             $item = $storage->save($sessionKey, $labelTrimmed, $payload, $descTrimmed);
         } catch (\Throwable $e) {
-            return $this->resultJson(new IntermediateToolResultDto(
+            return $this->resultJson(new StoreToolResultDto(
                 action    : 'save',
                 success   : false,
                 message   : 'Ошибка сохранения: ' . $e->getMessage(),
@@ -116,16 +113,16 @@ final class IntermediateSaveTool extends AIntermediateTool
             ));
         }
 
-        return $this->resultJson(new IntermediateToolResultDto(
-            action    : 'save',
-            success   : true,
-            message   : 'Сохранено.',
-            sessionKey: $sessionKey,
-            label     : $item->label,
-            fileName  : $item->fileName,
+        return $this->resultJson(new StoreToolResultDto(
+            action     : 'save',
+            success    : true,
+            message    : 'Сохранено.',
+            sessionKey : $sessionKey,
+            label      : $item->label,
+            fileName   : $item->fileName,
             description: $item->description,
-            savedAt   : $item->savedAt,
-            dataType  : $item->dataType,
+            savedAt    : $item->savedAt,
+            dataType   : $item->dataType,
         ));
     }
 

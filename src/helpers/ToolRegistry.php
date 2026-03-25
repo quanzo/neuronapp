@@ -7,12 +7,12 @@ namespace app\modules\neuron\helpers;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\tools\ATool;
 use app\modules\neuron\tools\GitSummaryTool;
-use app\modules\neuron\tools\IntermediateExistTool;
-use app\modules\neuron\tools\IntermediateListTool;
-use app\modules\neuron\tools\IntermediateLoadTool;
-use app\modules\neuron\tools\IntermediateSaveTool;
-use app\modules\neuron\tools\IntermediateDeleteTool;
-use app\modules\neuron\tools\IntermediatePadTool;
+use app\modules\neuron\tools\StoreExistTool;
+use app\modules\neuron\tools\StoreListTool;
+use app\modules\neuron\tools\StoreLoadTool;
+use app\modules\neuron\tools\StoreSaveTool;
+use app\modules\neuron\tools\StoreDeleteTool;
+use app\modules\neuron\tools\StorePadTool;
 use app\modules\neuron\tools\WikiSearchTool;
 use app\modules\neuron\tools\RuWikiSearchTool;
 use app\modules\neuron\tools\TodoGotoTool;
@@ -49,12 +49,12 @@ class ToolRegistry
             'ru_wiki_search'      => new RuWikiSearchTool(),
             'uni_search'          => new UniSearchTool(),
             'git_summary'         => new GitSummaryTool(),
-            'intermediate_save'   => new IntermediateSaveTool(),
-            'intermediate_load'   => new IntermediateLoadTool(),
-            'intermediate_list'   => new IntermediateListTool(),
-            'intermediate_exist'  => new IntermediateExistTool(),
-            'intermediate_delete' => new IntermediateDeleteTool(),
-            'intermediate_pad'    => new IntermediatePadTool(),
+            'store_save'          => new StoreSaveTool(),
+            'store_load'          => new StoreLoadTool(),
+            'store_list'          => new StoreListTool(),
+            'store_exist'         => new StoreExistTool(),
+            'store_delete'        => new StoreDeleteTool(),
+            'store_pad'           => new StorePadTool(),
             'todo_goto'           => new TodoGotoTool(),
             'todo_completed'      => new TodoCompletedTool(),
             default => null,

@@ -25,7 +25,7 @@
 - **`ViewTool`** — чтение содержимого файлов.
 - **`EditTool`** — безопасное редактирование файлов проекта (используется только по запросу пользователя).
 - **`chat_history.*`** — просмотр полной истории сообщений (размер, метаданные, получение сообщения по индексу).
-- **`IntermediateSaveTool` / `IntermediateLoadTool` / `IntermediateListTool` / `IntermediateExistTool`** — сохранение/загрузка/список/проверка промежуточных результатов в рамках `sessionKey` в `.store`.
+- **`StoreSaveTool` / `StoreLoadTool` / `StoreListTool` / `StoreExistTool`** — сохранение/загрузка/список/проверка результатов в рамках `sessionKey` в `.store`.
 - **`TodoGotoTool`** (`todo_goto`) — запрос перехода к пункту TodoList по номеру (`point`, 1-based), переход применяется циклом `TodoList::execute()`.
 - **`TodoCompletedTool`** (`todo_completed`) — установить флаг `completed` в `.store` для внешнего оркестратора (`done/not_done`, `1/0`, `исполнено/не исполнено`).
 - **`FileTreeTool`** — обзор структуры каталогов.
@@ -70,35 +70,35 @@
 {"tool":"chat_history.message","args":{"index":0}}
 ```
 
-### Intermediate*-инструменты: промежуточные результаты в `.store`
+### Store*-инструменты: результаты в `.store`
 
 Набор инструментов:
 
-- `IntermediateSaveTool` (`src/tools/IntermediateSaveTool.php`) — сохраняет промежуточный результат по метке;
-- `IntermediateLoadTool` (`src/tools/IntermediateLoadTool.php`) — загружает результат по метке;
-- `IntermediateListTool` (`src/tools/IntermediateListTool.php`) — возвращает список всех результатов для текущего `sessionKey`;
-- `IntermediateExistTool` (`src/tools/IntermediateExistTool.php`) — проверяет наличие результата по метке.
- - `IntermediateDeleteTool` (`src/tools/IntermediateDeleteTool.php`) — удаляет сохранённый результат по метке.
-- `IntermediatePadTool` (`src/tools/IntermediatePadTool.php`) — дополняет (append) строковые данные по метке, сохраняя переводы строк.
+- `StoreSaveTool` (`src/tools/StoreSaveTool.php`) — сохраняет результат по метке;
+- `StoreLoadTool` (`src/tools/StoreLoadTool.php`) — загружает результат по метке;
+- `StoreListTool` (`src/tools/StoreListTool.php`) — возвращает список всех результатов для текущего `sessionKey`;
+- `StoreExistTool` (`src/tools/StoreExistTool.php`) — проверяет наличие результата по метке.
+ - `StoreDeleteTool` (`src/tools/StoreDeleteTool.php`) — удаляет сохранённый результат по метке.
+- `StorePadTool` (`src/tools/StorePadTool.php`) — дополняет (append) строковые данные по метке, сохраняя переводы строк.
 
 Общее:
 
-- **Подключение**: через `tools: intermediate_save`, `intermediate_load`, `intermediate_list`, `intermediate_exist`, `intermediate_delete`, `intermediate_pad` — создаются через `ToolRegistry::makeTool(...)`.
+- **Подключение**: через `tools: store_save`, `store_load`, `store_list`, `store_exist`, `store_delete`, `store_pad` — создаются через `ToolRegistry::makeTool(...)`.
 - **Хранилище**: директория `.store` (через `ConfigurationApp::getStoreDir()`).
 - **Имена файлов**:
-  - результат: `.store/intermediate_{sessionKey}_{label}.json` (небезопасные символы в частях имени заменяются на `_`);
-  - индекс: `.store/intermediate_index_{sessionKey}.json` (для ускорения `list`).
+  - результат: `.store/store_{sessionKey}_{label}.json` (небезопасные символы в частях имени заменяются на `_`);
+  - индекс: `.store/store_index_{sessionKey}.json` (для ускорения `list`).
 
 Формат хранения (LLM-friendly JSON envelope) остаётся прежним:
 
-- `schema`: `neuronapp.intermediate.v1`
+ - `schema`: `neuronapp.store.v1`
 - `sessionKey`: ключ сессии
 - `label`: метка
 - `savedAt`: ISO‑8601 дата/время сохранения
 - `dataType`: `string|object|array|number|boolean|null`
 - `data`: сохранённое значение (JSON‑совместимое)
 
-Индекс хранит список элементов (без `data`) для `IntermediateListTool`.
+Индекс хранит список элементов (без `data`) для `StoreListTool`.
 
 ### Bash‑инструменты и безопасность
 
@@ -191,8 +191,8 @@
 Поведение:
 
 - инструмент нормализует `status` к `1|0`;
-- записывает значение в `IntermediateStorage` под меткой `completed`;
-- возвращает LLM-friendly JSON через `IntermediateToolResultDto` (`action=todo_completed`).
+- записывает значение в `StoreStorage` под меткой `completed`;
+- возвращает LLM-friendly JSON через `StoreToolResultDto` (`action=todo_completed`).
 
 Пример псевдо-вызова:
 

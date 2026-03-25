@@ -4,29 +4,24 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\dto\tools\IntermediateToolResultDto;
-use app\modules\neuron\classes\storage\IntermediateStorage;
+use app\modules\neuron\classes\dto\tools\StoreToolResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
-use app\modules\neuron\classes\config\ConfigurationApp;
 
-use function json_encode;
 use function trim;
 
-use const JSON_UNESCAPED_UNICODE;
-
 /**
- * Инструмент `IntermediateExistTool`: проверяет, существует ли промежуточный результат по метке.
+ * Инструмент `StoreExistTool`: проверяет, существует ли результат по метке.
  *
  * Назначение:
- * - дать LLM быстрый ответ, можно ли безопасно вызывать `IntermediateLoadTool` с указанной меткой;
+ * - дать LLM быстрый ответ, можно ли безопасно вызывать `StoreLoadTool` с указанной меткой;
  * - использовать в ветвлениях (если нет сохранённого результата — пересчитать или запросить у пользователя).
  */
-final class IntermediateExistTool extends AIntermediateTool
+final class StoreExistTool extends AStoreTool
 {
     public function __construct(
-        string $name = 'intermediate_exist',
-        string $description = 'Проверяет, существует ли промежуточный результат по метке для текущего sessionKey.',
+        string $name = 'store_exist',
+        string $description = 'Проверяет, существует ли результат по метке для текущего sessionKey.',
     ) {
         parent::__construct(name: $name, description: $description);
     }
@@ -62,7 +57,7 @@ final class IntermediateExistTool extends AIntermediateTool
         $labelTrimmed = trim($label);
 
         if ($labelTrimmed === '') {
-            return $this->resultJson(new IntermediateToolResultDto(
+            return $this->resultJson(new StoreToolResultDto(
                 action    : 'exist',
                 success   : false,
                 message   : 'label не может быть пустым.',
@@ -72,10 +67,10 @@ final class IntermediateExistTool extends AIntermediateTool
 
         $exists = $storage->exists($sessionKey, $labelTrimmed);
 
-        return $this->resultJson(new IntermediateToolResultDto(
+        return $this->resultJson(new StoreToolResultDto(
             action    : 'exist',
             success   : true,
-            message   : $exists ? 'Найдено.'                                          : 'Не найдено.',
+            message   : $exists ? 'Найдено.' : 'Не найдено.',
             sessionKey: $sessionKey,
             label     : $labelTrimmed,
             fileName  : $exists ? $storage->resultFileName($sessionKey, $labelTrimmed) : null,

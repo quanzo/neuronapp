@@ -9,11 +9,11 @@ use app\modules\neuron\helpers\CallableWrapper;
 use app\modules\neuron\helpers\ShellToolFactory;
 use app\modules\neuron\tools\GlobTool;
 use app\modules\neuron\tools\GrepTool;
-use app\modules\neuron\tools\IntermediateDeleteTool;
-use app\modules\neuron\tools\IntermediateExistTool;
-use app\modules\neuron\tools\IntermediateListTool;
-use app\modules\neuron\tools\IntermediateLoadTool;
-use app\modules\neuron\tools\IntermediatePadTool;
+use app\modules\neuron\tools\StoreDeleteTool;
+use app\modules\neuron\tools\StoreExistTool;
+use app\modules\neuron\tools\StoreListTool;
+use app\modules\neuron\tools\StoreLoadTool;
+use app\modules\neuron\tools\StorePadTool;
 use app\modules\neuron\tools\ViewTool;
 use app\modules\neuron\tools\ChatHistoryMessageTool;
 use app\modules\neuron\tools\ChatHistoryMetaTool;
@@ -105,11 +105,11 @@ return [
         [GrepTool::class, 'make'],
         [ViewTool::class, 'make'],
 
-        [IntermediatePadTool::class, 'make'],
-        [IntermediateListTool::class, 'make'],
-        [IntermediateExistTool::class, 'make'],
-        [IntermediateDeleteTool::class, 'make'],
-        [IntermediateLoadTool::class, 'make'],
+        [StorePadTool::class, 'make'],
+        [StoreListTool::class, 'make'],
+        [StoreExistTool::class, 'make'],
+        [StoreDeleteTool::class, 'make'],
+        [StoreLoadTool::class, 'make'],
 
     ],
 

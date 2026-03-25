@@ -6,8 +6,8 @@ namespace Tests\Tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\classes\storage\IntermediateStorage;
-use app\modules\neuron\tools\IntermediateListTool;
+use app\modules\neuron\classes\storage\StoreStorage;
+use app\modules\neuron\tools\StoreListTool;
 use PHPUnit\Framework\TestCase;
 
 use function json_decode;
@@ -16,19 +16,19 @@ use function sys_get_temp_dir;
 use function uniqid;
 
 /**
- * Тесты для {@see IntermediateListTool}.
+ * Тесты для {@see StoreListTool}.
  *
  * Проверяют:
- * - возврат правильного количества элементов и списка labels.
+ * - возврат правильного количества элементов и списка items.
  */
-final class IntermediateListToolTest extends TestCase
+final class StoreListToolTest extends TestCase
 {
     private string $tmpDir;
-    private IntermediateListTool $tool;
+    private StoreListTool $tool;
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_intermediate_list_' . uniqid();
+        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_store_list_' . uniqid();
         mkdir($this->tmpDir, 0777, true);
         mkdir($this->tmpDir . '/.store', 0777, true);
 
@@ -36,7 +36,7 @@ final class IntermediateListToolTest extends TestCase
         ConfigurationApp::init($dp);
         ConfigurationApp::getInstance()->setSessionKey('20250101-120000-1');
 
-        $this->tool = new IntermediateListTool();
+        $this->tool = new StoreListTool();
     }
 
     protected function tearDown(): void
@@ -53,7 +53,7 @@ final class IntermediateListToolTest extends TestCase
     public function testListReturnsItems(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        $storage = new IntermediateStorage($this->tmpDir . '/.store');
+        $storage = new StoreStorage($this->tmpDir . '/.store');
         $storage->save($sessionKey, 'a', '1', 'one');
         $storage->save($sessionKey, 'b', '2', 'two');
 
@@ -71,7 +71,7 @@ final class IntermediateListToolTest extends TestCase
     public function testListSearchAndPagination(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        $storage = new IntermediateStorage($this->tmpDir . '/.store');
+        $storage = new StoreStorage($this->tmpDir . '/.store');
         $storage->save($sessionKey, 'alpha', '1', 'first');
         $storage->save($sessionKey, 'beta', '2', 'second');
         $storage->save($sessionKey, 'gamma', '3', 'second match');

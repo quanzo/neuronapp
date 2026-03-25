@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\dto\tools\IntermediateToolResultDto;
+use app\modules\neuron\classes\dto\tools\StoreToolResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
@@ -13,7 +13,7 @@ use function strtolower;
 use function trim;
 
 /**
- * Инструмент установки флага завершения `completed` в промежуточном хранилище.
+ * Инструмент установки флага завершения `completed` в хранилище `.store`.
  *
  * Инструмент нужен для внешнего оркестратора: шаг `step` в todolist может явно
  * отметить успешное завершение обработки через этот tool.
@@ -24,7 +24,7 @@ use function trim;
  *
  * В хранилище записывается каноничное целочисленное значение `1|0` в label `completed`.
  */
-final class TodoCompletedTool extends AIntermediateTool
+final class TodoCompletedTool extends AStoreTool
 {
     public function __construct(
         string $name = 'todo_completed',
@@ -57,7 +57,7 @@ final class TodoCompletedTool extends AIntermediateTool
     /**
      * Устанавливает значение completed для текущего sessionKey.
      *
-     * @return string JSON-ответ в формате IntermediateToolResultDto.
+     * @return string JSON-ответ в формате StoreToolResultDto.
      */
     public function __invoke(string $status, ?string $reason = null): string
     {
@@ -65,7 +65,7 @@ final class TodoCompletedTool extends AIntermediateTool
         $normalized = $this->normalizeStatus($status);
 
         if ($normalized === null) {
-            return $this->resultJson(new IntermediateToolResultDto(
+            return $this->resultJson(new StoreToolResultDto(
                 action: 'todo_completed',
                 success: false,
                 message: 'Некорректный status. Используйте done/not_done, 1/0, true/false, исполнено/не исполнено.',
@@ -82,7 +82,7 @@ final class TodoCompletedTool extends AIntermediateTool
         try {
             $item = $this->getStorage()->save($sessionKey, 'completed', $normalized, $desc);
         } catch (\Throwable $e) {
-            return $this->resultJson(new IntermediateToolResultDto(
+            return $this->resultJson(new StoreToolResultDto(
                 action: 'todo_completed',
                 success: false,
                 message: 'Ошибка сохранения completed: ' . $e->getMessage(),
@@ -91,7 +91,7 @@ final class TodoCompletedTool extends AIntermediateTool
             ));
         }
 
-        return $this->resultJson(new IntermediateToolResultDto(
+        return $this->resultJson(new StoreToolResultDto(
             action: 'todo_completed',
             success: true,
             message: 'Флаг completed обновлён.',

@@ -15,7 +15,7 @@ use app\modules\neuron\classes\logger\ContextualLogger;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
-use app\modules\neuron\classes\storage\IntermediateStorage;
+use app\modules\neuron\classes\storage\StoreStorage;
 use app\modules\neuron\services\config\SessionConfigAppService;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -75,8 +75,8 @@ class ConfigurationApp
     /** Producer навыков (создаётся при первом обращении). */
     private ?SkillProducer $skillProducer = null;
 
-    /** Хранилище промежуточных результатов (лениво инициализируется). */
-    private ?IntermediateStorage $intermediateStorage = null;
+    /** Хранилище результатов (лениво инициализируется). */
+    private ?StoreStorage $storeStorage = null;
 
     /**
      * Базовый ключ сессии (временна́я часть без имени агента).
@@ -281,14 +281,14 @@ class ConfigurationApp
     }
 
     /**
-     * Возвращает объект хранилища промежуточных результатов для директории .store.
+     * Возвращает объект хранилища результатов для директории .store.
      */
-    public function getIntermediateStorage(): IntermediateStorage
+    public function getStoreStorage(): StoreStorage
     {
-        if ($this->intermediateStorage === null) {
-            $this->intermediateStorage = new IntermediateStorage($this->getStoreDir());
+        if ($this->storeStorage === null) {
+            $this->storeStorage = new StoreStorage($this->getStoreDir());
         }
-        return $this->intermediateStorage;
+        return $this->storeStorage;
     }
 
     private $_sessionSrv = null;

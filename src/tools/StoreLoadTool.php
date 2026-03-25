@@ -4,37 +4,32 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\dto\tools\IntermediateToolResultDto;
-use app\modules\neuron\classes\storage\IntermediateStorage;
-use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dto\tools\StoreToolResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
+use function array_slice;
 use function count;
 use function explode;
-use function json_encode;
-use function is_string;
-use function array_slice;
 use function implode;
+use function is_string;
 use function max;
 use function min;
 use function trim;
 
-use const JSON_UNESCAPED_UNICODE;
-
 /**
- * Инструмент `IntermediateLoadTool`: загружает ранее сохранённый промежуточный результат по метке.
+ * Инструмент `StoreLoadTool`: загружает ранее сохранённый результат по метке.
  *
  * Назначение:
  * - позволить LLM вернуть в контекст ранее сохранённый результат (по тому же `sessionKey`),
  *   не запрашивая пользователя и не повторяя вычисления;
  * - удобно для последовательных шагов (сперва разобрать данные, затем использовать результат).
  */
-final class IntermediateLoadTool extends AIntermediateTool
+final class StoreLoadTool extends AStoreTool
 {
     public function __construct(
-        string $name = 'intermediate_load',
-        string $description = 'Загружает ранее сохранённый промежуточный результат по метке для текущего sessionKey.',
+        string $name = 'store_load',
+        string $description = 'Загружает ранее сохранённый результат по метке для текущего sessionKey.',
     ) {
         parent::__construct(name: $name, description: $description);
     }
@@ -69,9 +64,11 @@ final class IntermediateLoadTool extends AIntermediateTool
     }
 
     /**
-     * Загружает промежуточный результат по метке.
+     * Загружает результат по метке.
      *
-     * @param string $label Метка результата.
+     * @param string   $label      Метка результата.
+     * @param int|null $start_line Начальная строка.
+     * @param int|null $end_line   Конечная строка.
      *
      * @return string JSON-результат (включает data при успехе).
      */
@@ -82,7 +79,7 @@ final class IntermediateLoadTool extends AIntermediateTool
         $labelTrimmed = trim($label);
 
         if ($labelTrimmed === '') {
-            return $this->resultJson(new IntermediateToolResultDto(
+            return $this->resultJson(new StoreToolResultDto(
                 action    : 'load',
                 success   : false,
                 message   : 'label не может быть пустым.',
@@ -92,7 +89,7 @@ final class IntermediateLoadTool extends AIntermediateTool
 
         $loaded = $storage->load($sessionKey, $labelTrimmed);
         if ($loaded === null) {
-            return $this->resultJson(new IntermediateToolResultDto(
+            return $this->resultJson(new StoreToolResultDto(
                 action    : 'load',
                 success   : false,
                 message   : 'Не найдено.',
@@ -108,17 +105,17 @@ final class IntermediateLoadTool extends AIntermediateTool
         $dataType = is_string($loaded['dataType'] ?? null) ? (string) $loaded['dataType'] : null;
 
         if (($start_line !== null || $end_line !== null) && !is_string($data)) {
-            return $this->resultJson(new IntermediateToolResultDto(
-                action    : 'load',
-                success   : false,
-                message   : 'Диапазон строк поддерживается только для строковых данных.',
-                sessionKey: $sessionKey,
-                label     : $labelTrimmed,
-                fileName  : $storage->resultFileName($sessionKey, $labelTrimmed),
+            return $this->resultJson(new StoreToolResultDto(
+                action     : 'load',
+                success    : false,
+                message    : 'Диапазон строк поддерживается только для строковых данных.',
+                sessionKey : $sessionKey,
+                label      : $labelTrimmed,
+                fileName   : $storage->resultFileName($sessionKey, $labelTrimmed),
                 description: $description,
-                savedAt   : $savedAt,
-                dataType  : $dataType,
-                exists    : true,
+                savedAt    : $savedAt,
+                dataType   : $dataType,
+                exists     : true,
             ));
         }
 
@@ -138,18 +135,18 @@ final class IntermediateLoadTool extends AIntermediateTool
                 $effectiveStart = 1;
                 $effectiveEnd = 0;
             } elseif ($effectiveStart > $totalLines) {
-                return $this->resultJson(new IntermediateToolResultDto(
-                    action    : 'load',
-                    success   : false,
-                    message   : 'start_line превышает общее количество строк.',
-                    sessionKey: $sessionKey,
-                    label     : $labelTrimmed,
-                    fileName  : $storage->resultFileName($sessionKey, $labelTrimmed),
+                return $this->resultJson(new StoreToolResultDto(
+                    action     : 'load',
+                    success    : false,
+                    message    : 'start_line превышает общее количество строк.',
+                    sessionKey : $sessionKey,
+                    label      : $labelTrimmed,
+                    fileName   : $storage->resultFileName($sessionKey, $labelTrimmed),
                     description: $description,
-                    savedAt   : $savedAt,
-                    dataType  : $dataType,
-                    totalLines: $totalLines,
-                    exists    : true,
+                    savedAt    : $savedAt,
+                    dataType   : $dataType,
+                    totalLines : $totalLines,
+                    exists     : true,
                 ));
             }
 
@@ -169,22 +166,22 @@ final class IntermediateLoadTool extends AIntermediateTool
             $totalLinesOut = $totalLines;
         }
 
-        return $this->resultJson(new IntermediateToolResultDto(
-            action    : 'load',
-            success   : true,
-            message   : 'Загружено.',
-            sessionKey: $sessionKey,
-            label     : $labelTrimmed,
-            fileName  : $storage->resultFileName($sessionKey, $labelTrimmed),
+        return $this->resultJson(new StoreToolResultDto(
+            action     : 'load',
+            success    : true,
+            message    : 'Загружено.',
+            sessionKey : $sessionKey,
+            label      : $labelTrimmed,
+            fileName   : $storage->resultFileName($sessionKey, $labelTrimmed),
             description: $description,
-            savedAt   : $savedAt,
-            dataType  : $dataType,
-            data      : $data,
-            exists    : true,
-            startLine : $startLineOut,
-            endLine   : $endLineOut,
-            totalLines: $totalLinesOut,
-            truncated : $truncated,
+            savedAt    : $savedAt,
+            dataType   : $dataType,
+            data       : $data,
+            exists     : true,
+            startLine  : $startLineOut,
+            endLine    : $endLineOut,
+            totalLines : $totalLinesOut,
+            truncated  : $truncated,
         ));
     }
 }

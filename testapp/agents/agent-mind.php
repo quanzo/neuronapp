@@ -70,11 +70,11 @@ return [
         [ChatHistoryMessageTool::class, 'make'],
 
         /*
-        [IntermediatePadTool::class, 'make'],
-        [IntermediateListTool::class, 'make'],
-        [IntermediateExistTool::class, 'make'],
-        [IntermediateDeleteTool::class, 'make'],
-        [IntermediateLoadTool::class, 'make'],
+        [StorePadTool::class, 'make'],
+        [StoreListTool::class, 'make'],
+        [StoreExistTool::class, 'make'],
+        [StoreDeleteTool::class, 'make'],
+        [StoreLoadTool::class, 'make'],
         */
 
     ],

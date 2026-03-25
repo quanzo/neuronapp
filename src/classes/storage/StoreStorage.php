@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\storage;
 
-use app\modules\neuron\classes\dto\tools\IntermediateIndexDto;
-use app\modules\neuron\classes\dto\tools\IntermediateIndexItemDto;
+use app\modules\neuron\classes\dto\tools\StoreIndexDto;
+use app\modules\neuron\classes\dto\tools\StoreIndexItemDto;
 
 use function dirname;
 use function file_exists;
@@ -32,9 +32,9 @@ use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_UNICODE;
 
 /**
- * Хранилище промежуточных результатов для одной директории `.store`.
+ * Хранилище результатов для одной директории `.store`.
  *
- * Этот класс инкапсулирует работу с файлами промежуточных результатов для
+ * Этот класс инкапсулирует работу с файлами результатов для
  * конкретной директории хранилища (обычно `.store`, путь к которой отдаёт
  * {@see \app\modules\neuron\classes\config\ConfigurationApp::getStoreDir()}).
  *
@@ -46,7 +46,7 @@ use const JSON_UNESCAPED_UNICODE;
  * - поддержка индекс-файла для ускорения операций list().
  *
  * Формат файла результата:
- * - `schema`      — версия схемы (`neuronapp.intermediate.v1`);
+ * - `schema`      — версия схемы (`neuronapp.store.v1`);
  * - `sessionKey`  — ключ сессии;
  * - `label`       — метка результата;
  * - `description` — краткое описание результата (для list и понимания LLM);
@@ -55,16 +55,16 @@ use const JSON_UNESCAPED_UNICODE;
  * - `data`        — произвольное JSON-совместимое значение.
  *
  * Формат индекс-файла:
- * - `schema`      — версия схемы (`neuronapp.intermediate_index.v1`);
+ * - `schema`      — версия схемы (`neuronapp.store_index.v1`);
  * - `sessionKey`  — ключ сессии;
- * - `items`       — массив {@see IntermediateIndexItemDto::toArray()}.
+ * - `items`       — массив {@see StoreIndexItemDto::toArray()}.
  *
  * Пример использования:
  *
  * ```php
- * use app\modules\neuron\classes\storage\IntermediateStorage;
+ * use app\modules\neuron\classes\storage\StoreStorage;
  *
- * $storage = new IntermediateStorage(__DIR__ . '/.store');
+ * $storage = new StoreStorage(__DIR__ . '/.store');
  * $sessionKey = '20250101-120000-1';
  *
  * // Сохранить результат
@@ -83,10 +83,14 @@ use const JSON_UNESCAPED_UNICODE;
  * $storage->delete($sessionKey, 'plan');
  * ```
  */
-final class IntermediateStorage
+final class StoreStorage
 {
-    public const SCHEMA_INTERMEDIATE_V1 = 'neuronapp.intermediate.v1';
-    public const SCHEMA_INDEX_V1 = 'neuronapp.intermediate_index.v1';
+    public const SCHEMA_STORE_V1 = 'neuronapp.store.v1';
+    public const SCHEMA_INDEX_V1 = 'neuronapp.store_index.v1';
+
+    private const RESULT_PREFIX = 'store_';
+    private const INDEX_PREFIX = 'store_index_';
+    private const TMP_PREFIX = 'store_';
 
     /**
      * @param string $storeDir Абсолютный путь к директории хранилища `.store`.
@@ -106,13 +110,13 @@ final class IntermediateStorage
      * @param string $sessionKey Базовый ключ сессии (без имени агента).
      * @param string $label      Метка результата.
      *
-     * @return string Имя файла без пути (например, `intermediate_20250101-120000-1_label.json`).
+     * @return string Имя файла без пути (например, `store_20250101-120000-1_label.json`).
      */
     public function resultFileName(string $sessionKey, string $label): string
     {
         $safeKey = $this->sanitizeKeyPart($sessionKey);
         $safeLabel = $this->sanitizeKeyPart($label);
-        return 'intermediate_' . $safeKey . '_' . $safeLabel . '.json';
+        return self::RESULT_PREFIX . $safeKey . '_' . $safeLabel . '.json';
     }
 
     private function resultFilePath(string $sessionKey, string $label): string
@@ -123,7 +127,7 @@ final class IntermediateStorage
     private function indexFileName(string $sessionKey): string
     {
         $safeKey = $this->sanitizeKeyPart($sessionKey);
-        return 'intermediate_index_' . $safeKey . '.json';
+        return self::INDEX_PREFIX . $safeKey . '.json';
     }
 
     private function indexFilePath(string $sessionKey): string
@@ -180,7 +184,7 @@ final class IntermediateStorage
             $items[] = $item;
         }
 
-        $updated = new IntermediateIndexDto(
+        $updated = new StoreIndexDto(
             schema: self::SCHEMA_INDEX_V1,
             sessionKey: $sessionKey,
             items: $items,
@@ -191,24 +195,24 @@ final class IntermediateStorage
     }
 
     /**
-     * Сохраняет промежуточный результат и обновляет индекс.
+     * Сохраняет результат и обновляет индекс.
      *
      * Данные сохраняются в JSON-файл с LLM-friendly конвертом (см. описание
      * класса). Индекс-файл дополняется или обновляет существующую запись
      * для переданной метки.
      *
-     * @param string $sessionKey Базовый ключ сессии.
-     * @param string $label      Метка результата (валидируется; не может быть пустой/слишком длинной).
+     * @param string      $sessionKey  Базовый ключ сессии.
+     * @param string      $label       Метка результата (валидируется; не может быть пустой/слишком длинной).
      * @param mixed       $data        JSON-совместимое значение для записи.
      * @param string|null $description Краткое описание результата (рекомендуется для list).
      *
-     * @return IntermediateIndexItemDto DTO с метаданными сохранённого результата.
+     * @return StoreIndexItemDto DTO с метаданными сохранённого результата.
      *
      * @throws \InvalidArgumentException Если label некорректен.
      * @throws \JsonException            При ошибке кодирования JSON.
      * @throws \RuntimeException         При ошибке записи/переименования файла.
      */
-    public function save(string $sessionKey, string $label, mixed $data, ?string $description = null): IntermediateIndexItemDto
+    public function save(string $sessionKey, string $label, mixed $data, ?string $description = null): StoreIndexItemDto
     {
         $this->validateLabel($label);
         $descriptionNorm = $this->normalizeDescription($description);
@@ -217,7 +221,7 @@ final class IntermediateStorage
         $dataType = $this->detectDataType($data);
 
         $payload = [
-            'schema' => self::SCHEMA_INTERMEDIATE_V1,
+            'schema' => self::SCHEMA_STORE_V1,
             'sessionKey' => $sessionKey,
             'label' => $label,
             'description' => $descriptionNorm,
@@ -231,7 +235,7 @@ final class IntermediateStorage
         $this->atomicWrite($path, $json);
 
         $sizeBytes = filesize($path);
-        $item = new IntermediateIndexItemDto(
+        $item = new StoreIndexItemDto(
             label: $label,
             description: $descriptionNorm,
             fileName: $this->resultFileName($sessionKey, $label),
@@ -289,7 +293,7 @@ final class IntermediateStorage
      *
      * @param string $sessionKey Базовый ключ сессии.
      *
-     * @return IntermediateIndexItemDto[] Массив DTO с метаданными результатов.
+     * @return StoreIndexItemDto[] Массив DTO с метаданными результатов.
      */
     public function list(string $sessionKey): array
     {
@@ -306,9 +310,9 @@ final class IntermediateStorage
      *
      * @param string $sessionKey Базовый ключ сессии.
      *
-     * @return IntermediateIndexDto|null Объект индекса или null, если файла нет или он некорректен.
+     * @return StoreIndexDto|null Объект индекса или null, если файла нет или он некорректен.
      */
-    private function readIndex(string $sessionKey): ?IntermediateIndexDto
+    private function readIndex(string $sessionKey): ?StoreIndexDto
     {
         $path = $this->indexFilePath($sessionKey);
         if (!file_exists($path)) {
@@ -325,21 +329,21 @@ final class IntermediateStorage
             return null;
         }
 
-        return IntermediateIndexDto::tryFromArray($decoded);
+        return StoreIndexDto::tryFromArray($decoded);
     }
 
     /**
      * Добавляет или обновляет элемент индекса и записывает индекс-файл атомарно.
      *
-     * @param string                  $sessionKey Базовый ключ сессии.
-     * @param IntermediateIndexItemDto $item      Элемент индекса (метаданные результата).
+     * @param string            $sessionKey Базовый ключ сессии.
+     * @param StoreIndexItemDto $item       Элемент индекса (метаданные результата).
      *
      * @return void
      *
      * @throws \JsonException    При ошибке кодирования JSON.
      * @throws \RuntimeException При ошибке записи/переименования индекс-файла.
      */
-    private function upsertIndexItem(string $sessionKey, IntermediateIndexItemDto $item): void
+    private function upsertIndexItem(string $sessionKey, StoreIndexItemDto $item): void
     {
         $existing = $this->readIndex($sessionKey);
         $items = $existing?->items ?? [];
@@ -358,7 +362,7 @@ final class IntermediateStorage
             $updated[] = $item;
         }
 
-        $index = new IntermediateIndexDto(
+        $index = new StoreIndexDto(
             schema: self::SCHEMA_INDEX_V1,
             sessionKey: $sessionKey,
             items: $updated,
@@ -372,12 +376,12 @@ final class IntermediateStorage
      * Выполняет полное сканирование директории хранилища для данной сессии.
      *
      * Используется как fallback, когда индекс-файл отсутствует или повреждён.
-     * Ищет файлы формата `intermediate_{sessionKey}_*.json` и пытается
+     * Ищет файлы формата `{prefix}{sessionKey}_*.json` и пытается
      * восстановить метаданные из их содержимого.
      *
      * @param string $sessionKey Базовый ключ сессии.
      *
-     * @return IntermediateIndexItemDto[] Массив DTO на основе найденных файлов.
+     * @return StoreIndexItemDto[] Массив DTO на основе найденных файлов.
      */
     private function scanStoreForSession(string $sessionKey): array
     {
@@ -387,17 +391,19 @@ final class IntermediateStorage
         }
 
         $safeKey = $this->sanitizeKeyPart($sessionKey);
-        $prefix = 'intermediate_' . $safeKey . '_';
+        $prefix = self::RESULT_PREFIX . $safeKey . '_';
+
         $items = [];
 
         foreach ($entries as $entry) {
             if (!is_string($entry) || $entry === '.' || $entry === '..') {
                 continue;
             }
-            if (!str_starts_with($entry, $prefix)) {
+            if (!str_ends_with($entry, '.json')) {
                 continue;
             }
-            if (!str_ends_with($entry, '.json')) {
+
+            if (!str_starts_with($entry, $prefix)) {
                 continue;
             }
 
@@ -421,7 +427,7 @@ final class IntermediateStorage
             $dataType = is_string($decoded['dataType'] ?? null) ? (string) $decoded['dataType'] : '';
             $sizeBytes = filesize($path);
 
-            $items[] = new IntermediateIndexItemDto(
+            $items[] = new StoreIndexItemDto(
                 label: $label,
                 description: $description,
                 fileName: $entry,
@@ -451,18 +457,18 @@ final class IntermediateStorage
     private function atomicWrite(string $targetPath, string $content): void
     {
         $dir = dirname($targetPath);
-        $tmp = $dir . DIRECTORY_SEPARATOR . 'intermediate_' . uniqid('', true) . '.tmp';
+        $tmp = $dir . DIRECTORY_SEPARATOR . self::TMP_PREFIX . uniqid('', true) . '.tmp';
 
         if (file_put_contents($tmp, $content) === false) {
             if (file_exists($tmp)) {
                 @unlink($tmp);
             }
-            throw new \RuntimeException('Не удалось записать промежуточный результат во временный файл: ' . $tmp);
+            throw new \RuntimeException('Не удалось записать результат во временный файл: ' . $tmp);
         }
 
         if (!rename($tmp, $targetPath)) {
             @unlink($tmp);
-            throw new \RuntimeException('Не удалось переименовать временный файл промежуточного результата в: ' . $targetPath);
+            throw new \RuntimeException('Не удалось переименовать временный файл результата в: ' . $targetPath);
         }
     }
 

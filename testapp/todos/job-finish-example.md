@@ -1,9 +1,9 @@
 ---
-tools: intermediate_load
+tools: store_load
 pure_context: false
 ---
 
-1. Загрузи итоговые значения `counter`, `target`, `completed` из промежуточного хранилища.
+1. Загрузи итоговые значения `counter`, `target`, `completed` из хранилища.
 
 2. Сформируй финальный отчет:
    - завершена ли задача (`completed`);

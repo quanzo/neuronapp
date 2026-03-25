@@ -37,7 +37,7 @@ use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\interfaces\IAttachmentFile;
 use app\modules\neuron\interfaces\IDependConfigApp;
-use app\modules\neuron\classes\storage\IntermediateStorage;
+use app\modules\neuron\classes\storage\StoreStorage;
 use app\modules\neuron\exceptions\RunStateNotFoundException;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\tools\ATool;
@@ -144,9 +144,9 @@ class ConfigurationAgent implements IDependConfigApp
     protected ?string $sessionKey = null;
 
     /**
-     * Хранилище промежуточных результатов для данного агента.
+     * Хранилище результатов для данного агента.
      */
-    protected ?IntermediateStorage $intermediateStorage = null;
+    protected ?StoreStorage $storeStorage = null;
 
     /**
      * Системный промпт
@@ -668,24 +668,24 @@ class ConfigurationAgent implements IDependConfigApp
     }
 
     /**
-     * Возвращает хранилище промежуточных результатов для агента.
+     * Возвращает хранилище результатов для агента.
      *
-     * По умолчанию делегирует в ConfigurationApp::getIntermediateStorage().
+     * По умолчанию делегирует в ConfigurationApp::getStoreStorage().
      */
-    public function getIntermediateStorage(): IntermediateStorage
+    public function getStoreStorage(): StoreStorage
     {
-        if ($this->intermediateStorage !== null) {
-            return $this->intermediateStorage;
+        if ($this->storeStorage !== null) {
+            return $this->storeStorage;
         }
 
         $configApp = $this->getConfigurationApp();
         if ($configApp !== null) {
-            $this->intermediateStorage = $configApp->getIntermediateStorage();
+            $this->storeStorage = $configApp->getStoreStorage();
         } else {
-            $this->intermediateStorage = ConfigurationApp::getInstance()->getIntermediateStorage();
+            $this->storeStorage = ConfigurationApp::getInstance()->getStoreStorage();
         }
 
-        return $this->intermediateStorage;
+        return $this->storeStorage;
     }
 
     /**

@@ -4,43 +4,40 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\dto\tools\IntermediateToolResultDto;
+use app\modules\neuron\classes\dto\tools\StoreToolResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
 use function is_string;
-use function json_encode;
 use function ltrim;
 use function str_ends_with;
 use function str_starts_with;
 use function trim;
 
-use const JSON_UNESCAPED_UNICODE;
-
 /**
- * Инструмент `IntermediatePadTool`: дополняет (append) строковые данные по указанной метке.
+ * Инструмент `StorePadTool`: дополняет (append) строковые данные по указанной метке.
  *
- * Отличие от {@see IntermediateSaveTool}:
+ * Отличие от {@see StoreSaveTool}:
  * - Save полностью перезаписывает данные.
  * - Pad добавляет новый текст в конец существующего текста, сохраняя переводы строк.
  *
  * Правила объединения строк:
- * - если существующий текст не пустой и не заканчивается `\\n`, а добавляемый текст не начинается с `\\n` — вставляется один `\\n`;
- * - если существующий текст заканчивается `\\n`, а добавляемый начинается с `\\n` — один ведущий `\\n` удаляется из добавляемого текста;
+ * - если существующий текст не пустой и не заканчивается `\n`, а добавляемый текст не начинается с `\n` — вставляется один `\n`;
+ * - если существующий текст заканчивается `\n`, а добавляемый начинается с `\n` — один ведущий `\n` удаляется из добавляемого текста;
  * - если данных по label нет — создаётся новая запись.
  */
-final class IntermediatePadTool extends AIntermediateTool
+final class StorePadTool extends AStoreTool
 {
     /**
-     * Максимальное кол-во вызовов в сессии одного агента этого инструмента
+     * Максимальное кол-во вызовов в сессии одного агента этого инструмента.
      *
-     * @var integer|null
+     * @var int|null
      */
     protected ?int $maxRuns = 50;
 
     public function __construct(
-        string $name = 'intermediate_pad',
-        string $description = 'Дополняет (append) строковые промежуточные данные по метке, сохраняя переводы строк. Если метки нет — создаёт новую запись.',
+        string $name = 'store_pad',
+        string $description = 'Дополняет (append) строковые данные по метке, сохраняя переводы строк. Если метки нет — создаёт новую запись.',
     ) {
         parent::__construct(name: $name, description: $description);
     }
@@ -77,9 +74,9 @@ final class IntermediatePadTool extends AIntermediateTool
     /**
      * Дополняет текстовые данные по label или создаёт новую запись.
      *
-     * @param string $label Метка результата.
+     * @param string $label       Метка результата.
      * @param string $description Краткое описание.
-     * @param string $data Текст для добавления.
+     * @param string $data        Текст для добавления.
      *
      * @return string JSON-результат.
      */
@@ -92,7 +89,7 @@ final class IntermediatePadTool extends AIntermediateTool
         $descTrimmed = trim($description);
 
         if ($labelTrimmed === '') {
-            return $this->resultJson(new IntermediateToolResultDto(
+            return $this->resultJson(new StoreToolResultDto(
                 action: 'pad',
                 success: false,
                 message: 'label не может быть пустым.',
@@ -101,7 +98,7 @@ final class IntermediatePadTool extends AIntermediateTool
         }
 
         if ($descTrimmed === '') {
-            return $this->resultJson(new IntermediateToolResultDto(
+            return $this->resultJson(new StoreToolResultDto(
                 action    : 'pad',
                 success   : false,
                 message   : 'description не может быть пустым.',
@@ -114,7 +111,7 @@ final class IntermediatePadTool extends AIntermediateTool
         $existing = $loaded['data'] ?? null;
 
         if ($loaded !== null && $existing !== null && !is_string($existing)) {
-            return $this->resultJson(new IntermediateToolResultDto(
+            return $this->resultJson(new StoreToolResultDto(
                 action     : 'pad',
                 success    : false,
                 message    : 'Pad поддерживает только строковые данные. Текущие данные не строка.',
@@ -122,8 +119,8 @@ final class IntermediatePadTool extends AIntermediateTool
                 label      : $labelTrimmed,
                 fileName   : $storage->resultFileName($sessionKey, $labelTrimmed),
                 description: is_string($loaded['description'] ?? null) ? (string) $loaded['description'] : null,
-                savedAt    : is_string($loaded['savedAt'] ?? null) ? (string) $loaded['savedAt']        : null,
-                dataType   : is_string($loaded['dataType'] ?? null) ? (string) $loaded['dataType']      : null,
+                savedAt    : is_string($loaded['savedAt'] ?? null) ? (string) $loaded['savedAt'] : null,
+                dataType   : is_string($loaded['dataType'] ?? null) ? (string) $loaded['dataType'] : null,
                 exists     : true,
             ));
         }
@@ -136,7 +133,7 @@ final class IntermediatePadTool extends AIntermediateTool
         try {
             $item = $storage->save($sessionKey, $labelTrimmed, $merged, $descTrimmed);
         } catch (\Throwable $e) {
-            return $this->resultJson(new IntermediateToolResultDto(
+            return $this->resultJson(new StoreToolResultDto(
                 action    : 'pad',
                 success   : false,
                 message   : 'Ошибка сохранения: ' . $e->getMessage(),
@@ -145,7 +142,7 @@ final class IntermediatePadTool extends AIntermediateTool
             ));
         }
 
-        return $this->resultJson(new IntermediateToolResultDto(
+        return $this->resultJson(new StoreToolResultDto(
             action     : 'pad',
             success    : true,
             message    : $loaded === null ? 'Создано.' : 'Дополнено.',

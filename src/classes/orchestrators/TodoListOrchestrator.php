@@ -44,7 +44,7 @@ use Revolt\EventLoop;
  * Важно:
  * - оркестратор намеренно не опирается на todo_goto;
  * - источник истины для статуса завершения — ключ `completed` в
- *   {@see \app\modules\neuron\classes\storage\IntermediateStorage}.
+ *   {@see \app\modules\neuron\classes\storage\StoreStorage}.
  */
 class TodoListOrchestrator
 {
@@ -53,7 +53,7 @@ class TodoListOrchestrator
      *
      * Через объект конфигурации оркестратор получает:
      * - sessionKey;
-     * - доступ к IntermediateStorage;
+     * - доступ к StoreStorage;
      * - фабрики/поиск зависимостей, необходимых во время исполнения списков.
      */
     public function __construct(
@@ -263,7 +263,7 @@ class TodoListOrchestrator
      */
     protected function readCompletedRaw(): mixed
     {
-        $storage = $this->configApp->getIntermediateStorage();
+        $storage = $this->configApp->getStoreStorage();
         $payload = $storage->load($this->configApp->getSessionKey(), 'completed');
 
         return $payload['data'] ?? null;
@@ -312,7 +312,7 @@ class TodoListOrchestrator
     protected function setCompleted(int $value, string $description): void
     {
         $this->configApp
-            ->getIntermediateStorage()
+            ->getStoreStorage()
             ->save($this->configApp->getSessionKey(), 'completed', $value, $description);
     }
 

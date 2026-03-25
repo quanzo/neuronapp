@@ -6,8 +6,8 @@ namespace Tests\Tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\classes\storage\IntermediateStorage;
-use app\modules\neuron\tools\IntermediateLoadTool;
+use app\modules\neuron\classes\storage\StoreStorage;
+use app\modules\neuron\tools\StoreDeleteTool;
 use PHPUnit\Framework\TestCase;
 
 use function json_decode;
@@ -16,20 +16,21 @@ use function sys_get_temp_dir;
 use function uniqid;
 
 /**
- * Тесты для {@see IntermediateLoadTool}.
+ * Тесты для {@see StoreDeleteTool}.
  *
  * Проверяют:
- * - успешную загрузку ранее сохранённого значения
- * - корректную ошибку при отсутствии метки
+ * - успешное удаление существующей записи
+ * - idempotent-поведение при отсутствии записи
+ * - ошибку при пустой метке
  */
-final class IntermediateLoadToolTest extends TestCase
+final class StoreDeleteToolTest extends TestCase
 {
     private string $tmpDir;
-    private IntermediateLoadTool $tool;
+    private StoreDeleteTool $tool;
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_intermediate_load_' . uniqid();
+        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_store_delete_' . uniqid();
         mkdir($this->tmpDir, 0777, true);
         mkdir($this->tmpDir . '/.store', 0777, true);
 
@@ -37,7 +38,7 @@ final class IntermediateLoadToolTest extends TestCase
         ConfigurationApp::init($dp);
         ConfigurationApp::getInstance()->setSessionKey('20250101-120000-1');
 
-        $this->tool = new IntermediateLoadTool();
+        $this->tool = new StoreDeleteTool();
     }
 
     protected function tearDown(): void
@@ -48,52 +49,38 @@ final class IntermediateLoadToolTest extends TestCase
         }
     }
 
-    /**
-     * При наличии сохранённого значения load должен вернуть success=true и данные.
-     */
-    public function testLoadExisting(): void
+    public function testDeleteExisting(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        $storage = new IntermediateStorage($this->tmpDir . '/.store');
-        $storage->save($sessionKey, 'parsed', ['x' => 1], 'Короткое описание');
+        $storage = new StoreStorage($this->tmpDir . '/.store');
+        $storage->save($sessionKey, 'tmp', '1', 'tmp value');
+        $this->assertTrue($storage->exists($sessionKey, 'tmp'));
 
-        $json = ($this->tool)('parsed');
+        $json = ($this->tool)('tmp');
         $data = json_decode($json, true);
 
         $this->assertTrue($data['success']);
-        $this->assertSame('load', $data['action']);
-        $this->assertSame(['x' => 1], $data['data']);
+        $this->assertFalse($storage->exists($sessionKey, 'tmp'));
     }
 
-    /**
-     * Для строковых данных поддерживается загрузка диапазона строк (start_line/end_line).
-     */
-    public function testLoadStringRange(): void
+    public function testDeleteMissing(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        $storage = new IntermediateStorage($this->tmpDir . '/.store');
-        $storage->save($sessionKey, 'text', "l1\nl2\nl3\nl4", 'Text');
+        $storage = new StoreStorage($this->tmpDir . '/.store');
+        $this->assertFalse($storage->exists($sessionKey, 'nope'));
 
-        $json = ($this->tool)('text', 2, 3);
+        $json = ($this->tool)('nope');
         $data = json_decode($json, true);
 
         $this->assertTrue($data['success']);
-        $this->assertSame("l2\nl3", $data['data']);
-        $this->assertSame(2, $data['startLine']);
-        $this->assertSame(3, $data['endLine']);
-        $this->assertSame(4, $data['totalLines']);
     }
 
-    /**
-     * Отсутствующее значение должно давать success=false и exists=false.
-     */
-    public function testLoadMissing(): void
+    public function testEmptyLabelReturnsError(): void
     {
-        $json = ($this->tool)('missing');
+        $json = ($this->tool)('   ');
         $data = json_decode($json, true);
 
         $this->assertFalse($data['success']);
-        $this->assertFalse($data['exists']);
     }
 
     private function resetConfigurationAppSingleton(): void

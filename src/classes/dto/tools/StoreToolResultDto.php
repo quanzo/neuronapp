@@ -7,19 +7,17 @@ namespace app\modules\neuron\classes\dto\tools;
 use app\modules\neuron\interfaces\IArrayable;
 
 use function array_map;
-use function is_array;
-use function is_string;
 
 /**
- * DTO ответа инструмента IntermediateTool.
+ * DTO ответа инструмента StoreTool.
  *
  * Возвращается LLM в виде JSON и содержит единый предсказуемый формат
- * для операций save/load/list/exist.
+ * для операций save/load/list/exist/delete/pad.
  *
  * Формат сериализации (toArray):
  * ```
  * [
- *   'action'     => string,  // save|load|list|exist
+ *   'action'     => string,  // save|load|list|exist|delete|pad
  *   'success'    => bool,
  *   'message'    => string,
  *   'sessionKey' => string,
@@ -30,7 +28,7 @@ use function is_string;
  *   'dataType'   => string|null,
  *   'data'       => mixed|null,
  *   'exists'     => bool|null,
- *   'items'      => array<IntermediateIndexItemDto::toArray()>|null,
+ *   'items'      => array<StoreIndexItemDto::toArray()>|null,
  *   'count'      => int|null,
  *   'totalCount' => int|null,
  *   'page'       => int|null,
@@ -43,30 +41,30 @@ use function is_string;
  * ]
  * ```
  */
-final class IntermediateToolResultDto implements IArrayable
+final class StoreToolResultDto implements IArrayable
 {
     /**
-     * @param string                     $action     Операция.
-     * @param bool                       $success    Успешность операции.
-     * @param string                     $message    Человекочитаемое сообщение.
-     * @param string                     $sessionKey Текущий sessionKey.
-     * @param string|null                $label      Метка (если применимо).
-     * @param string|null                $fileName   Имя файла (если применимо).
-     * @param string|null                $description Краткое описание результата (если применимо).
-     * @param string|null                $savedAt    ISO-8601 время сохранения (если применимо).
-     * @param string|null                $dataType   Тип данных (если применимо).
-     * @param mixed|null                 $data       Данные (для load или echo save при необходимости).
-     * @param bool|null                  $exists     Результат exist (если применимо).
-     * @param IntermediateIndexItemDto[]|null $items Список (для list).
-     * @param int|null                   $count      Количество элементов (для list).
-     * @param int|null                   $totalCount Общее количество элементов (для list с фильтрацией/пагинацией).
-     * @param int|null                   $page       Номер страницы (1-based).
-     * @param int|null                   $pageSize   Размер страницы.
-     * @param string|null                $query      Строка поиска (для list).
-     * @param int|null                   $startLine  Начальная строка (1-based) для строковых данных (load).
-     * @param int|null                   $endLine    Конечная строка (1-based) для строковых данных (load).
-     * @param int|null                   $totalLines Общее число строк в строковых данных (load).
-     * @param bool|null                  $truncated  Был ли результат усечён (load диапазона).
+     * @param string               $action     Операция.
+     * @param bool                 $success    Успешность операции.
+     * @param string               $message    Человекочитаемое сообщение.
+     * @param string               $sessionKey Текущий sessionKey.
+     * @param string|null          $label      Метка (если применимо).
+     * @param string|null          $fileName   Имя файла (если применимо).
+     * @param string|null          $description Краткое описание результата (если применимо).
+     * @param string|null          $savedAt    ISO-8601 время сохранения (если применимо).
+     * @param string|null          $dataType   Тип данных (если применимо).
+     * @param mixed|null           $data       Данные (для load).
+     * @param bool|null            $exists     Результат exist (если применимо).
+     * @param StoreIndexItemDto[]|null $items  Список (для list).
+     * @param int|null             $count      Количество элементов (для list).
+     * @param int|null             $totalCount Общее количество элементов (для list с фильтрацией/пагинацией).
+     * @param int|null             $page       Номер страницы (1-based).
+     * @param int|null             $pageSize   Размер страницы.
+     * @param string|null          $query      Строка поиска (для list).
+     * @param int|null             $startLine  Начальная строка (1-based) для строковых данных (load).
+     * @param int|null             $endLine    Конечная строка (1-based) для строковых данных (load).
+     * @param int|null             $totalLines Общее число строк в строковых данных (load).
+     * @param bool|null            $truncated  Был ли результат усечён (load диапазона).
      */
     public function __construct(
         public readonly string $action,
@@ -114,7 +112,7 @@ final class IntermediateToolResultDto implements IArrayable
             'exists' => $this->exists,
             'items' => $this->items === null
                 ? null
-                : array_map(static fn(IntermediateIndexItemDto $i): array => $i->toArray(), $this->items),
+                : array_map(static fn(StoreIndexItemDto $i): array => $i->toArray(), $this->items),
             'count' => $this->count,
             'totalCount' => $this->totalCount,
             'page' => $this->page,

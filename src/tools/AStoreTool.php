@@ -4,21 +4,20 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\storage\IntermediateStorage;
+use app\modules\neuron\classes\storage\StoreStorage;
 use app\modules\neuron\classes\config\ConfigurationApp;
-use app\modules\neuron\classes\dto\tools\IntermediateToolResultDto;
+use app\modules\neuron\classes\dto\tools\StoreToolResultDto;
 use JSON_UNESCAPED_UNICODE;
 
 /**
- * Инструмент для работы с промежуточными данными
- *
+ * Инструмент для работы с результатами в `.store`.
  */
-class AIntermediateTool extends ATool
+class AStoreTool extends ATool
 {
-    protected function getStorage(): IntermediateStorage
+    protected function getStorage(): StoreStorage
     {
         $agentCfg = $this->getAgentCfg();
-        return $agentCfg?->getIntermediateStorage() ?? ConfigurationApp::getInstance()->getIntermediateStorage();
+        return $agentCfg?->getStoreStorage() ?? ConfigurationApp::getInstance()->getStoreStorage();
     }
 
     protected function getSessionKey(): string
@@ -30,10 +29,10 @@ class AIntermediateTool extends ATool
     /**
      * Сериализует результат в JSON.
      *
-     * @param IntermediateToolResultDto $dto DTO результата.
+     * @param StoreToolResultDto $dto DTO результата.
      * @return string JSON.
      */
-    protected function resultJson(IntermediateToolResultDto $dto): string
+    protected function resultJson(StoreToolResultDto $dto): string
     {
         return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
     }

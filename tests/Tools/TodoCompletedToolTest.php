@@ -21,7 +21,7 @@ use function uniqid;
  * Проверяют:
  * - корректную нормализацию статусов в completed=1/0;
  * - обработку невалидного статуса;
- * - запись значения в intermediate storage.
+ * - запись значения в store storage.
  */
 final class TodoCompletedToolTest extends TestCase
 {
@@ -63,7 +63,7 @@ final class TodoCompletedToolTest extends TestCase
         $this->assertSame('completed', $data['label']);
 
         $payload = ConfigurationApp::getInstance()
-            ->getIntermediateStorage()
+            ->getStoreStorage()
             ->load(ConfigurationApp::getInstance()->getSessionKey(), 'completed');
         $this->assertIsArray($payload);
         $this->assertSame($expected, $payload['data']);

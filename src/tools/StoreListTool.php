@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\dto\tools\IntermediateToolResultDto;
-use app\modules\neuron\classes\storage\IntermediateStorage;
-use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dto\tools\StoreToolResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
@@ -14,26 +12,23 @@ use function array_filter;
 use function array_slice;
 use function array_values;
 use function count;
-use function json_encode;
-use function max;
-use function min;
 use function strtolower;
 use function trim;
-
-use const JSON_UNESCAPED_UNICODE;
+use function max;
+use function min;
 
 /**
- * Инструмент `IntermediateListTool`: возвращает список промежуточных результатов для текущего `sessionKey`.
+ * Инструмент `StoreListTool`: возвращает список результатов для текущего `sessionKey`.
  *
  * Назначение:
  * - дать LLM обзор того, какие метки уже сохранены в текущей сессии;
  * - использовать этот список, чтобы выбирать подходящий `label` для дальнейших load/exist.
  */
-final class IntermediateListTool extends AIntermediateTool
+final class StoreListTool extends AStoreTool
 {
     public function __construct(
-        string $name = 'intermediate_list',
-        string $description = 'Список всех промежуточных результатов в .store для текущего sessionKey (метки и метаданные).',
+        string $name = 'store_list',
+        string $description = 'Список всех результатов в .store для текущего sessionKey (метки и метаданные).',
     ) {
         parent::__construct(name: $name, description: $description);
     }
@@ -68,14 +63,14 @@ final class IntermediateListTool extends AIntermediateTool
     }
 
     /**
-     * Возвращает список сохранённых промежуточных результатов.
+     * Возвращает список сохранённых результатов.
      *
      * @return string JSON-результат со списком items.
      */
     public function __invoke(?int $page_size = null, ?int $page = null, ?string $query = null): string
     {
-        $storage      = $this->getStorage();
-        $sessionKey   = $this->getSessionKey();
+        $storage    = $this->getStorage();
+        $sessionKey = $this->getSessionKey();
 
         $items = $storage->list($sessionKey);
         $queryNorm = $query !== null ? trim($query) : '';
@@ -103,7 +98,7 @@ final class IntermediateListTool extends AIntermediateTool
             $items       = array_slice($items, $offset, $pageSizeOut);
         }
 
-        return $this->resultJson(new IntermediateToolResultDto(
+        return $this->resultJson(new StoreToolResultDto(
             action    : 'list',
             success   : true,
             message   : 'OK',

@@ -6,8 +6,8 @@ namespace Tests\Tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\classes\storage\IntermediateStorage;
-use app\modules\neuron\tools\IntermediateExistTool;
+use app\modules\neuron\tools\StorePadTool;
+use app\modules\neuron\tools\StoreLoadTool;
 use PHPUnit\Framework\TestCase;
 
 use function json_decode;
@@ -16,21 +16,17 @@ use function sys_get_temp_dir;
 use function uniqid;
 
 /**
- * Тесты для {@see IntermediateExistTool}.
- *
- * Проверяют:
- * - exist=true для существующей метки
- * - exist=false для отсутствующей метки
- * - ошибку при пустой метке
+ * Тесты для {@see StorePadTool}.
  */
-final class IntermediateExistToolTest extends TestCase
+final class StorePadToolTest extends TestCase
 {
     private string $tmpDir;
-    private IntermediateExistTool $tool;
+    private StorePadTool $padTool;
+    private StoreLoadTool $loadTool;
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_intermediate_exist_' . uniqid();
+        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_store_pad_' . uniqid();
         mkdir($this->tmpDir, 0777, true);
         mkdir($this->tmpDir . '/.store', 0777, true);
 
@@ -38,7 +34,8 @@ final class IntermediateExistToolTest extends TestCase
         ConfigurationApp::init($dp);
         ConfigurationApp::getInstance()->setSessionKey('20250101-120000-1');
 
-        $this->tool = new IntermediateExistTool();
+        $this->padTool = new StorePadTool();
+        $this->loadTool = new StoreLoadTool();
     }
 
     protected function tearDown(): void
@@ -49,29 +46,22 @@ final class IntermediateExistToolTest extends TestCase
         }
     }
 
-    public function testExistTrueAndFalse(): void
+    /**
+     * Pad создаёт запись, если её нет, и дополняет с переводом строк.
+     */
+    public function testPadCreatesAndAppendsWithNewline(): void
     {
-        $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        $storage = new IntermediateStorage($this->tmpDir . '/.store');
-        $storage->save($sessionKey, 'x', '1', 'desc');
-
-        $json1 = ($this->tool)('x');
+        $json1 = ($this->padTool)('log', 'Append log', 'first');
         $d1 = json_decode($json1, true);
         $this->assertTrue($d1['success']);
-        $this->assertTrue($d1['exists']);
 
-        $json2 = ($this->tool)('missing');
+        $json2 = ($this->padTool)('log', 'Append log', 'second');
         $d2 = json_decode($json2, true);
         $this->assertTrue($d2['success']);
-        $this->assertFalse($d2['exists']);
-    }
 
-    public function testEmptyLabelReturnsError(): void
-    {
-        $json = ($this->tool)('   ');
-        $data = json_decode($json, true);
-
-        $this->assertFalse($data['success']);
+        $loadedJson = ($this->loadTool)('log');
+        $loaded = json_decode($loadedJson, true);
+        $this->assertSame("first\nsecond", $loaded['data']);
     }
 
     private function resetConfigurationAppSingleton(): void

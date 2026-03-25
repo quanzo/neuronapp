@@ -26,7 +26,7 @@
   - `getSessionDirName()` / `getSessionDir()` → `.sessions`;
   - `getLogDirName()` / `getLogDir()` → `.logs`;
   - `getStoreDirName()` / `getStoreDir()` → `.store` (чекпоинты выполнения todolist);
-  - `getIntermediateStorage()` — объектное хранилище промежуточных результатов (`IntermediateStorage`) для директории `.store`;
+  - `getStoreStorage()` — объектное хранилище результатов (`StoreStorage`) для директории `.store`;
 - доступ к настройкам:
   - `getAll(): array<string,mixed>`;
   - `get(string $key, mixed $default = null): mixed` — поддерживает ключи вида `"context_files.allowed_paths"`;
@@ -64,8 +64,8 @@
   - `setChatHistory()` и `resetChatHistory()` управляют текущим объектом истории;
 - сессии todolist:
   - `getBlankRunStateDto()` / `getExistRunStateDto()` — работа с `RunStateDto` и чекпоинтами в `.store` через `RunStateCheckpointHelper`;
-- промежуточные результаты:
-  - `getIntermediateStorage()` — доступ к хранилищу промежуточных результатов (`IntermediateStorage`), которое используют инструменты семейства `Intermediate*Tool`;
+- результаты:
+  - `getStoreStorage()` — доступ к хранилищу результатов (`StoreStorage`), которое используют инструменты семейства `Store*Tool`;
 - клоны для отдельных запусков:
   - `cloneForSession(ChatHistoryCloneMode $mode)` — создаёт клон с:
     - сброшенным агентом (`_agent = null`);

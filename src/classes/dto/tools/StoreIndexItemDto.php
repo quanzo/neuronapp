@@ -7,32 +7,32 @@ namespace app\modules\neuron\classes\dto\tools;
 use app\modules\neuron\interfaces\IArrayable;
 
 /**
- * DTO элемента индекса промежуточных результатов (IntermediateStorage).
+ * DTO элемента индекса результатов (StoreStorage).
  *
- * Используется для list_intermediate(): показывает метаданные сохранённого значения
+ * Используется для list_store(): показывает метаданные сохранённого значения
  * без необходимости загружать само data.
  *
  * Формат сериализации (toArray):
  * ```
  * [
- *   'label'     => string,
+ *   'label'       => string,
  *   'description' => string,
- *   'fileName'  => string,
- *   'savedAt'   => string, // ISO-8601
- *   'dataType'  => string, // string|object|array|number|boolean|null
- *   'sizeBytes' => int,
+ *   'fileName'    => string,
+ *   'savedAt'     => string, // ISO-8601
+ *   'dataType'    => string, // string|object|array|number|boolean|null
+ *   'sizeBytes'   => int,
  * ]
  * ```
  */
-final class IntermediateIndexItemDto implements IArrayable
+final class StoreIndexItemDto implements IArrayable
 {
     /**
-     * @param string $label     Метка результата.
+     * @param string $label       Метка результата.
      * @param string $description Краткое описание результата (для list).
-     * @param string $fileName  Имя файла в `.store`.
-     * @param string $savedAt   Время сохранения (ISO-8601).
-     * @param string $dataType  Тип данных.
-     * @param int    $sizeBytes Размер файла (байты).
+     * @param string $fileName    Имя файла в `.store`.
+     * @param string $savedAt     Время сохранения (ISO-8601).
+     * @param string $dataType    Тип данных.
+     * @param int    $sizeBytes   Размер файла (байты).
      */
     public function __construct(
         public readonly string $label,

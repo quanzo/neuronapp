@@ -1,9 +1,9 @@
 ---
-tools: intermediate_load, intermediate_save, todo_completed
+tools: store_load, store_save, todo_completed
 pure_context: false
 ---
 
-1. Загрузи значения `counter` и `target` из промежуточного хранилища.
+1. Загрузи значения `counter` и `target` из хранилища.
    Если хотя бы одно значение отсутствует — зафиксируй `completed = 0` через `todo_completed(status="not_done")`
    и верни сообщение об ошибке инициализации.
 
