@@ -103,7 +103,7 @@ final class OrchestratorResultDto implements IArrayable
     }
 
     /**
-     * Сырое значение completed, загруженное из StoreStorage.
+     * Сырое значение completed, загруженное из VarStorage.
      */
     public function getCompletedRaw(): mixed
     {

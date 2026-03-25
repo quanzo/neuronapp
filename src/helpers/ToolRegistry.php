@@ -6,13 +6,18 @@ namespace app\modules\neuron\helpers;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\tools\ATool;
+use app\modules\neuron\tools\ChunckSizeTool;
+use app\modules\neuron\tools\ChunckViewTool;
 use app\modules\neuron\tools\GitSummaryTool;
-use app\modules\neuron\tools\StoreExistTool;
-use app\modules\neuron\tools\StoreListTool;
-use app\modules\neuron\tools\StoreLoadTool;
-use app\modules\neuron\tools\StoreSaveTool;
-use app\modules\neuron\tools\StoreDeleteTool;
-use app\modules\neuron\tools\StorePadTool;
+use app\modules\neuron\tools\GlobTool;
+use app\modules\neuron\tools\GrepTool;
+use app\modules\neuron\tools\HttpFetchTool;
+use app\modules\neuron\tools\VarExistTool;
+use app\modules\neuron\tools\VarGetTool;
+use app\modules\neuron\tools\VarListTool;
+use app\modules\neuron\tools\VarPadTool;
+use app\modules\neuron\tools\VarSetTool;
+use app\modules\neuron\tools\VarUnsetTool;
 use app\modules\neuron\tools\WikiSearchTool;
 use app\modules\neuron\tools\RuWikiSearchTool;
 use app\modules\neuron\tools\TodoGotoTool;
@@ -45,19 +50,24 @@ class ToolRegistry
         }
 
         $tool = match ($name) {
-            'wiki_search'         => new WikiSearchTool(),
-            'ru_wiki_search'      => new RuWikiSearchTool(),
-            'uni_search'          => new UniSearchTool(),
-            'git_summary'         => new GitSummaryTool(),
-            'store_save'          => new StoreSaveTool(),
-            'store_load'          => new StoreLoadTool(),
-            'store_list'          => new StoreListTool(),
-            'store_exist'         => new StoreExistTool(),
-            'store_delete'        => new StoreDeleteTool(),
-            'store_pad'           => new StorePadTool(),
-            'todo_goto'           => new TodoGotoTool(),
-            'todo_completed'      => new TodoCompletedTool(),
-            default => null,
+            'wiki_search'    => new WikiSearchTool(),
+            'ru_wiki_search' => new RuWikiSearchTool(),
+            'uni_search'     => new UniSearchTool(),
+            'git_summary'    => new GitSummaryTool(),
+            'var_set'        => new VarSetTool(),
+            'var_get'        => new VarGetTool(),
+            'var_list'       => new VarListTool(),
+            'var_exist'      => new VarExistTool(),
+            'var_unset'      => new VarUnsetTool(),
+            'var_pad'        => new VarPadTool(),
+            'todo_goto'      => new TodoGotoTool(),
+            'todo_completed' => new TodoCompletedTool(),
+            'chunk_size'     => new ChunckSizeTool(),
+            'chunk_view'     => new ChunckViewTool(),
+            'glob'           => new GlobTool(),
+            'grep'           => new GrepTool(),
+            'http_fetch'     => new HttpFetchTool(),
+            default          => null,
         };
         if ($tool && $tool instanceof ATool) {
             $tool->setAgentCfg($agentCfg);

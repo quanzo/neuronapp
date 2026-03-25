@@ -7,15 +7,15 @@ namespace app\modules\neuron\classes\dto\tools;
 use app\modules\neuron\interfaces\IArrayable;
 
 /**
- * DTO элемента индекса результатов (StoreStorage).
+ * DTO элемента индекса результатов (VarStorage).
  *
- * Используется для list_store(): показывает метаданные сохранённого значения
+ * Используется для list_var(): показывает метаданные сохранённого значения
  * без необходимости загружать само data.
  *
  * Формат сериализации (toArray):
  * ```
  * [
- *   'label'       => string,
+ *   'name'       => string,
  *   'description' => string,
  *   'fileName'    => string,
  *   'savedAt'     => string, // ISO-8601
@@ -24,10 +24,10 @@ use app\modules\neuron\interfaces\IArrayable;
  * ]
  * ```
  */
-final class StoreIndexItemDto implements IArrayable
+final class VarIndexItemDto implements IArrayable
 {
     /**
-     * @param string $label       Метка результата.
+     * @param string $name        Имя переменной.
      * @param string $description Краткое описание результата (для list).
      * @param string $fileName    Имя файла в `.store`.
      * @param string $savedAt     Время сохранения (ISO-8601).
@@ -35,7 +35,7 @@ final class StoreIndexItemDto implements IArrayable
      * @param int    $sizeBytes   Размер файла (байты).
      */
     public function __construct(
-        public readonly string $label,
+        public readonly string $name,
         public readonly string $description,
         public readonly string $fileName,
         public readonly string $savedAt,
@@ -47,17 +47,17 @@ final class StoreIndexItemDto implements IArrayable
     /**
      * Преобразует DTO в массив для сериализации.
      *
-     * @return array{label: string, description: string, fileName: string, savedAt: string, dataType: string, sizeBytes: int}
+     * @return array{name: string, description: string, fileName: string, savedAt: string, dataType: string, sizeBytes: int}
      */
     public function toArray(): array
     {
         return [
-            'label' => $this->label,
+            'name'        => $this->name,
             'description' => $this->description,
-            'fileName' => $this->fileName,
-            'savedAt' => $this->savedAt,
-            'dataType' => $this->dataType,
-            'sizeBytes' => $this->sizeBytes,
+            'fileName'    => $this->fileName,
+            'savedAt'     => $this->savedAt,
+            'dataType'    => $this->dataType,
+            'sizeBytes'   => $this->sizeBytes,
         ];
     }
 }

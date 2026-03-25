@@ -6,8 +6,8 @@ namespace Tests\Tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\classes\storage\StoreStorage;
-use app\modules\neuron\tools\StoreDeleteTool;
+use app\modules\neuron\classes\storage\VarStorage;
+use app\modules\neuron\tools\VarExistTool;
 use PHPUnit\Framework\TestCase;
 
 use function json_decode;
@@ -16,29 +16,25 @@ use function sys_get_temp_dir;
 use function uniqid;
 
 /**
- * Тесты для {@see StoreDeleteTool}.
- *
- * Проверяют:
- * - успешное удаление существующей записи
- * - idempotent-поведение при отсутствии записи
- * - ошибку при пустой метке
+ * Тесты для {@see VarExistTool}.
  */
-final class StoreDeleteToolTest extends TestCase
+final class VarExistToolTest extends TestCase
 {
     private string $tmpDir;
-    private StoreDeleteTool $tool;
+    private VarExistTool $tool;
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_store_delete_' . uniqid();
+        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_var_exist_' . uniqid();
         mkdir($this->tmpDir, 0777, true);
         mkdir($this->tmpDir . '/.store', 0777, true);
 
         $dp = new DirPriority([$this->tmpDir]);
+        $this->resetConfigurationAppSingleton();
         ConfigurationApp::init($dp);
         ConfigurationApp::getInstance()->setSessionKey('20250101-120000-1');
 
-        $this->tool = new StoreDeleteTool();
+        $this->tool = new VarExistTool();
     }
 
     protected function tearDown(): void
@@ -49,30 +45,21 @@ final class StoreDeleteToolTest extends TestCase
         }
     }
 
-    public function testDeleteExisting(): void
+    public function testExistTrueAndFalse(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        $storage = new StoreStorage($this->tmpDir . '/.store');
-        $storage->save($sessionKey, 'tmp', '1', 'tmp value');
-        $this->assertTrue($storage->exists($sessionKey, 'tmp'));
+        $storage = new VarStorage($this->tmpDir . '/.store');
+        $storage->save($sessionKey, 'x', '1', 'desc');
 
-        $json = ($this->tool)('tmp');
-        $data = json_decode($json, true);
+        $json1 = ($this->tool)('x');
+        $d1 = json_decode($json1, true);
+        $this->assertTrue($d1['success']);
+        $this->assertTrue($d1['exists']);
 
-        $this->assertTrue($data['success']);
-        $this->assertFalse($storage->exists($sessionKey, 'tmp'));
-    }
-
-    public function testDeleteMissing(): void
-    {
-        $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        $storage = new StoreStorage($this->tmpDir . '/.store');
-        $this->assertFalse($storage->exists($sessionKey, 'nope'));
-
-        $json = ($this->tool)('nope');
-        $data = json_decode($json, true);
-
-        $this->assertTrue($data['success']);
+        $json2 = ($this->tool)('missing');
+        $d2 = json_decode($json2, true);
+        $this->assertTrue($d2['success']);
+        $this->assertFalse($d2['exists']);
     }
 
     public function testEmptyLabelReturnsError(): void

@@ -6,8 +6,8 @@ namespace Tests\Tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\tools\StorePadTool;
-use app\modules\neuron\tools\StoreLoadTool;
+use app\modules\neuron\tools\VarGetTool;
+use app\modules\neuron\tools\VarPadTool;
 use PHPUnit\Framework\TestCase;
 
 use function json_decode;
@@ -16,26 +16,27 @@ use function sys_get_temp_dir;
 use function uniqid;
 
 /**
- * Тесты для {@see StorePadTool}.
+ * Тесты для {@see VarPadTool}.
  */
-final class StorePadToolTest extends TestCase
+final class VarPadToolTest extends TestCase
 {
     private string $tmpDir;
-    private StorePadTool $padTool;
-    private StoreLoadTool $loadTool;
+    private VarPadTool $padTool;
+    private VarGetTool $loadTool;
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_store_pad_' . uniqid();
+        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_var_pad_' . uniqid();
         mkdir($this->tmpDir, 0777, true);
         mkdir($this->tmpDir . '/.store', 0777, true);
 
         $dp = new DirPriority([$this->tmpDir]);
+        $this->resetConfigurationAppSingleton();
         ConfigurationApp::init($dp);
         ConfigurationApp::getInstance()->setSessionKey('20250101-120000-1');
 
-        $this->padTool = new StorePadTool();
-        $this->loadTool = new StoreLoadTool();
+        $this->padTool = new VarPadTool();
+        $this->loadTool = new VarGetTool();
     }
 
     protected function tearDown(): void
@@ -46,9 +47,6 @@ final class StorePadToolTest extends TestCase
         }
     }
 
-    /**
-     * Pad создаёт запись, если её нет, и дополняет с переводом строк.
-     */
     public function testPadCreatesAndAppendsWithNewline(): void
     {
         $json1 = ($this->padTool)('log', 'Append log', 'first');

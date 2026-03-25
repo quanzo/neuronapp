@@ -1,5 +1,5 @@
 ---
-tools: store_load
+tools: var_get
 pure_context: false
 ---
 

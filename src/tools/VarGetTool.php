@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\dto\tools\StoreToolResultDto;
+use app\modules\neuron\classes\dto\tools\VarToolResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
@@ -18,100 +18,84 @@ use function min;
 use function trim;
 
 /**
- * Инструмент `StoreLoadTool`: загружает ранее сохранённый результат по метке.
- *
- * Назначение:
- * - позволить LLM вернуть в контекст ранее сохранённый результат (по тому же `sessionKey`),
- *   не запрашивая пользователя и не повторяя вычисления;
- * - удобно для последовательных шагов (сперва разобрать данные, затем использовать результат).
+ * Инструмент `VarGetTool`: получить переменную (результат) по имени.
  */
-final class StoreLoadTool extends AStoreTool
+final class VarGetTool extends AVarTool
 {
     public function __construct(
-        string $name = 'store_load',
-        string $description = 'Загружает ранее сохранённый результат по метке для текущего sessionKey.',
+        string $name = 'var_get',
+        string $description = 'Получает переменную по имени.',
     ) {
         parent::__construct(name: $name, description: $description);
     }
 
     /**
-     * Описание входных параметров инструмента для LLM.
-     *
      * @return ToolProperty[]
      */
     protected function properties(): array
     {
         return [
             ToolProperty::make(
-                name: 'label',
-                type: PropertyType::STRING,
-                description: 'Метка ранее сохранённого результата. Должна совпадать с label, использованным при сохранении.',
-                required: true,
+                name       : 'name',
+                type       : PropertyType::STRING,
+                description: 'Имя переменной, сохраненной ранее. Должна совпадать с `name`, использованным при установке.',
+                required   : true,
             ),
             ToolProperty::make(
-                name: 'start_line',
-                type: PropertyType::INTEGER,
+                name       : 'start_line',
+                type       : PropertyType::INTEGER,
                 description: 'Для строковых данных: номер начальной строки (1-based, включительно). Если не задан — с начала.',
-                required: false,
+                required   : false,
             ),
             ToolProperty::make(
-                name: 'end_line',
-                type: PropertyType::INTEGER,
+                name       : 'end_line',
+                type       : PropertyType::INTEGER,
                 description: 'Для строковых данных: номер конечной строки (1-based, включительно). Если не задан — до конца.',
-                required: false,
+                required   : false,
             ),
         ];
     }
 
-    /**
-     * Загружает результат по метке.
-     *
-     * @param string   $label      Метка результата.
-     * @param int|null $start_line Начальная строка.
-     * @param int|null $end_line   Конечная строка.
-     *
-     * @return string JSON-результат (включает data при успехе).
-     */
-    public function __invoke(string $label, ?int $start_line = null, ?int $end_line = null): string
+    public function __invoke(string $name, ?int $start_line = null, ?int $end_line = null): string
     {
         $storage      = $this->getStorage();
         $sessionKey   = $this->getSessionKey();
-        $labelTrimmed = trim($label);
+        $nameTrimmed = trim($name);
 
-        if ($labelTrimmed === '') {
-            return $this->resultJson(new StoreToolResultDto(
-                action    : 'load',
+        if ($nameTrimmed === '') {
+            return $this->resultJson(new VarToolResultDto(
+                action    : 'get',
                 success   : false,
-                message   : 'label не может быть пустым.',
+                message   : 'Имя не не может быть пустым.',
                 sessionKey: $sessionKey,
             ));
         }
 
-        $loaded = $storage->load($sessionKey, $labelTrimmed);
+        $loaded = $storage->load($sessionKey, $nameTrimmed);
         if ($loaded === null) {
-            return $this->resultJson(new StoreToolResultDto(
-                action    : 'load',
+            return $this->resultJson(new VarToolResultDto(
+                action    : 'get',
                 success   : false,
                 message   : 'Не найдено.',
                 sessionKey: $sessionKey,
-                label     : $labelTrimmed,
+                name     : $nameTrimmed,
                 exists    : false,
             ));
         }
 
-        $data = $loaded['data'] ?? null;
+        $data        = $loaded['data'] ?? null;
         $description = is_string($loaded['description'] ?? null) ? (string) $loaded['description'] : null;
-        $savedAt = is_string($loaded['savedAt'] ?? null) ? (string) $loaded['savedAt'] : null;
-        $dataType = is_string($loaded['dataType'] ?? null) ? (string) $loaded['dataType'] : null;
+        $savedAt     = is_string($loaded['savedAt'] ?? null) ? (string) $loaded['savedAt'] : null;
+        $dataType    = is_string($loaded['dataType'] ?? null) ? (string) $loaded['dataType'] : null;
 
         if (($start_line !== null || $end_line !== null) && !is_string($data)) {
-            return $this->resultJson(new StoreToolResultDto(
-                action     : 'load',
+            return $this->resultJson(new VarToolResultDto(
+                action     : 'get',
                 success    : false,
                 message    : 'Диапазон строк поддерживается только для строковых данных.',
                 sessionKey : $sessionKey,
-                label      : $labelTrimmed,
-                fileName   : $storage->resultFileName($sessionKey, $labelTrimmed),
+                name       : $nameTrimmed,
+                fileName   : $storage->resultFileName($sessionKey, $nameTrimmed),
                 description: $description,
                 savedAt    : $savedAt,
                 dataType   : $dataType,
@@ -135,13 +119,13 @@ final class StoreLoadTool extends AStoreTool
                 $effectiveStart = 1;
                 $effectiveEnd = 0;
             } elseif ($effectiveStart > $totalLines) {
-                return $this->resultJson(new StoreToolResultDto(
-                    action     : 'load',
+                return $this->resultJson(new VarToolResultDto(
+                    action     : 'get',
                     success    : false,
                     message    : 'start_line превышает общее количество строк.',
                     sessionKey : $sessionKey,
-                    label      : $labelTrimmed,
-                    fileName   : $storage->resultFileName($sessionKey, $labelTrimmed),
+                    name       : $nameTrimmed,
+                    fileName   : $storage->resultFileName($sessionKey, $nameTrimmed),
                     description: $description,
                     savedAt    : $savedAt,
                     dataType   : $dataType,
@@ -166,13 +150,13 @@ final class StoreLoadTool extends AStoreTool
             $totalLinesOut = $totalLines;
         }
 
-        return $this->resultJson(new StoreToolResultDto(
-            action     : 'load',
+        return $this->resultJson(new VarToolResultDto(
+            action     : 'get',
             success    : true,
-            message    : 'Загружено.',
+            message    : 'OK',
             sessionKey : $sessionKey,
-            label      : $labelTrimmed,
-            fileName   : $storage->resultFileName($sessionKey, $labelTrimmed),
+            name      : $nameTrimmed,
+            fileName   : $storage->resultFileName($sessionKey, $nameTrimmed),
             description: $description,
             savedAt    : $savedAt,
             dataType   : $dataType,

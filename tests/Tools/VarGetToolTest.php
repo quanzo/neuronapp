@@ -6,8 +6,8 @@ namespace Tests\Tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\classes\storage\StoreStorage;
-use app\modules\neuron\tools\StoreListTool;
+use app\modules\neuron\classes\storage\VarStorage;
+use app\modules\neuron\tools\VarGetTool;
 use PHPUnit\Framework\TestCase;
 
 use function json_decode;
@@ -16,27 +16,25 @@ use function sys_get_temp_dir;
 use function uniqid;
 
 /**
- * Тесты для {@see StoreListTool}.
- *
- * Проверяют:
- * - возврат правильного количества элементов и списка items.
+ * Тесты для {@see VarGetTool}.
  */
-final class StoreListToolTest extends TestCase
+final class VarGetToolTest extends TestCase
 {
     private string $tmpDir;
-    private StoreListTool $tool;
+    private VarGetTool $tool;
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_store_list_' . uniqid();
+        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_var_get_' . uniqid();
         mkdir($this->tmpDir, 0777, true);
         mkdir($this->tmpDir . '/.store', 0777, true);
 
         $dp = new DirPriority([$this->tmpDir]);
+        $this->resetConfigurationAppSingleton();
         ConfigurationApp::init($dp);
         ConfigurationApp::getInstance()->setSessionKey('20250101-120000-1');
 
-        $this->tool = new StoreListTool();
+        $this->tool = new VarGetTool();
     }
 
     protected function tearDown(): void
@@ -47,44 +45,43 @@ final class StoreListToolTest extends TestCase
         }
     }
 
-    /**
-     * list должен возвращать корректный список и count.
-     */
-    public function testListReturnsItems(): void
+    public function testGetExisting(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        $storage = new StoreStorage($this->tmpDir . '/.store');
-        $storage->save($sessionKey, 'a', '1', 'one');
-        $storage->save($sessionKey, 'b', '2', 'two');
+        $storage = new VarStorage($this->tmpDir . '/.store');
+        $storage->save($sessionKey, 'parsed', ['x' => 1], 'Короткое описание');
 
-        $json = ($this->tool)();
+        $json = ($this->tool)('parsed');
         $data = json_decode($json, true);
 
         $this->assertTrue($data['success']);
-        $this->assertSame(2, $data['count']);
-        $this->assertCount(2, $data['items']);
+        $this->assertSame('get', $data['action']);
+        $this->assertSame(['x' => 1], $data['data']);
     }
 
-    /**
-     * list поддерживает поиск по label/description и пагинацию.
-     */
-    public function testListSearchAndPagination(): void
+    public function testGetStringRange(): void
     {
         $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        $storage = new StoreStorage($this->tmpDir . '/.store');
-        $storage->save($sessionKey, 'alpha', '1', 'first');
-        $storage->save($sessionKey, 'beta', '2', 'second');
-        $storage->save($sessionKey, 'gamma', '3', 'second match');
+        $storage = new VarStorage($this->tmpDir . '/.store');
+        $storage->save($sessionKey, 'text', "l1\nl2\nl3\nl4", 'Text');
 
-        $json = ($this->tool)(2, 1, 'second'); // page_size=2, page=1, query=second
+        $json = ($this->tool)('text', 2, 3);
         $data = json_decode($json, true);
 
         $this->assertTrue($data['success']);
-        $this->assertSame(2, $data['pageSize']);
-        $this->assertSame(1, $data['page']);
-        $this->assertSame('second', $data['query']);
-        $this->assertSame(2, $data['totalCount']); // beta + gamma
-        $this->assertSame(2, $data['count']); // first page gets both
+        $this->assertSame("l2\nl3", $data['data']);
+        $this->assertSame(2, $data['startLine']);
+        $this->assertSame(3, $data['endLine']);
+        $this->assertSame(4, $data['totalLines']);
+    }
+
+    public function testGetMissing(): void
+    {
+        $json = ($this->tool)('missing');
+        $data = json_decode($json, true);
+
+        $this->assertFalse($data['success']);
+        $this->assertFalse($data['exists']);
     }
 
     private function resetConfigurationAppSingleton(): void

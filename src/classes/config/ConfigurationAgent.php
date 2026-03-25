@@ -37,7 +37,7 @@ use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\interfaces\IAttachmentFile;
 use app\modules\neuron\interfaces\IDependConfigApp;
-use app\modules\neuron\classes\storage\StoreStorage;
+use app\modules\neuron\classes\storage\VarStorage;
 use app\modules\neuron\exceptions\RunStateNotFoundException;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\tools\ATool;
@@ -146,7 +146,7 @@ class ConfigurationAgent implements IDependConfigApp
     /**
      * Хранилище результатов для данного агента.
      */
-    protected ?StoreStorage $storeStorage = null;
+    protected ?VarStorage $varStorage = null;
 
     /**
      * Системный промпт
@@ -559,7 +559,23 @@ class ConfigurationAgent implements IDependConfigApp
             }
         }
 
-        return $tools;
+        // инструменты должны быть уникальны по имени
+        $arToolsUniq = [];
+        foreach ($tools as $toolObj) {
+            $name = null;
+            if (is_object($toolObj) && method_exists($toolObj, 'getName')) {
+                $name = $toolObj->getName();
+            }
+
+            if (!is_string($name) || $name === '') {
+                // Fallback: уникальный ключ, чтобы не потерять инструмент из-за неожиданной реализации.
+                $name = is_object($toolObj) ? $toolObj::class . '#' . spl_object_id($toolObj) : 'tool#' . uniqid('', true);
+            }
+
+            $arToolsUniq[$name] = $toolObj;
+        }
+
+        return array_values($arToolsUniq);
     }
 
     /**
@@ -670,22 +686,22 @@ class ConfigurationAgent implements IDependConfigApp
     /**
      * Возвращает хранилище результатов для агента.
      *
-     * По умолчанию делегирует в ConfigurationApp::getStoreStorage().
+     * По умолчанию делегирует в ConfigurationApp::getVarStorage().
      */
-    public function getStoreStorage(): StoreStorage
+    public function getVarStorage(): VarStorage
     {
-        if ($this->storeStorage !== null) {
-            return $this->storeStorage;
+        if ($this->varStorage !== null) {
+            return $this->varStorage;
         }
 
         $configApp = $this->getConfigurationApp();
         if ($configApp !== null) {
-            $this->storeStorage = $configApp->getStoreStorage();
+            $this->varStorage = $configApp->getVarStorage();
         } else {
-            $this->storeStorage = ConfigurationApp::getInstance()->getStoreStorage();
+            $this->varStorage = ConfigurationApp::getInstance()->getVarStorage();
         }
 
-        return $this->storeStorage;
+        return $this->varStorage;
     }
 
     /**

@@ -70,11 +70,12 @@ return [
         [ChatHistoryMessageTool::class, 'make'],
 
         /*
-        [StorePadTool::class, 'make'],
-        [StoreListTool::class, 'make'],
-        [StoreExistTool::class, 'make'],
-        [StoreDeleteTool::class, 'make'],
-        [StoreLoadTool::class, 'make'],
+        [VarPadTool::class, 'make'],
+        [VarListTool::class, 'make'],
+        [VarExistTool::class, 'make'],
+        [VarUnsetTool::class, 'make'],
+        [VarGetTool::class, 'make'],
+        [VarSetTool::class, 'make'],
         */
 
     ],

@@ -1,5 +1,5 @@
 ---
-tools: store_load, store_save, todo_completed
+tools: var_get, var_set, todo_completed
 pure_context: false
 ---
 

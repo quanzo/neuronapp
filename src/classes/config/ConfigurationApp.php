@@ -15,7 +15,7 @@ use app\modules\neuron\classes\logger\ContextualLogger;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
-use app\modules\neuron\classes\storage\StoreStorage;
+use app\modules\neuron\classes\storage\VarStorage;
 use app\modules\neuron\services\config\SessionConfigAppService;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -76,7 +76,7 @@ class ConfigurationApp
     private ?SkillProducer $skillProducer = null;
 
     /** Хранилище результатов (лениво инициализируется). */
-    private ?StoreStorage $storeStorage = null;
+    private ?VarStorage $varStorage = null;
 
     /**
      * Базовый ключ сессии (временна́я часть без имени агента).
@@ -283,12 +283,12 @@ class ConfigurationApp
     /**
      * Возвращает объект хранилища результатов для директории .store.
      */
-    public function getStoreStorage(): StoreStorage
+    public function getVarStorage(): VarStorage
     {
-        if ($this->storeStorage === null) {
-            $this->storeStorage = new StoreStorage($this->getStoreDir());
+        if ($this->varStorage === null) {
+            $this->varStorage = new VarStorage($this->getStoreDir());
         }
-        return $this->storeStorage;
+        return $this->varStorage;
     }
 
     private $_sessionSrv = null;

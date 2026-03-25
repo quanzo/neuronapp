@@ -9,11 +9,12 @@ use app\modules\neuron\helpers\CallableWrapper;
 use app\modules\neuron\helpers\ShellToolFactory;
 use app\modules\neuron\tools\GlobTool;
 use app\modules\neuron\tools\GrepTool;
-use app\modules\neuron\tools\StoreDeleteTool;
-use app\modules\neuron\tools\StoreExistTool;
-use app\modules\neuron\tools\StoreListTool;
-use app\modules\neuron\tools\StoreLoadTool;
-use app\modules\neuron\tools\StorePadTool;
+use app\modules\neuron\tools\VarExistTool;
+use app\modules\neuron\tools\VarGetTool;
+use app\modules\neuron\tools\VarListTool;
+use app\modules\neuron\tools\VarPadTool;
+use app\modules\neuron\tools\VarSetTool;
+use app\modules\neuron\tools\VarUnsetTool;
 use app\modules\neuron\tools\ViewTool;
 use app\modules\neuron\tools\ChatHistoryMessageTool;
 use app\modules\neuron\tools\ChatHistoryMetaTool;
@@ -105,11 +106,12 @@ return [
         [GrepTool::class, 'make'],
         [ViewTool::class, 'make'],
 
-        [StorePadTool::class, 'make'],
-        [StoreListTool::class, 'make'],
-        [StoreExistTool::class, 'make'],
-        [StoreDeleteTool::class, 'make'],
-        [StoreLoadTool::class, 'make'],
+        [VarPadTool::class, 'make'],
+        [VarListTool::class, 'make'],
+        [VarExistTool::class, 'make'],
+        [VarUnsetTool::class, 'make'],
+        [VarGetTool::class, 'make'],
+        [VarSetTool::class, 'make'],
 
     ],
 

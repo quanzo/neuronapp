@@ -6,8 +6,7 @@ namespace Tests\Tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\classes\storage\StoreStorage;
-use app\modules\neuron\tools\StoreExistTool;
+use app\modules\neuron\tools\VarSetTool;
 use PHPUnit\Framework\TestCase;
 
 use function json_decode;
@@ -16,29 +15,25 @@ use function sys_get_temp_dir;
 use function uniqid;
 
 /**
- * Тесты для {@see StoreExistTool}.
- *
- * Проверяют:
- * - exist=true для существующей метки
- * - exist=false для отсутствующей метки
- * - ошибку при пустой метке
+ * Тесты для {@see VarSetTool}.
  */
-final class StoreExistToolTest extends TestCase
+final class VarSetToolTest extends TestCase
 {
     private string $tmpDir;
-    private StoreExistTool $tool;
+    private VarSetTool $tool;
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_store_exist_' . uniqid();
+        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_var_set_' . uniqid();
         mkdir($this->tmpDir, 0777, true);
         mkdir($this->tmpDir . '/.store', 0777, true);
 
         $dp = new DirPriority([$this->tmpDir]);
+        $this->resetConfigurationAppSingleton();
         ConfigurationApp::init($dp);
         ConfigurationApp::getInstance()->setSessionKey('20250101-120000-1');
 
-        $this->tool = new StoreExistTool();
+        $this->tool = new VarSetTool();
     }
 
     protected function tearDown(): void
@@ -49,26 +44,19 @@ final class StoreExistToolTest extends TestCase
         }
     }
 
-    public function testExistTrueAndFalse(): void
+    public function testSetJson(): void
     {
-        $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
-        $storage = new StoreStorage($this->tmpDir . '/.store');
-        $storage->save($sessionKey, 'x', '1', 'desc');
+        $json = ($this->tool)('parsed', 'Распарсенный JSON для проверки', '{"x":[1,2]}');
+        $data = json_decode($json, true);
 
-        $json1 = ($this->tool)('x');
-        $d1 = json_decode($json1, true);
-        $this->assertTrue($d1['success']);
-        $this->assertTrue($d1['exists']);
-
-        $json2 = ($this->tool)('missing');
-        $d2 = json_decode($json2, true);
-        $this->assertTrue($d2['success']);
-        $this->assertFalse($d2['exists']);
+        $this->assertTrue($data['success']);
+        $this->assertSame('set', $data['action']);
+        $this->assertSame('parsed', $data['label']);
     }
 
     public function testEmptyLabelReturnsError(): void
     {
-        $json = ($this->tool)('   ');
+        $json = ($this->tool)('   ', 'desc', '{"a":1}');
         $data = json_decode($json, true);
 
         $this->assertFalse($data['success']);

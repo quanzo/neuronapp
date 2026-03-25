@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\dto\tools\StoreToolResultDto;
+use app\modules\neuron\classes\dto\tools\VarToolResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
@@ -22,9 +22,9 @@ use function trim;
  * - завершено: `done`, `1`, `true`, `исполнено`
  * - не завершено: `not_done`, `0`, `false`, `не исполнено`
  *
- * В хранилище записывается каноничное целочисленное значение `1|0` в label `completed`.
+ * В хранилище записывается каноничное целочисленное значение `1|0` в name `completed`.
  */
-final class TodoCompletedTool extends AStoreTool
+final class TodoCompletedTool extends AVarTool
 {
     public function __construct(
         string $name = 'todo_completed',
@@ -57,7 +57,7 @@ final class TodoCompletedTool extends AStoreTool
     /**
      * Устанавливает значение completed для текущего sessionKey.
      *
-     * @return string JSON-ответ в формате StoreToolResultDto.
+     * @return string JSON-ответ в формате VarToolResultDto.
      */
     public function __invoke(string $status, ?string $reason = null): string
     {
@@ -65,12 +65,12 @@ final class TodoCompletedTool extends AStoreTool
         $normalized = $this->normalizeStatus($status);
 
         if ($normalized === null) {
-            return $this->resultJson(new StoreToolResultDto(
-                action: 'todo_completed',
-                success: false,
-                message: 'Некорректный status. Используйте done/not_done, 1/0, true/false, исполнено/не исполнено.',
+            return $this->resultJson(new VarToolResultDto(
+                action    : 'todo_completed',
+                success   : false,
+                message   : 'Некорректный status. Используйте done/not_done, 1/0, true/false, исполнено/не исполнено.',
                 sessionKey: $sessionKey,
-                label: 'completed',
+                name      : 'completed',
             ));
         }
 
@@ -82,27 +82,27 @@ final class TodoCompletedTool extends AStoreTool
         try {
             $item = $this->getStorage()->save($sessionKey, 'completed', $normalized, $desc);
         } catch (\Throwable $e) {
-            return $this->resultJson(new StoreToolResultDto(
-                action: 'todo_completed',
-                success: false,
-                message: 'Ошибка сохранения completed: ' . $e->getMessage(),
+            return $this->resultJson(new VarToolResultDto(
+                action    : 'todo_completed',
+                success   : false,
+                message   : 'Ошибка сохранения completed: ' . $e->getMessage(),
                 sessionKey: $sessionKey,
-                label: 'completed',
+                name      : 'completed',
             ));
         }
 
-        return $this->resultJson(new StoreToolResultDto(
-            action: 'todo_completed',
-            success: true,
-            message: 'Флаг completed обновлён.',
-            sessionKey: $sessionKey,
-            label: 'completed',
-            fileName: $item->fileName,
+        return $this->resultJson(new VarToolResultDto(
+            action     : 'todo_completed',
+            success    : true,
+            message    : 'Флаг completed обновлён.',
+            sessionKey : $sessionKey,
+            name       : 'completed',
+            fileName   : $item->fileName,
             description: $item->description,
-            savedAt: $item->savedAt,
-            dataType: $item->dataType,
-            data: $normalized,
-            exists: true,
+            savedAt    : $item->savedAt,
+            dataType   : $item->dataType,
+            data       : $normalized,
+            exists     : true,
         ));
     }
 

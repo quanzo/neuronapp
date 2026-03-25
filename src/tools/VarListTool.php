@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\dto\tools\StoreToolResultDto;
+use app\modules\neuron\classes\dto\tools\VarToolResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
@@ -12,61 +12,50 @@ use function array_filter;
 use function array_slice;
 use function array_values;
 use function count;
-use function strtolower;
-use function trim;
 use function max;
 use function min;
+use function strtolower;
+use function trim;
 
 /**
- * Инструмент `StoreListTool`: возвращает список результатов для текущего `sessionKey`.
- *
- * Назначение:
- * - дать LLM обзор того, какие метки уже сохранены в текущей сессии;
- * - использовать этот список, чтобы выбирать подходящий `label` для дальнейших load/exist.
+ * Инструмент `VarListTool`: возвращает список результатов для текущего `sessionKey`.
  */
-final class StoreListTool extends AStoreTool
+final class VarListTool extends AVarTool
 {
     public function __construct(
-        string $name = 'store_list',
+        string $name = 'var_list',
         string $description = 'Список всех результатов в .store для текущего sessionKey (метки и метаданные).',
     ) {
         parent::__construct(name: $name, description: $description);
     }
 
     /**
-     * Описание входных параметров инструмента для LLM.
-     *
      * @return ToolProperty[]
      */
     protected function properties(): array
     {
         return [
             ToolProperty::make(
-                name: 'page_size',
-                type: PropertyType::INTEGER,
+                name       : 'page_size',
+                type       : PropertyType::INTEGER,
                 description: 'Размер страницы (для постраничного списка). Если не задан — вернуть весь список.',
-                required: false,
+                required   : false,
             ),
             ToolProperty::make(
-                name: 'page',
-                type: PropertyType::INTEGER,
+                name       : 'page',
+                type       : PropertyType::INTEGER,
                 description: 'Номер страницы (1-based). Используется вместе с page_size.',
-                required: false,
+                required   : false,
             ),
             ToolProperty::make(
-                name: 'query',
-                type: PropertyType::STRING,
-                description: 'Строка поиска по label и description (case-insensitive). Если не задана — без фильтра.',
-                required: false,
+                name       : 'query',
+                type       : PropertyType::STRING,
+                description: 'Строка поиска по name и description (case-insensitive). Если не задана — без фильтра.',
+                required   : false,
             ),
         ];
     }
 
-    /**
-     * Возвращает список сохранённых результатов.
-     *
-     * @return string JSON-результат со списком items.
-     */
     public function __invoke(?int $page_size = null, ?int $page = null, ?string $query = null): string
     {
         $storage    = $this->getStorage();
@@ -80,9 +69,9 @@ final class StoreListTool extends AStoreTool
             $items = array_values(array_filter(
                 $items,
                 static function ($item) use ($q): bool {
-                    $label = strtolower((string) ($item->label ?? ''));
+                    $name = strtolower((string) ($item->name ?? ''));
                     $desc = strtolower((string) ($item->description ?? ''));
-                    return str_contains($label, $q) || str_contains($desc, $q);
+                    return str_contains($name, $q) || str_contains($desc, $q);
                 }
             ));
         }
@@ -98,17 +87,19 @@ final class StoreListTool extends AStoreTool
             $items       = array_slice($items, $offset, $pageSizeOut);
         }
 
-        return $this->resultJson(new StoreToolResultDto(
-            action    : 'list',
-            success   : true,
-            message   : 'OK',
-            sessionKey: $sessionKey,
-            items     : $items,
-            count     : count($items),
-            totalCount: $totalCount,
-            page      : $pageOut,
-            pageSize  : $pageSizeOut,
-            query     : $queryNorm !== '' ? $queryNorm : null,
-        ));
+        return $this->resultJson(
+            new VarToolResultDto(
+                action    : 'list',
+                success   : true,
+                message   : 'OK',
+                sessionKey: $sessionKey,
+                items     : $items,
+                count     : count($items),
+                totalCount: $totalCount,
+                page      : $pageOut,
+                pageSize  : $pageSizeOut,
+                query     : $queryNorm !== '' ? $queryNorm : null,
+            )
+        );
     }
 }

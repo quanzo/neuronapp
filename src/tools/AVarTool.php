@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\storage\StoreStorage;
 use app\modules\neuron\classes\config\ConfigurationApp;
-use app\modules\neuron\classes\dto\tools\StoreToolResultDto;
+use app\modules\neuron\classes\dto\tools\VarToolResultDto;
+use app\modules\neuron\classes\storage\VarStorage;
 use JSON_UNESCAPED_UNICODE;
 
 /**
  * Инструмент для работы с результатами в `.store`.
  */
-class AStoreTool extends ATool
+class AVarTool extends ATool
 {
-    protected function getStorage(): StoreStorage
+    protected function getStorage(): VarStorage
     {
         $agentCfg = $this->getAgentCfg();
-        return $agentCfg?->getStoreStorage() ?? ConfigurationApp::getInstance()->getStoreStorage();
+        return $agentCfg?->getVarStorage() ?? ConfigurationApp::getInstance()->getVarStorage();
     }
 
     protected function getSessionKey(): string
@@ -29,10 +29,10 @@ class AStoreTool extends ATool
     /**
      * Сериализует результат в JSON.
      *
-     * @param StoreToolResultDto $dto DTO результата.
+     * @param VarToolResultDto $dto DTO результата.
      * @return string JSON.
      */
-    protected function resultJson(StoreToolResultDto $dto): string
+    protected function resultJson(VarToolResultDto $dto): string
     {
         return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
     }

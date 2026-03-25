@@ -1,5 +1,5 @@
 ---
-tools: store_save
+tools: var_set
 pure_context: false
 ---
 

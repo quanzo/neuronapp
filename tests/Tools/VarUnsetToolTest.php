@@ -6,7 +6,8 @@ namespace Tests\Tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\tools\StoreSaveTool;
+use app\modules\neuron\classes\storage\VarStorage;
+use app\modules\neuron\tools\VarUnsetTool;
 use PHPUnit\Framework\TestCase;
 
 use function json_decode;
@@ -15,28 +16,25 @@ use function sys_get_temp_dir;
 use function uniqid;
 
 /**
- * Тесты для {@see StoreSaveTool}.
- *
- * Проверяют:
- * - успешное сохранение JSON-структуры
- * - ошибку при пустом label
+ * Тесты для {@see VarUnsetTool}.
  */
-final class StoreSaveToolTest extends TestCase
+final class VarUnsetToolTest extends TestCase
 {
     private string $tmpDir;
-    private StoreSaveTool $tool;
+    private VarUnsetTool $tool;
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_store_save_' . uniqid();
+        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_var_unset_' . uniqid();
         mkdir($this->tmpDir, 0777, true);
         mkdir($this->tmpDir . '/.store', 0777, true);
 
         $dp = new DirPriority([$this->tmpDir]);
+        $this->resetConfigurationAppSingleton();
         ConfigurationApp::init($dp);
         ConfigurationApp::getInstance()->setSessionKey('20250101-120000-1');
 
-        $this->tool = new StoreSaveTool();
+        $this->tool = new VarUnsetTool();
     }
 
     protected function tearDown(): void
@@ -47,26 +45,33 @@ final class StoreSaveToolTest extends TestCase
         }
     }
 
-    /**
-     * Сохранение JSON-строки должно помечать операцию как успешную.
-     */
-    public function testSaveJson(): void
+    public function testUnsetExisting(): void
     {
-        $json = ($this->tool)('parsed', 'Распарсенный JSON для проверки', '{"x":[1,2]}');
+        $sessionKey = ConfigurationApp::getInstance()->getSessionKey();
+        $storage = new VarStorage($this->tmpDir . '/.store');
+        $storage->save($sessionKey, 'tmp', '1', 'tmp value');
+        $this->assertTrue($storage->exists($sessionKey, 'tmp'));
+
+        $json = ($this->tool)('tmp');
         $data = json_decode($json, true);
 
         $this->assertTrue($data['success']);
-        $this->assertSame('save', $data['action']);
-        $this->assertSame('parsed', $data['label']);
-        $this->assertSame('Распарсенный JSON для проверки', $data['description']);
+        $this->assertSame('unset', $data['action']);
+        $this->assertFalse($storage->exists($sessionKey, 'tmp'));
     }
 
-    /**
-     * Пустой label должен приводить к ошибке.
-     */
+    public function testUnsetMissing(): void
+    {
+        $json = ($this->tool)('nope');
+        $data = json_decode($json, true);
+
+        $this->assertTrue($data['success']);
+        $this->assertSame('unset', $data['action']);
+    }
+
     public function testEmptyLabelReturnsError(): void
     {
-        $json = ($this->tool)('   ', 'desc', '{"a":1}');
+        $json = ($this->tool)('   ');
         $data = json_decode($json, true);
 
         $this->assertFalse($data['success']);

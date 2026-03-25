@@ -14,24 +14,24 @@ use function is_string;
 /**
  * DTO индекса результатов для одной сессии.
  *
- * Хранится в `.store/store_index_{sessionKey}.json` и позволяет быстро
+ * Хранится в `.store/var_index_{sessionKey}.json` и позволяет быстро
  * получить список сохранённых результатов.
  *
  * Формат сериализации (toArray):
  * ```
  * [
- *   'schema'     => string, // neuronapp.store_index.v1
+ *   'schema'     => string, // neuronapp.var_index.v1
  *   'sessionKey' => string,
- *   'items'      => array<StoreIndexItemDto::toArray()>,
+ *   'items'      => array<VarIndexItemDto::toArray()>,
  * ]
  * ```
  */
-final class StoreIndexDto implements IArrayable
+final class VarIndexDto implements IArrayable
 {
     /**
-     * @param string             $schema     Версия схемы индекса.
-     * @param string             $sessionKey Базовый ключ сессии.
-     * @param StoreIndexItemDto[] $items     Элементы индекса.
+     * @param string            $schema     Версия схемы индекса.
+     * @param string            $sessionKey Базовый ключ сессии.
+     * @param VarIndexItemDto[] $items      Элементы индекса.
      */
     public function __construct(
         public readonly string $schema,
@@ -61,24 +61,24 @@ final class StoreIndexDto implements IArrayable
             if (!is_array($item)) {
                 continue;
             }
-            $label = $item['label'] ?? null;
+            $name        = $item['name'] ?? null;
             $description = $item['description'] ?? null;
-            $fileName = $item['fileName'] ?? null;
-            $savedAt = $item['savedAt'] ?? null;
-            $dataType = $item['dataType'] ?? null;
-            $sizeBytes = $item['sizeBytes'] ?? null;
+            $fileName    = $item['fileName'] ?? null;
+            $savedAt     = $item['savedAt'] ?? null;
+            $dataType    = $item['dataType'] ?? null;
+            $sizeBytes   = $item['sizeBytes'] ?? null;
 
-            if (!is_string($label) || !is_string($description) || !is_string($fileName) || !is_string($savedAt) || !is_string($dataType) || !is_int($sizeBytes)) {
+            if (!is_string($name) || !is_string($description) || !is_string($fileName) || !is_string($savedAt) || !is_string($dataType) || !is_int($sizeBytes)) {
                 continue;
             }
 
-            $dtoItems[] = new StoreIndexItemDto(
-                label: $label,
+            $dtoItems[] = new VarIndexItemDto(
+                name       : $name,
                 description: $description,
-                fileName: $fileName,
-                savedAt: $savedAt,
-                dataType: $dataType,
-                sizeBytes: $sizeBytes,
+                fileName   : $fileName,
+                savedAt    : $savedAt,
+                dataType   : $dataType,
+                sizeBytes  : $sizeBytes,
             );
         }
 
@@ -92,7 +92,7 @@ final class StoreIndexDto implements IArrayable
     /**
      * Преобразует DTO в массив для сериализации.
      *
-     * @return array{schema: string, sessionKey: string, items: array<int, array{label: string, description: string, fileName: string, savedAt: string, dataType: string, sizeBytes: int}>}
+     * @return array{schema: string, sessionKey: string, items: array<int, array{name: string, description: string, fileName: string, savedAt: string, dataType: string, sizeBytes: int}>}
      */
     public function toArray(): array
     {
@@ -100,7 +100,7 @@ final class StoreIndexDto implements IArrayable
             'schema' => $this->schema,
             'sessionKey' => $this->sessionKey,
             'items' => array_map(
-                static fn(StoreIndexItemDto $i): array => $i->toArray(),
+                static fn(VarIndexItemDto $i): array => $i->toArray(),
                 $this->items,
             ),
         ];

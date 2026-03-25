@@ -134,7 +134,10 @@ abstract class AbstractPromptWithParams extends APromptComponent implements IDep
             );
         }
 
-        return $agentCfg;
+        /**
+         * !Важно! Skill и TodoList могут настраивать агент по своим настройкам. Если объект агента будет один для всех, то настройки будут повторяться и накапливаться между сессиями.
+         */
+        return clone $agentCfg;
     }
 
     /**

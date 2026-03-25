@@ -9,53 +9,26 @@ use app\modules\neuron\interfaces\IArrayable;
 use function array_map;
 
 /**
- * DTO ответа инструмента StoreTool.
+ * DTO ответа инструмента VarTool.
  *
  * Возвращается LLM в виде JSON и содержит единый предсказуемый формат
  * для операций save/load/list/exist/delete/pad.
- *
- * Формат сериализации (toArray):
- * ```
- * [
- *   'action'     => string,  // save|load|list|exist|delete|pad
- *   'success'    => bool,
- *   'message'    => string,
- *   'sessionKey' => string,
- *   'label'      => string|null,
- *   'fileName'   => string|null,
- *   'description'=> string|null,
- *   'savedAt'    => string|null,
- *   'dataType'   => string|null,
- *   'data'       => mixed|null,
- *   'exists'     => bool|null,
- *   'items'      => array<StoreIndexItemDto::toArray()>|null,
- *   'count'      => int|null,
- *   'totalCount' => int|null,
- *   'page'       => int|null,
- *   'pageSize'   => int|null,
- *   'query'      => string|null,
- *   'startLine'  => int|null,
- *   'endLine'    => int|null,
- *   'totalLines' => int|null,
- *   'truncated'  => bool|null
- * ]
- * ```
  */
-final class StoreToolResultDto implements IArrayable
+final class VarToolResultDto implements IArrayable
 {
     /**
      * @param string               $action     Операция.
      * @param bool                 $success    Успешность операции.
      * @param string               $message    Человекочитаемое сообщение.
      * @param string               $sessionKey Текущий sessionKey.
-     * @param string|null          $label      Метка (если применимо).
+     * @param string|null          $name      Метка (если применимо).
      * @param string|null          $fileName   Имя файла (если применимо).
      * @param string|null          $description Краткое описание результата (если применимо).
      * @param string|null          $savedAt    ISO-8601 время сохранения (если применимо).
      * @param string|null          $dataType   Тип данных (если применимо).
      * @param mixed|null           $data       Данные (для load).
      * @param bool|null            $exists     Результат exist (если применимо).
-     * @param StoreIndexItemDto[]|null $items  Список (для list).
+     * @param VarIndexItemDto[]|null $items    Список (для list).
      * @param int|null             $count      Количество элементов (для list).
      * @param int|null             $totalCount Общее количество элементов (для list с фильтрацией/пагинацией).
      * @param int|null             $page       Номер страницы (1-based).
@@ -71,7 +44,7 @@ final class StoreToolResultDto implements IArrayable
         public readonly bool $success,
         public readonly string $message,
         public readonly string $sessionKey,
-        public readonly ?string $label = null,
+        public readonly ?string $name = null,
         public readonly ?string $fileName = null,
         public readonly ?string $description = null,
         public readonly ?string $savedAt = null,
@@ -99,29 +72,29 @@ final class StoreToolResultDto implements IArrayable
     public function toArray(): array
     {
         return [
-            'action' => $this->action,
-            'success' => $this->success,
-            'message' => $this->message,
-            'sessionKey' => $this->sessionKey,
-            'label' => $this->label,
-            'fileName' => $this->fileName,
+            'action'      => $this->action,
+            'success'     => $this->success,
+            'message'     => $this->message,
+            'sessionKey'  => $this->sessionKey,
+            'name'        => $this->name,
+            'fileName'    => $this->fileName,
             'description' => $this->description,
-            'savedAt' => $this->savedAt,
-            'dataType' => $this->dataType,
-            'data' => $this->data,
-            'exists' => $this->exists,
-            'items' => $this->items === null
+            'savedAt'     => $this->savedAt,
+            'dataType'    => $this->dataType,
+            'data'        => $this->data,
+            'exists'      => $this->exists,
+            'items'       => $this->items === null
                 ? null
-                : array_map(static fn(StoreIndexItemDto $i): array => $i->toArray(), $this->items),
-            'count' => $this->count,
+                :  array_map(static fn(VarIndexItemDto $i): array => $i->toArray(), $this->items),
+            'count'      => $this->count,
             'totalCount' => $this->totalCount,
-            'page' => $this->page,
-            'pageSize' => $this->pageSize,
-            'query' => $this->query,
-            'startLine' => $this->startLine,
-            'endLine' => $this->endLine,
+            'page'       => $this->page,
+            'pageSize'   => $this->pageSize,
+            'query'      => $this->query,
+            'startLine'  => $this->startLine,
+            'endLine'    => $this->endLine,
             'totalLines' => $this->totalLines,
-            'truncated' => $this->truncated,
+            'truncated'  => $this->truncated,
         ];
     }
 }

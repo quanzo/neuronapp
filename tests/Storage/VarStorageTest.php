@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Storage;
 
-use app\modules\neuron\classes\dto\tools\StoreIndexItemDto;
-use app\modules\neuron\classes\storage\StoreStorage;
+use app\modules\neuron\classes\dto\tools\VarIndexItemDto;
+use app\modules\neuron\classes\storage\VarStorage;
 use PHPUnit\Framework\TestCase;
 
 use function file_put_contents;
@@ -14,22 +14,20 @@ use function sys_get_temp_dir;
 use function uniqid;
 
 /**
- * Тесты для {@see StoreStorage}.
- *
- * Проверяют операции хранилища через объектный интерфейс.
+ * Тесты для {@see VarStorage}.
  */
-final class StoreStorageTest extends TestCase
+final class VarStorageTest extends TestCase
 {
     private string $tmpDir;
-    private StoreStorage $storage;
+    private VarStorage $storage;
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_store_storage_' . uniqid();
+        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_var_storage_' . uniqid();
         mkdir($this->tmpDir, 0777, true);
         mkdir($this->tmpDir . '/.store', 0777, true);
 
-        $this->storage = new StoreStorage($this->tmpDir . '/.store');
+        $this->storage = new VarStorage($this->tmpDir . '/.store');
     }
 
     protected function tearDown(): void
@@ -67,7 +65,7 @@ final class StoreStorageTest extends TestCase
         $this->storage->save('s1', 'b', '2', 'two');
 
         $items = $this->storage->list('s1');
-        $labels = array_map(static fn(StoreIndexItemDto $i) => $i->label, $items);
+        $labels = array_map(static fn(VarIndexItemDto $i) => $i->label, $items);
 
         $this->assertContains('a', $labels);
         $this->assertContains('b', $labels);
@@ -76,18 +74,18 @@ final class StoreStorageTest extends TestCase
     public function testListFallbackWhenIndexCorrupted(): void
     {
         $this->storage->save('s1', 'recover', ['v' => 1], 'recover');
-        $indexPath = $this->tmpDir . '/.store/' . 'store_index_' . 's1' . '.json';
+        $indexPath = $this->tmpDir . '/.store/' . 'var_index_' . 's1' . '.json';
         file_put_contents($indexPath, '{not json');
 
         $items = $this->storage->list('s1');
-        $labels = array_map(static fn(StoreIndexItemDto $i) => $i->label, $items);
+        $labels = array_map(static fn(VarIndexItemDto $i) => $i->label, $items);
         $this->assertContains('recover', $labels);
     }
 
     public function testResultFileNameSanitizes(): void
     {
         $fileName = $this->storage->resultFileName('20250308-120000-1', 'with bad/chars');
-        $this->assertStringContainsString('store_', $fileName);
+        $this->assertStringContainsString('var_', $fileName);
         $this->assertStringEndsWith('.json', $fileName);
     }
 

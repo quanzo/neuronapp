@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
-use app\modules\neuron\classes\dto\tools\StoreToolResultDto;
+use app\modules\neuron\classes\dto\tools\VarToolResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
@@ -15,18 +15,9 @@ use function str_starts_with;
 use function trim;
 
 /**
- * Инструмент `StorePadTool`: дополняет (append) строковые данные по указанной метке.
- *
- * Отличие от {@see StoreSaveTool}:
- * - Save полностью перезаписывает данные.
- * - Pad добавляет новый текст в конец существующего текста, сохраняя переводы строк.
- *
- * Правила объединения строк:
- * - если существующий текст не пустой и не заканчивается `\n`, а добавляемый текст не начинается с `\n` — вставляется один `\n`;
- * - если существующий текст заканчивается `\n`, а добавляемый начинается с `\n` — один ведущий `\n` удаляется из добавляемого текста;
- * - если данных по label нет — создаётся новая запись.
+ * Инструмент `VarPadTool`: дополняет (append) строковые данные по указанной метке.
  */
-final class StorePadTool extends AStoreTool
+final class VarPadTool extends AVarTool
 {
     /**
      * Максимальное кол-во вызовов в сессии одного агента этого инструмента.
@@ -36,24 +27,22 @@ final class StorePadTool extends AStoreTool
     protected ?int $maxRuns = 50;
 
     public function __construct(
-        string $name = 'store_pad',
+        string $name = 'var_pad',
         string $description = 'Дополняет (append) строковые данные по метке, сохраняя переводы строк. Если метки нет — создаёт новую запись.',
     ) {
         parent::__construct(name: $name, description: $description);
     }
 
     /**
-     * Описание входных параметров инструмента для LLM.
-     *
      * @return ToolProperty[]
      */
     protected function properties(): array
     {
         return [
             ToolProperty::make(
-                name: 'label',
+                name: 'name',
                 type: PropertyType::STRING,
-                description: 'Метка результата, который нужно дополнить.',
+                description: 'Имя переменной, которую нужно дополнить.',
                 required: true,
             ),
             ToolProperty::make(
@@ -71,53 +60,44 @@ final class StorePadTool extends AStoreTool
         ];
     }
 
-    /**
-     * Дополняет текстовые данные по label или создаёт новую запись.
-     *
-     * @param string $label       Метка результата.
-     * @param string $description Краткое описание.
-     * @param string $data        Текст для добавления.
-     *
-     * @return string JSON-результат.
-     */
-    public function __invoke(string $label, string $description, string $data): string
+    public function __invoke(string $name, string $description, string $data): string
     {
         $storage = $this->getStorage();
         $sessionKey = $this->getSessionKey();
 
-        $labelTrimmed = trim($label);
+        $nameTrimmed = trim($name);
         $descTrimmed = trim($description);
 
-        if ($labelTrimmed === '') {
-            return $this->resultJson(new StoreToolResultDto(
+        if ($nameTrimmed === '') {
+            return $this->resultJson(new VarToolResultDto(
                 action: 'pad',
                 success: false,
-                message: 'label не может быть пустым.',
+                message: 'name не может быть пустым.',
                 sessionKey: $sessionKey,
             ));
         }
 
         if ($descTrimmed === '') {
-            return $this->resultJson(new StoreToolResultDto(
+            return $this->resultJson(new VarToolResultDto(
                 action    : 'pad',
                 success   : false,
                 message   : 'description не может быть пустым.',
                 sessionKey: $sessionKey,
-                label     : $labelTrimmed,
+                name     : $nameTrimmed,
             ));
         }
 
-        $loaded = $storage->load($sessionKey, $labelTrimmed);
+        $loaded = $storage->load($sessionKey, $nameTrimmed);
         $existing = $loaded['data'] ?? null;
 
         if ($loaded !== null && $existing !== null && !is_string($existing)) {
-            return $this->resultJson(new StoreToolResultDto(
+            return $this->resultJson(new VarToolResultDto(
                 action     : 'pad',
                 success    : false,
                 message    : 'Pad поддерживает только строковые данные. Текущие данные не строка.',
                 sessionKey : $sessionKey,
-                label      : $labelTrimmed,
-                fileName   : $storage->resultFileName($sessionKey, $labelTrimmed),
+                name      : $nameTrimmed,
+                fileName   : $storage->resultFileName($sessionKey, $nameTrimmed),
                 description: is_string($loaded['description'] ?? null) ? (string) $loaded['description'] : null,
                 savedAt    : is_string($loaded['savedAt'] ?? null) ? (string) $loaded['savedAt'] : null,
                 dataType   : is_string($loaded['dataType'] ?? null) ? (string) $loaded['dataType'] : null,
@@ -131,23 +111,23 @@ final class StorePadTool extends AStoreTool
         $merged = $this->mergeWithNewline($existingText, $appendText);
 
         try {
-            $item = $storage->save($sessionKey, $labelTrimmed, $merged, $descTrimmed);
+            $item = $storage->save($sessionKey, $nameTrimmed, $merged, $descTrimmed);
         } catch (\Throwable $e) {
-            return $this->resultJson(new StoreToolResultDto(
+            return $this->resultJson(new VarToolResultDto(
                 action    : 'pad',
                 success   : false,
                 message   : 'Ошибка сохранения: ' . $e->getMessage(),
                 sessionKey: $sessionKey,
-                label     : $labelTrimmed,
+                name     : $nameTrimmed,
             ));
         }
 
-        return $this->resultJson(new StoreToolResultDto(
+        return $this->resultJson(new VarToolResultDto(
             action     : 'pad',
             success    : true,
             message    : $loaded === null ? 'Создано.' : 'Дополнено.',
             sessionKey : $sessionKey,
-            label      : $item->label,
+            name      : $item->name,
             fileName   : $item->fileName,
             description: $item->description,
             savedAt    : $item->savedAt,
@@ -156,9 +136,6 @@ final class StorePadTool extends AStoreTool
         ));
     }
 
-    /**
-     * Склеивает два фрагмента текста, сохраняя переводы строк.
-     */
     private function mergeWithNewline(string $existing, string $append): string
     {
         if ($existing === '') {

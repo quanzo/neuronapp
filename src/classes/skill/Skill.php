@@ -133,6 +133,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
 
         $paramsOption = $options['params'] ?? null;
         [$paramList, $paramErrors] = ParamListDto::tryFromOptionValue($paramsOption);
+
         // Ошибки должны были отфильтроваться выше (через checkErrors), но на всякий случай.
         if ($paramErrors !== []) {
             throw new \RuntimeException(
