@@ -81,21 +81,21 @@ class GrepTool extends ATool
      * @param string   $description     Описание инструмента
      */
     public function __construct(
-        string $basePath        = '',
-        int    $maxMatches      = 50,
-        int    $maxFileSize     = 1048576,
-        array  $excludePatterns = ['.git', 'node_modules', 'vendor'],
-        int    $contextLines    = 0,
-        string $name            = 'grep',
-        string $description     = 'Поиск текста или регулярного выражения внутри файлов. Возвращает совпадения с указанием файла и номера строки.',
+        string $basePath = '',
+        int $maxMatches = 50,
+        int $maxFileSize = 1048576,
+        array $excludePatterns = ['.git', 'node_modules', 'vendor'],
+        int $contextLines = 0,
+        string $name = 'grep',
+        string $description = 'Поиск текста или регулярного выражения внутри файлов. Возвращает совпадения с указанием файла и номера строки.',
     ) {
         parent::__construct(name: $name, description: $description);
 
-        $this->basePath = $basePath !== '' ? $basePath : (string) getcwd();
-        $this->maxMatches = $maxMatches;
-        $this->maxFileSize = $maxFileSize;
+        $this->basePath        = $basePath !== '' ? $basePath : (string) getcwd();
+        $this->maxMatches      = $maxMatches;
+        $this->maxFileSize     = $maxFileSize;
         $this->excludePatterns = $excludePatterns;
-        $this->contextLines = $contextLines;
+        $this->contextLines    = $contextLines;
     }
 
     /**
@@ -107,22 +107,22 @@ class GrepTool extends ATool
     {
         return [
             ToolProperty::make(
-                name: 'pattern',
-                type: PropertyType::STRING,
+                name       : 'pattern',
+                type       : PropertyType::STRING,
                 description: 'Регулярное выражение или текст для поиска.',
-                required: true,
+                required   : true,
             ),
             ToolProperty::make(
-                name: 'path',
-                type: PropertyType::STRING,
+                name       : 'path',
+                type       : PropertyType::STRING,
                 description: 'Путь к файлу или директории для поиска (относительно базовой директории). Если не указан — поиск по всему проекту.',
-                required: false,
+                required   : false,
             ),
             ToolProperty::make(
-                name: 'include',
-                type: PropertyType::STRING,
+                name       : 'include',
+                type       : PropertyType::STRING,
                 description: 'Glob-шаблон для фильтрации файлов (например, "*.php", "*.js").',
-                required: false,
+                required   : false,
             ),
         ];
     }
@@ -158,10 +158,10 @@ class GrepTool extends ATool
             ], JSON_UNESCAPED_UNICODE);
         }
 
-        $matches = [];
-        $totalMatches = 0;
+        $matches       = [];
+        $totalMatches  = 0;
         $filesSearched = 0;
-        $truncated = false;
+        $truncated     = false;
 
         if (is_file($searchPath)) {
             $this->searchFile($searchPath, $regex, $matches, $totalMatches, $filesSearched);
@@ -192,10 +192,10 @@ class GrepTool extends ATool
         );
 
         $dto = new GrepResultDto(
-            pattern: $pattern,
-            matches: $relativeMatches,
-            truncated: $truncated,
-            totalMatches: $totalMatches,
+            pattern      : $pattern,
+            matches      : $relativeMatches,
+            truncated    : $truncated,
+            totalMatches : $totalMatches,
             filesSearched: $filesSearched,
         );
 
@@ -263,10 +263,10 @@ class GrepTool extends ATool
                     : $matchText;
 
                 $matches[] = new GrepMatchDto(
-                    filePath: $filePath,
-                    lineNumber: $index + 1,
+                    filePath   : $filePath,
+                    lineNumber : $index + 1,
                     lineContent: mb_strlen($line) > 500 ? mb_substr($line, 0, 497) . '...' : $line,
-                    matchText: $truncatedMatch,
+                    matchText  : $truncatedMatch,
                 );
             }
         }

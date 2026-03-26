@@ -38,9 +38,9 @@ class ChunckSizeTool extends AChunckTool
         string $description = 'Получение размера текстового файла в символах и строках.',
     ) {
         parent::__construct(
-            basePath: $basePath,
+            basePath   : $basePath,
             maxFileSize: 10485760,
-            name: $name,
+            name       : $name,
             description: $description,
         );
     }

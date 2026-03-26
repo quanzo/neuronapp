@@ -8,6 +8,7 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\tools\ATool;
 use app\modules\neuron\tools\ChunckSizeTool;
 use app\modules\neuron\tools\ChunckViewTool;
+use app\modules\neuron\tools\ChunckGrepTool;
 use app\modules\neuron\tools\GitSummaryTool;
 use app\modules\neuron\tools\GlobTool;
 use app\modules\neuron\tools\GrepTool;
@@ -64,6 +65,7 @@ class ToolRegistry
             'todo_completed' => new TodoCompletedTool(),
             'chunk_size'     => new ChunckSizeTool(),
             'chunk_view'     => new ChunckViewTool(),
+            'chunk_grep'     => new ChunckGrepTool(),
             'glob'           => new GlobTool(),
             'grep'           => new GrepTool(),
             'http_fetch'     => new HttpFetchTool(),

@@ -30,6 +30,7 @@
 - **`TodoCompletedTool`** (`todo_completed`) — установить флаг `completed` в `.store` для внешнего оркестратора (`done/not_done`, `1/0`, `исполнено/не исполнено`).
 - **`FileTreeTool`** — обзор структуры каталогов.
 - **`SearchReplaceTool`** — поиск и замена по проекту с ограничениями.
+- **`ChunckGrepTool`** — поиск строки в файле с возвратом семантических чанков вокруг совпадений.
 - **`GitSummaryTool`** — получение краткой сводки по текущему git‑состоянию (например, изменения, ветка).
 - **`WikiSearchTool` / `RuWikiSearchTool` / `UniSearchTool`** — поиск по Wikipedia/универсальным источникам (в зависимости от реализации).
 - **`HttpFetchTool`** — выполнение HTTP‑запросов к внешним ресурсам (GET/HEAD, белый список хостов, лимиты); см. ниже.
@@ -53,6 +54,8 @@
 - `chat_history.size` — размер полной истории (количество сообщений).
 - `chat_history.meta` — метаданные сообщения по индексу без текста (роль, длина, tool-сигнатура).
 - `chat_history.message` — получить сообщение по индексу (роль + текст + tool-сигнатура).
+- `chat_history.grep` — поиск строки/regex в полной истории (индекс сообщения, роль, номер строки, фрагмент).
+- `chunk_grep` — поиск по файлу с возвратом семантических markdown-чанков вокруг совпадений.
 
 Формат ответов — LLM-friendly JSON, ошибки возвращаются как JSON с полями `error`, `count`, `minIndex`, `maxIndex`.
 
@@ -68,6 +71,10 @@
 
 ```json
 {"tool":"chat_history.message","args":{"index":0}}
+```
+
+```json
+{"tool":"chat_history.grep","args":{"pattern":"ошибка","caseInsensitive":true,"maxMatches":10}}
 ```
 
 ### Var*-инструменты: результаты в `.store`
@@ -205,6 +212,27 @@
 В `src/helpers/MarkdownChunckHelper.php` добавлен метод:
 
 - `chunkBySemanticBlocks(string $markdown, int $targetChars): MarkdownChunksResultDto`
+- `chunkAroundAnchorLineRegex(string $markdown, int $fromChar, string $lineRegex, int $maxChars = 5000): ?MarkdownChunkDto`
+- `chunksAroundAllAnchorLineRegex(string $markdown, string $lineRegex, int $maxCharsPerBlock = 5000, int $maxTotalChars = 5000): MarkdownChunksResultDto`
+
+### `ChunckGrepTool` (`chunk_grep`)
+
+Назначение:
+
+- найти совпадения в текстовом файле и вернуть **семантические чанки markdown** вокруг строк-якорей.
+- полезно для “быстрого контекста” вокруг совпадений без чтения всего файла.
+
+Параметры:
+
+- `path` (string, required) — путь к файлу.
+- `query` (string, required) — regex (с разделителями) или обычная строка (будет преобразована в regex).
+- `max_chars` (integer, required) — максимальный суммарный размер возвращаемого контента.
+
+Пример псевдо-вызова:
+
+```json
+{"tool":"chunk_grep","args":{"path":"docs/tools.md","query":"chat_history","max_chars":2000}}
+```
 
 Назначение:
 
@@ -212,6 +240,18 @@
 - сохраняет семантические блоки целыми (таблицы, fenced code block, абзацы, списки, заголовки);
 - для длинных текстовых блоков допускает деление по предложениям без разрыва слов;
 - допускает недобор/перебор относительно `targetChars`, если это требуется для читаемости.
+
+Дополнительно:
+
+- `chunkAroundAnchorLineRegex(...)` находит **первую строку**, совпадающую с `lineRegex` (regex **или** обычная строка) начиная с `fromChar`,
+  и возвращает окно семантических блоков вокруг якоря. Окно строится из **целых блоков**
+  до/после якоря так, чтобы якорь оказался примерно в середине, с ограничением `maxChars`.
+  Если якорный семантический блок больше `maxChars`, возвращается этот блок целиком.
+
+- `chunksAroundAllAnchorLineRegex(...)` возвращает **набор** непересекающихся чанков вокруг **всех**
+  вхождений строк по `lineRegex` (regex **или** обычная строка). Каждый чанк строится из **целых** семантических блоков и ограничен
+  `maxCharsPerBlock`, а суммарный размер всех чанков ограничен `maxTotalChars`. Если новый чанк
+  пересекается по блокам с уже выбранными — он пропускается.
 
 Формат результата:
 
