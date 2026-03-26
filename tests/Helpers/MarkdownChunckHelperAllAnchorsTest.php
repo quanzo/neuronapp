@@ -25,7 +25,7 @@ final class MarkdownChunckHelperAllAnchorsTest extends TestCase
     #[DataProvider('datasetProvider')]
     public function testChunksAroundAllAnchorLineRegexDataset(
         string $markdown,
-        string $regex,
+        string|array $regex,
         int $perBlock,
         int $totalMax,
         int $expectedChunks,
@@ -53,7 +53,7 @@ final class MarkdownChunckHelperAllAnchorsTest extends TestCase
     /**
      * @return array<string, array{
      *   markdown:string,
-     *   regex:string,
+     *   regex:string|array,
      *   perBlock:int,
      *   totalMax:int,
      *   expectedChunks:int,
@@ -101,6 +101,15 @@ final class MarkdownChunckHelperAllAnchorsTest extends TestCase
             'plain string pattern finds matches' => [
                 'markdown' => $mdFarMatches,
                 'regex' => 'FIND_ME',
+                'perBlock' => 200,
+                'totalMax' => 5000,
+                'expectedChunks' => 2,
+                'mustContain' => 'Another place:',
+            ],
+            // 1c. Поиск по массиву паттернов (строка + regex).
+            'array patterns find matches' => [
+                'markdown' => $mdFarMatches,
+                'regex' => ['NOT_PRESENT', '/FIND_ME/u'],
                 'perBlock' => 200,
                 'totalMax' => 5000,
                 'expectedChunks' => 2,
@@ -155,7 +164,7 @@ final class MarkdownChunckHelperAllAnchorsTest extends TestCase
 
     #[DataProvider('invalidParamsProvider')]
     public function testChunksAroundAllAnchorLineRegexThrowsOnInvalidParams(
-        string $regex,
+        string|array $regex,
         int $perBlock,
         int $totalMax,
     ): void {
@@ -164,7 +173,7 @@ final class MarkdownChunckHelperAllAnchorsTest extends TestCase
     }
 
     /**
-     * @return array<string, array{regex:string, perBlock:int, totalMax:int}>
+     * @return array<string, array{regex:string|array, perBlock:int, totalMax:int}>
      */
     public static function invalidParamsProvider(): array
     {
@@ -174,6 +183,7 @@ final class MarkdownChunckHelperAllAnchorsTest extends TestCase
             'invalid regex' => ['regex' => '/(/u', 'perBlock' => 10, 'totalMax' => 100],
             'perBlock <= 0' => ['regex' => '/x/u', 'perBlock' => 0, 'totalMax' => 100],
             'totalMax <= 0' => ['regex' => '/x/u', 'perBlock' => 10, 'totalMax' => 0],
+            'empty patterns array' => ['regex' => [], 'perBlock' => 10, 'totalMax' => 100],
         ];
     }
 }

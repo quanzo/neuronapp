@@ -18,6 +18,7 @@ use function preg_quote;
 use function preg_split;
 use function trim;
 use function in_array;
+use function is_string;
 
 /**
  * Вспомогательный класс для семантического разбиения Markdown на чанки и выборок “вокруг якоря”.
@@ -115,9 +116,9 @@ class MarkdownChunckHelper
      */
     public static function chunksAroundAllAnchorLineRegex(
         string $markdown,
-        string $lineRegex,
+        string|array $lineRegex,
         int $maxCharsPerBlock = 5000,
-        int $maxTotalChars    = 20000,
+        int $maxTotalChars = 20000,
     ): MarkdownChunksResultDto {
         if ($maxCharsPerBlock <= 0) {
             throw new InvalidArgumentException('Параметр maxCharsPerBlock должен быть больше 0.');
@@ -125,10 +126,7 @@ class MarkdownChunckHelper
         if ($maxTotalChars <= 0) {
             throw new InvalidArgumentException('Параметр maxTotalChars должен быть больше 0.');
         }
-        if ($lineRegex === '') {
-            throw new InvalidArgumentException('Параметр lineRegex не должен быть пустым.');
-        }
-        $regex = self::buildLineRegex($lineRegex);
+        $regexes = self::buildLineRegexList($lineRegex);
 
         $lines = explode("\n", $markdown);
         if ($lines === []) {
@@ -142,10 +140,11 @@ class MarkdownChunckHelper
 
         $anchorLineIndexes = [];
         foreach ($lines as $lineIndex => $line) {
-            if (@preg_match($regex, $line) === 1) {
-                $anchorLineIndexes[] = $lineIndex;
+            if (self::matchesAnyRegex($line, $regexes)) {
+                $anchorLineIndexes[$lineIndex] = true;
             }
         }
+        $anchorLineIndexes = array_keys($anchorLineIndexes);
 
         if ($anchorLineIndexes === []) {
             return new MarkdownChunksResultDto($maxCharsPerBlock, []);
@@ -261,7 +260,7 @@ class MarkdownChunckHelper
     public static function chunkAroundAnchorLineRegex(
         string $markdown,
         int $fromChar,
-        string $lineRegex,
+        string|array $lineRegex,
         int $maxChars = 5000,
     ): ?MarkdownChunkDto {
         if ($fromChar < 0) {
@@ -270,10 +269,7 @@ class MarkdownChunckHelper
         if ($maxChars <= 0) {
             throw new InvalidArgumentException('Параметр maxChars должен быть больше 0.');
         }
-        if ($lineRegex === '') {
-            throw new InvalidArgumentException('Параметр lineRegex не должен быть пустым.');
-        }
-        $regex = self::buildLineRegex($lineRegex);
+        $regexes = self::buildLineRegexList($lineRegex);
 
         $lines     = explode("\n", $markdown);
         $lineCount = count($lines);
@@ -289,7 +285,7 @@ class MarkdownChunckHelper
 
         $anchorLineIndex = null;
         for ($i = $startLineIndex; $i < $lineCount; $i++) {
-            if (@preg_match($regex, $lines[$i]) === 1) {
+            if (self::matchesAnyRegex($lines[$i], $regexes)) {
                 $anchorLineIndex = $i;
                 break;
             }
@@ -922,6 +918,54 @@ class MarkdownChunckHelper
         }
 
         return $regex;
+    }
+
+    /**
+     * Нормализует входной паттерн/паттерны к списку корректных regex.
+     *
+     * Позволяет принимать:
+     * - строку (regex или обычный текст);
+     * - массив строк (каждая — regex или обычный текст).
+     *
+     * @param string|array<int,string> $lineRegexOrTexts
+     *
+     * @return list<string>
+     */
+    private static function buildLineRegexList(string|array $lineRegexOrTexts): array
+    {
+        if (is_string($lineRegexOrTexts)) {
+            return [self::buildLineRegex($lineRegexOrTexts)];
+        }
+
+        if ($lineRegexOrTexts === []) {
+            throw new InvalidArgumentException('Параметр lineRegex не должен быть пустым.');
+        }
+
+        $result = [];
+        foreach ($lineRegexOrTexts as $item) {
+            if (!is_string($item)) {
+                throw new InvalidArgumentException('Параметр lineRegex должен быть строкой или массивом строк.');
+            }
+            $result[] = self::buildLineRegex($item);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Проверяет совпадение строки хотя бы с одним regex из списка.
+     *
+     * @param string $line
+     * @param list<string> $regexes
+     */
+    private static function matchesAnyRegex(string $line, array $regexes): bool
+    {
+        foreach ($regexes as $regex) {
+            if (@preg_match($regex, $line) === 1) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

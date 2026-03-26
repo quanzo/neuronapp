@@ -93,9 +93,9 @@ final class ChunckGrepTool extends AChunckTool
      * @param string $description Описание инструмента (для LLM).
      */
     public function __construct(
-        string $basePath    = '',
-        int    $maxFileSize = 10485760,
-        string $name        = 'chunk_grep',
+        string $basePath = '',
+        int $maxFileSize = 10485760,
+        string $name = 'chunk_grep',
         string $description = 'Поиск строки/regex в файле с возвратом семантических чанков/блоков.',
     ) {
         parent::__construct(
@@ -124,7 +124,7 @@ final class ChunckGrepTool extends AChunckTool
             ToolProperty::make(
                 name       : 'max_chars',
                 type       : PropertyType::INTEGER,
-                description: 'Максимальный суммарный размер возвращаемого контента в символах.',
+                description: 'Максимальный суммарный размер возвращаемого контента в символах. По умолчанию 20000.',
                 required   : false,
             ),
         ];
@@ -141,7 +141,7 @@ final class ChunckGrepTool extends AChunckTool
      *
      * @param string $path      Путь к файлу (абсолютный или относительный к basePath).
      * @param string $query     Строка поиска: regex (с разделителями) или обычный текст.
-     * @param int    $max_chars Максимальный суммарный размер возвращаемого контента (в символах).
+     * @param int|null $max_chars Максимальный суммарный размер возвращаемого контента (в символах). По умолчанию 20000.
      *
      * @return string JSON
      */
@@ -152,7 +152,13 @@ final class ChunckGrepTool extends AChunckTool
             return $validated;
         }
 
-        $max_chars = $max_chars !== null && $max_chars > 0 ? $max_chars : 20000;
+        if ($max_chars !== null && $max_chars <= 0) {
+            return json_encode([
+                'error' => 'Параметр max_chars должен быть больше 0.',
+            ], JSON_UNESCAPED_UNICODE);
+        }
+
+        $max_chars = $max_chars ?? 20000;
 
         $content = file_get_contents($validated['resolvedPath']);
         if ($content === false) {

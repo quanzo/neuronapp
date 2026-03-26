@@ -38,7 +38,7 @@ final class MarkdownChunckHelperAnchorWindowTest extends TestCase
     public function testChunkAroundAnchorLineRegexDataset(
         string $markdown,
         int $fromChar,
-        string $regex,
+        string|array $regex,
         int $maxChars,
         bool $expectFound,
         bool $expectOversized,
@@ -124,6 +124,17 @@ final class MarkdownChunckHelperAnchorWindowTest extends TestCase
                 'markdown' => $md,
                 'fromChar' => 0,
                 'regex' => 'FIND_ME',
+                'maxChars' => 200,
+                'expectFound' => true,
+                'expectOversized' => false,
+                'mustContain' => 'Anchor: FIND_ME',
+                'mustNotContain' => null,
+            ],
+            // 1c. Поиск по массиву паттернов: строка + regex.
+            'anchor by array of patterns' => [
+                'markdown' => $md,
+                'fromChar' => 0,
+                'regex' => ['NOT_PRESENT', '/FIND_ME/u'],
                 'maxChars' => 200,
                 'expectFound' => true,
                 'expectOversized' => false,
@@ -267,7 +278,7 @@ final class MarkdownChunckHelperAnchorWindowTest extends TestCase
     #[DataProvider('invalidParamsProvider')]
     public function testChunkAroundAnchorLineRegexThrowsOnInvalidParams(
         int $fromChar,
-        string $regex,
+        string|array $regex,
         int $maxChars,
     ): void {
         $this->expectException(InvalidArgumentException::class);
@@ -277,7 +288,7 @@ final class MarkdownChunckHelperAnchorWindowTest extends TestCase
     /**
      * Набор заведомо некорректных входных параметров.
      *
-     * @return array<string, array{fromChar:int, regex:string, maxChars:int}>
+     * @return array<string, array{fromChar:int, regex:string|array, maxChars:int}>
      */
     public static function invalidParamsProvider(): array
     {
@@ -290,6 +301,8 @@ final class MarkdownChunckHelperAnchorWindowTest extends TestCase
             'empty regex' => ['fromChar' => 0, 'regex' => '', 'maxChars' => 10],
             // 4. Невалидный regex, который выглядит как regex — должен быть ошибкой.
             'invalid regex syntax' => ['fromChar' => 0, 'regex' => '/(/u', 'maxChars' => 10],
+            // 5. Пустой массив паттернов.
+            'empty patterns array' => ['fromChar' => 0, 'regex' => [], 'maxChars' => 10],
         ];
     }
 }
