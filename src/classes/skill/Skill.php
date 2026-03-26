@@ -157,7 +157,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 $future = $this->execute($role, [], $args);
                 $result = $future->await();
                 if ($result instanceof JsonSerializable) {
-                    return $result->jsonSerialize();
+                    //return $result->jsonSerialize();
                 }
                 if ($result instanceof NeuronMessage) {
                     return $result->getContent();
