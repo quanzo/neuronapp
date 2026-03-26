@@ -24,6 +24,7 @@ use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\interfaces\ISkill;
 use app\modules\neuron\traits\HasNeedSkillsTrait;
 use app\modules\neuron\traits\AttachesSkillToolsTrait;
+use JsonSerializable;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
 use NeuronAI\Tools\PropertyType;
@@ -155,6 +156,12 @@ class Skill extends AbstractPromptWithParams implements ISkill
             try {
                 $future = $this->execute($role, [], $args);
                 $result = $future->await();
+                if ($result instanceof JsonSerializable) {
+                    return $result->jsonSerialize();
+                }
+                if ($result instanceof NeuronMessage) {
+                    return $result->getContent();
+                }
                 return $result;
             } catch (\Throwable $e) {
                 EventBus::trigger(

@@ -261,6 +261,8 @@ class TodolistCommand extends AbstractAgentCommand
 
         if ($error !== null) {
             $output->writeln('<error>' . $error->getMessage() . '</error>');
+            $output->writeln('<error>' .  $error->getFile() . ' ' . $error->getLine() . '</error>');
+            $output->writeln('<error>' .  $error->getTraceAsString() . '</error>');
             return Command::FAILURE;
         }
 
