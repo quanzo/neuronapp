@@ -261,17 +261,27 @@ final class VarStorage
         ];
 
         $path = $this->resultFilePath($sessionKey, $name);
-        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
+        try {
+            $err = false;
+            $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        } catch (\Throwable $e) {
+            $err = true;
+        }
+        if ($err) {
+            $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        }
+
         $this->atomicWrite($path, $json);
 
         $sizeBytes = filesize($path);
         $item = new VarIndexItemDto(
-            name: $name,
+            name       : $name,
             description: $descriptionNorm,
-            fileName: $this->resultFileName($sessionKey, $name),
-            savedAt: $savedAt,
-            dataType: $dataType,
-            sizeBytes: is_int($sizeBytes) ? $sizeBytes : 0,
+            fileName   : $this->resultFileName($sessionKey, $name),
+            savedAt    : $savedAt,
+            dataType   : $dataType,
+            sizeBytes  : is_int($sizeBytes) ? $sizeBytes          : 0,
         );
 
         $this->upsertIndexItem($sessionKey, $item);

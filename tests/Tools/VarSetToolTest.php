@@ -51,7 +51,7 @@ final class VarSetToolTest extends TestCase
 
         $this->assertTrue($data['success']);
         $this->assertSame('set', $data['action']);
-        $this->assertSame('parsed', $data['label']);
+        $this->assertSame('parsed', $data['name']);
     }
 
     public function testEmptyLabelReturnsError(): void

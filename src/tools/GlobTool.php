@@ -100,10 +100,10 @@ class GlobTool extends ATool
     {
         return [
             ToolProperty::make(
-                name: 'pattern',
-                type: PropertyType::STRING,
+                name       : 'pattern',
+                type       : PropertyType::STRING,
                 description: 'Glob-шаблон для поиска файлов (например, "**/*.php", "src/**/*.test.js", "*.txt").',
-                required: true,
+                required   : true,
             ),
         ];
     }

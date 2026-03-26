@@ -25,6 +25,20 @@ LLM может вызывать инструменты просмотра ист
 - `.sessions/neuron_<sessionKey>.chat` — история диалога (см. `FileFullChatHistory`).
 - `.store/run_state_<sessionKey>_<agent>.json` — чекпоинт статуса выполнения run (см. `RunStateCheckpointHelper` и `RunStateDto`).
 
+### Очистка сессий из CLI
+
+Для удаления файлов, связанных с сессией, доступны команды:
+
+- `session:clear` — удалить одну сессию по `--session_id`;
+- `sessions:clear` — удалить все сессии (ключи собираются как union по `.sessions/.store/.logs`).
+
+Удаляются файлы:
+
+- `.sessions/neuron_<sessionKey>*.chat`
+- `.store/run_state_<sessionKey>_*.json`
+- `.store/var_<sessionKey>_*.json` и `.store/var_index_<sessionKey>.json`
+- `.logs/<sessionKey>.log`
+
 Дополнительно в checkpoint TodoList могут храниться поля управления переходами:
 
 - `goto_requested_todo_index` — индекс пункта, куда нужно перейти после текущего шага (записывается `todo_goto`);

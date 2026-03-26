@@ -8,6 +8,49 @@
 - История чата и `sessionKey` позволяют продолжать диалог между запусками.
 - Формат `session_id` валидируется через `ConfigurationApp::isValidSessionKey()` и должен соответствовать `YYYYMMDD-HHMMSS-μs`.
 
+### Команды очистки сессий
+
+Команды для удаления файлов, связанных с сессиями (история, чекпоинты `.store`, результаты `.store`, логи `.logs`).
+
+#### Команда `session:clear`
+
+Класс: `ClearSessionCommand`.
+
+**Назначение**: очистить одну сессию по `--session_id`.
+
+Опции:
+
+- `--session_id` (обязательно) — ключ сессии;
+- `--dry-run` — показать список файлов-кандидатов без удаления;
+- `-y|--yes` — не спрашивать подтверждение (нужно для non-interactive).
+
+Примеры:
+
+- `php bin/console session:clear --session_id 20250301-143022-123456-0 --dry-run`
+- `php bin/console session:clear --session_id 20250301-143022-123456-0 --yes`
+
+#### Команда `sessions:clear`
+
+Класс: `ClearAllSessionsCommand`.
+
+**Назначение**: очистить все сессии.
+
+Ключи сессий собираются как union по:
+
+- `.sessions` (файлы `neuron_*.chat`);
+- `.store` (файлы `run_state_*.json` и `var_index_*.json`);
+- `.logs` (файлы `*.log`).
+
+Опции:
+
+- `--dry-run` — показать список sessionKey и кандидатов без удаления;
+- `-y|--yes` — удалить без подтверждения (нужно для non-interactive).
+
+Примеры:
+
+- `php bin/console sessions:clear --dry-run`
+- `php bin/console sessions:clear --yes`
+
 ### Команда `simplemessage`
 
 Класс: `SimpleMessageCommand`.

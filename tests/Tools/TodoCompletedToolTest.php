@@ -60,7 +60,7 @@ final class TodoCompletedToolTest extends TestCase
         $this->assertTrue($data['success']);
         $this->assertSame('todo_completed', $data['action']);
         $this->assertSame($expected, $data['data']);
-        $this->assertSame('completed', $data['label']);
+        $this->assertSame('completed', $data['name']);
 
         $payload = ConfigurationApp::getInstance()
             ->getVarStorage()

@@ -1,5 +1,5 @@
 ---
-tools: var_set, var_get, chunk_view
+tools: chunk_view
 pure_context: false
 agent: agent-orch
 ---

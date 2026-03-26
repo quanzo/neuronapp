@@ -60,7 +60,7 @@ final class VarExistTool extends AVarTool
             message   : $exists ? 'Найдено.' : 'Не найдено.',
             sessionKey: $sessionKey,
             name      : $nameTrimmed,
-            fileName  : $exists ? $storage->resultFileName($sessionKey, $nameTrimmed): null,
+            fileName  : $exists ? $storage->resultFileName($sessionKey, $nameTrimmed) : null,
             exists    : $exists,
         ));
     }

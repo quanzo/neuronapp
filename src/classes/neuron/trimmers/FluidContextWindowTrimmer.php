@@ -189,6 +189,12 @@ final class FluidContextWindowTrimmer implements HistoryTrimmerInterface
 
         $window = array_slice($messages, $startIndex, $endIndex - $startIndex + 1);
         $window = $this->ensureValidMessageSequence($window);
+        if (empty($window) && $anchor) {
+            // В крайнем случае всегда возвращаем хотя бы сообщение-«якорь».
+            $window = [$messages[$anchor]];
+            //$window = $this->ensureValidMessageSequence($window);
+            $aaa = 1;
+        }
         $this->totalTokens = $this->computeTotalTokens($window);
 
         return $window;

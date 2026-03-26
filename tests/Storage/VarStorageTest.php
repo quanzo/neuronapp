@@ -40,7 +40,7 @@ final class VarStorageTest extends TestCase
     public function testSaveAndLoad(): void
     {
         $item = $this->storage->save('s1', 'label1', ['a' => 1], 'Example data');
-        $this->assertSame('label1', $item->label);
+        $this->assertSame('label1', $item->name);
         $this->assertSame('Example data', $item->description);
 
         $loaded = $this->storage->load('s1', 'label1');
@@ -65,7 +65,7 @@ final class VarStorageTest extends TestCase
         $this->storage->save('s1', 'b', '2', 'two');
 
         $items = $this->storage->list('s1');
-        $labels = array_map(static fn(VarIndexItemDto $i) => $i->label, $items);
+        $labels = array_map(static fn(VarIndexItemDto $i) => $i->name, $items);
 
         $this->assertContains('a', $labels);
         $this->assertContains('b', $labels);
@@ -78,7 +78,7 @@ final class VarStorageTest extends TestCase
         file_put_contents($indexPath, '{not json');
 
         $items = $this->storage->list('s1');
-        $labels = array_map(static fn(VarIndexItemDto $i) => $i->label, $items);
+        $labels = array_map(static fn(VarIndexItemDto $i) => $i->name, $items);
         $this->assertContains('recover', $labels);
     }
 

@@ -9,6 +9,8 @@ use app\modules\neuron\classes\command\SimpleMessageCommand;
 use app\modules\neuron\classes\command\TodolistCommand;
 use app\modules\neuron\classes\command\ConvertToMarkdownChunksCommand;
 use app\modules\neuron\classes\command\ConvertToMarkdownCommand;
+use app\modules\neuron\classes\command\ClearAllSessionsCommand;
+use app\modules\neuron\classes\command\ClearSessionCommand;
 use app\modules\neuron\classes\command\OrchestrateCommand;
 use app\modules\neuron\classes\command\WikiCommand;
 use app\modules\neuron\classes\config\ConfigurationApp;
@@ -104,6 +106,8 @@ $app->add(new RuwikiCommand());
 $app->add(new ConvertToMarkdownCommand());
 $app->add(new ConvertToMarkdownChunksCommand());
 $app->add(new OrchestrateCommand());
+$app->add(new ClearSessionCommand());
+$app->add(new ClearAllSessionsCommand());
 
 // Можно также добавить встроенную команду list, которая уже есть в Symfony,
 // поэтому отдельная HelpCommand не требуется, но при желании можно добавить.

@@ -62,6 +62,7 @@ return [
                 'top_p'          => 0.95,
                 'repeat_penalty' => 1.1,
                 'num_ctx'        => $contextWindow,
+                'think'          => false,
             ],
         ],
         'model' => 'qwen3.5:9b',
@@ -70,14 +71,15 @@ return [
     'instructions' => [
         CallableWrapper::class,
         'createObject',
-        'class' => SystemPrompt::class,
+        'class'      => SystemPrompt::class,
         'background' => [
+// Отвечай сразу, без каких-либо рассуждений, не используй теги <think> и не показывай свои мысли. Только готовый ответ.
 <<<TEXT
-Ты выполняешь задания и отвечаешь на вопросы.
+Ты выполняешь задания и отвечаешь на вопросы. Основной язык общения - русский. Отвечай сразу, без каких-либо рассуждений, не используй теги <think> и не показывай свои мысли.
 
-Твой контекст ограничен ' . $contextWindow . ' токенов. Следи за тем, чтобы сумма токенов текущего блока и всех промежуточных данных, которые ты держишь в памяти, не превышала этот лимит.
+Твой контекст ограничен $contextWindow токенов. Следи за тем, чтобы сумма токенов текущего блока и всех промежуточных данных, которые ты держишь в памяти, не превышала этот лимит.
 
-Основной язык общения - русский.
+Сохраняй значения и промежуточные данные в переменных. Обязательно комментируй переменные. Если не хватает данных - поищи среди списка переменных. Читай и сохраняй переменные каждую отдельно!
 
 ## Tool Calling Rules (STRICT)
 
@@ -113,8 +115,7 @@ TEXT
 
         [GlobTool::class, 'make'],
         //[GrepTool::class, 'make'],
-        [ChunckViewTool::class, 'make'],
-        [ChunckSizeTool::class, 'make'],
+        
 
         [VarPadTool::class, 'make'],
         [VarListTool::class, 'make'],
@@ -123,6 +124,12 @@ TEXT
         [VarGetTool::class, 'make'],
         [VarSetTool::class, 'make'],
         */
+        [VarGetTool::class, 'make'],
+        [VarSetTool::class, 'make'],
+        [VarListTool::class, 'make'],
+        [VarPadTool::class, 'make'],
+        [ChunckViewTool::class, 'make'],
+        [ChunckSizeTool::class, 'make'],
 
     ],
 ];
