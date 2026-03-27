@@ -32,6 +32,7 @@ use app\modules\neuron\classes\logger\ContextualLogger;
 use app\modules\neuron\classes\neuron\providers\LoggingAIProviderDecorator;
 use app\modules\neuron\classes\neuron\history\FileFullChatHistory;
 use app\modules\neuron\classes\neuron\trimmers\FluidContextWindowTrimmer;
+use app\modules\neuron\classes\neuron\trimmers\TokenCounter;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use app\modules\neuron\enums\EventNameEnum;
@@ -44,6 +45,7 @@ use app\modules\neuron\tools\ATool;
 use app\modules\neuron\traits\DependConfigAppTrait;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
+use NeuronAI\Chat\History\HistoryTrimmer;
 use NeuronAI\RAG\PostProcessor\PostProcessorInterface;
 use NeuronAI\RAG\PreProcessor\PreProcessorInterface;
 use NeuronAI\Tools\ProviderToolInterface;
@@ -424,10 +426,28 @@ class ConfigurationAgent implements IDependConfigApp
      */
     public function cloneForSession(ChatHistoryCloneMode $mode = ChatHistoryCloneMode::RESET_EMPTY): self
     {
-        $clone = clone $this;
+        $clone         = clone $this;
         $clone->_agent = null;
+        $targetHistory = null;
 
-        $targetHistory = new InMemoryChatHistory($this->contextWindow);
+        if ($this->enableChatHistory) {
+            $configApp = $this->getConfigurationApp();
+            if ($configApp->get('pure_history.save', true)) {
+                // историю временного чата запишем
+                $targetHistory = new FileFullChatHistory(
+                    ConfigurationApp::getInstance()->getSessionDir(),
+                    $this->getSessionKey(),
+                    $this->contextWindow,
+                    '_' . (string)time() . '_' . rand(1, 999) . '_',
+                    '.chat',
+                    new HistoryTrimmer(new TokenCounter())
+                );
+            }
+        }
+
+        if (empty($targetHistory)) {
+            $targetHistory = new InMemoryChatHistory($this->contextWindow);
+        }
 
         if ($mode === ChatHistoryCloneMode::COPY_CONTEXT) {
             $sourceHistory = $this->_chatHistory ?? $this->getChatHistory();

@@ -1,5 +1,5 @@
 ---
-skills: skill_findInFile
+skills: skill-text-finder
 pure_context: false
 agent: agent-main
 ---

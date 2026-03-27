@@ -74,8 +74,8 @@ final class SessionCleanupHelper
         $result = [];
 
         $sessionsDir = $appCfg->getSessionDir();
-        $storeDir = $appCfg->getStoreDir();
-        $logsDir = $appCfg->getLogDir();
+        $storeDir    = $appCfg->getStoreDir();
+        $logsDir     = $appCfg->getLogDir();
 
         // .sessions: neuron_<sessionKey>*.chat (включая legacy neuron_<sessionKey>-agent.chat)
         foreach (self::listChatFilesForSession($sessionsDir, $sessionKey) as $path) {
@@ -98,6 +98,17 @@ final class SessionCleanupHelper
 
         // .logs: <sessionKey>.log
         $result[] = $logsDir . DIRECTORY_SEPARATOR . $sessionKey . '.log';
+
+        // из директрии сессий уберем все файлы с сессионным ключом
+        $arSessFiles = scandir($sessionsDir);
+        $mask1 = '_' . $safeKey . '_';
+        $mask2 = '_' . $safeKey . '.';
+        foreach ($arSessFiles as $fn) {
+            if (strpos($fn, $mask1) !== false || strpos($fn, $mask2) !== false) {
+                $ffn = $sessionsDir . DIRECTORY_SEPARATOR . $fn;
+                $result[] = $ffn;
+            }
+        }
 
         // Дедуп (на всякий случай)
         $uniq = [];

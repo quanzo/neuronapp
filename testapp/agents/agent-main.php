@@ -37,7 +37,7 @@ return [
             CallableWrapper::class,
             'createObject',
             'class'          => GuzzleHttpClient::class,
-            'timeout'        => 1800.0,
+            'timeout'        => 60.0,
             'connectTimeout' => 10.0,
         ],
         'parameters' => [
