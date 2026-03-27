@@ -327,7 +327,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                 }
             } // end while
 
-            // спросим модель "Is the work finished? Answer only YES or NO!" "Сontinue with the task" "Repeat the final message"
+            // спросим модель "Is the work finished? Answer only YES or NO!" "Сontinue with the task" "Repeat the final message" "Is the task complete? Answer only YES or NO! If NO, continue!"
 
             if ($runStateDto !== null) {
                 $runStateDto->delete();
