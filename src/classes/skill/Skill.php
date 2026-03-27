@@ -167,6 +167,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
                     EventNameEnum::SKILL_FAILED->value,
                     $this,
                     $this->buildSkillEventDto($this->getConfigurationAgent(), '')
+                        ->setParams(['args' => $args])
                         ->setSuccess(false)
                         ->setErrorClass($e::class)
                         ->setErrorMessage($e->getMessage())
@@ -194,20 +195,32 @@ class Skill extends AbstractPromptWithParams implements ISkill
         array $attachments = [],
         ?array $params = null
     ): Future {
-        $agentCfg = $this->getConfigurationAgent();
-        $runId     = $this->generateRunId();
+        $agentCfg        = $this->getConfigurationAgent();
+        $runId           = $this->generateRunId();
+        $effectiveParams = $this->buildEffectiveParams($params ?? [], null);
+        $baseSkillEvent  = $this->buildSkillEventDto($agentCfg, $runId)->setParams($effectiveParams);
+        $baseRunEvent    = new RunEventDto();
+        $baseRunEvent->setSessionKey($agentCfg->getSessionKey() ?? '')
+            ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setAgent($agentCfg)
+            ->setType('skill')
+            ->setName($this->getName());
+
+        $runEventDto = clone $baseRunEvent;
         EventBus::trigger(
             EventNameEnum::RUN_STARTED->value,
             $this,
-            $this->buildRunEventDto($agentCfg, $runId, 0)->setSuccess(true)
+            $runEventDto->setSteps(0)->setSuccess(true)
         );
+
+        $eventDto = clone $baseSkillEvent;
         EventBus::trigger(
             EventNameEnum::SKILL_STARTED->value,
             $this,
-            $this->buildSkillEventDto($agentCfg, $runId)->setSuccess(true)
+            $eventDto->setSuccess(true)
         );
 
-        $text = $this->getSkill($params ?? []);
+        $text = PlaceholderHelper::renderWithParams($this->getBody(), $effectiveParams);
 
         $configApp = $this->getConfigurationApp();
         if ($configApp !== null) {
@@ -222,7 +235,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
             }
         }
 
-        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments, $runId): mixed {
+        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments, $baseSkillEvent, $baseRunEvent): mixed {
 
             $sessionCfg_0 = $this->isPureContext()
                 ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) // здесь агент без истории сообщений
@@ -240,33 +253,34 @@ class Skill extends AbstractPromptWithParams implements ISkill
             try {
                 $message = new NeuronMessage($role, $text);
                 $result = $sessionCfg->sendMessageWithAttachments($message, $attachments);
+                
+                $eventDto = clone $baseSkillEvent;
                 EventBus::trigger(
                     EventNameEnum::SKILL_COMPLETED->value,
                     $this,
-                    $this->buildSkillEventDto($agentCfg, $runId)->setSuccess(true)
+                    $eventDto->setSuccess(true)
                 );
+
+                $runEventDto = clone $baseRunEvent;
                 EventBus::trigger(
                     EventNameEnum::RUN_FINISHED->value,
                     $this,
-                    $this->buildRunEventDto($agentCfg, $runId, 1)->setSuccess(true)
+                    $runEventDto->setSteps(1)->setSuccess(true)
                 );
                 return $result;
             } catch (\Throwable $e) {
+                $eventDto = clone $baseSkillEvent;
                 EventBus::trigger(
                     EventNameEnum::SKILL_FAILED->value,
                     $this,
-                    $this->buildSkillEventDto($agentCfg, $runId)
-                        ->setSuccess(false)
-                        ->setErrorClass($e::class)
-                        ->setErrorMessage($e->getMessage())
+                    $eventDto->setSuccess(false)->setErrorClass($e::class)->setErrorMessage($e->getMessage())
                 );
+
+                $runEventDto = clone $baseRunEvent;
                 EventBus::trigger(
                     EventNameEnum::RUN_FAILED->value,
                     $this,
-                    $this->buildRunEventDto($agentCfg, $runId, 0)
-                        ->setSuccess(false)
-                        ->setErrorClass($e::class)
-                        ->setErrorMessage($e->getMessage())
+                    $runEventDto->setSteps(0)->setSuccess(false)->setErrorClass($e::class)->setErrorMessage($e->getMessage())
                 );
                 throw $e;
             }
@@ -283,21 +297,6 @@ class Skill extends AbstractPromptWithParams implements ISkill
     protected function getDefaultPureContext(): bool
     {
         return false;
-    }
-
-    /**
-     * Создает DTO run-события для Skill.
-     */
-    private function buildRunEventDto(ConfigurationAgent $agentCfg, string $runId, int $steps): RunEventDto
-    {
-        return (new RunEventDto())
-            ->setSessionKey($agentCfg->getSessionKey() ?? '')
-            ->setRunId($runId)
-            ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
-            ->setAgent($agentCfg)
-            ->setType('skill')
-            ->setName($this->getName())
-            ->setSteps($steps);
     }
 
     /**

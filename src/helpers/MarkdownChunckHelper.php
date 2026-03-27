@@ -1012,7 +1012,8 @@ class MarkdownChunckHelper
      * @param string $lineRegexOrText
      * @return boolean
      */
-    public static function isRegexp(string $lineRegexOrText): bool {
+    public static function isRegexp(string $lineRegexOrText): bool
+    {
         if (self::looksLikeRegex($lineRegexOrText)) {
             if (@preg_match($lineRegexOrText, '') === false) {
                 return false;

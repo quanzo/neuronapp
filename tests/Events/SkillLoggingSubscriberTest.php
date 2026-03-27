@@ -58,6 +58,7 @@ final class SkillLoggingSubscriberTest extends TestCase
             ->setTimestamp('2026-03-24T12:00:00+00:00')
             ->setAgent($agentCfg)
             ->setSkill($skill)
+            ->setParams(['query' => 'hello'])
             ->setSuccess(true);
 
         EventBus::trigger(EventNameEnum::SKILL_STARTED->value, '*', $event);
