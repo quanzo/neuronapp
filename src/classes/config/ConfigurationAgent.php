@@ -39,6 +39,7 @@ use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\interfaces\IAttachmentFile;
 use app\modules\neuron\interfaces\IDependConfigApp;
 use app\modules\neuron\classes\storage\VarStorage;
+use app\modules\neuron\classes\WaitSuccess;
 use app\modules\neuron\exceptions\RunStateNotFoundException;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\tools\ATool;
@@ -302,16 +303,24 @@ class ConfigurationAgent implements IDependConfigApp
                 }
             }
 
-            if ($this->reponseStructClass) {
-                $response = $agent->structured(
-                    $message,
-                    $this->reponseStructClass,
-                    2
-                );
-            } else {
-                $handler = $agent->chat($message);
-                $response = $handler->getMessage();
-            }
+            $response = null;
+            WaitSuccess::waitSuccess(
+                function () use (&$response, $message, $agent) {
+                    if ($this->reponseStructClass) {
+                        $response = $agent->structured(
+                            $message,
+                            $this->reponseStructClass,
+                            2
+                        );
+                    } else {
+                        $handler = $agent->chat($message);
+                        $response = $handler->getMessage();
+                    }
+                },
+                10000,
+                3
+            );
+
         } catch (\Throwable $e) {
             $duration = round(microtime(true) - $start, 2);
             EventBus::trigger(

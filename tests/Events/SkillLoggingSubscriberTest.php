@@ -67,5 +67,12 @@ final class SkillLoggingSubscriberTest extends TestCase
 
         $this->assertCount(0, $fallbackLogger->records);
         $this->assertCount(3, $agentLogger->records);
+
+        foreach ($agentLogger->records as $record) {
+            $this->assertArrayHasKey('context', $record);
+            $this->assertIsArray($record['context']);
+            $this->assertArrayHasKey('params', $record['context']);
+            $this->assertSame(['query' => 'hello'], $record['context']['params']);
+        }
     }
 }
