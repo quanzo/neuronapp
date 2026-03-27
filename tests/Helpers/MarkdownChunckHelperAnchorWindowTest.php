@@ -269,6 +269,74 @@ final class MarkdownChunckHelperAnchorWindowTest extends TestCase
                 'mustContain' => 'FIND_ME',
                 'mustNotContain' => 'Tail paragraph.',
             ],
+            // 11. Фраза (не regex) должна находить русскоязычный якорь после phrase->regex преобразования.
+            'phrase query in russian paragraph' => [
+                'markdown' => implode("\n", [
+                    'Вводный блок.',
+                    '',
+                    'Отчет: коэффициент локализации производимая продукция расчеты результаты за период.',
+                    '',
+                    'Хвостовой блок.',
+                ]),
+                'fromChar' => 0,
+                'regex' => 'коэффициент локализация производимая продукция расчеты результаты',
+                'maxChars' => 300,
+                'expectFound' => true,
+                'expectOversized' => false,
+                'mustContain' => 'коэффициент локализации',
+                'mustNotContain' => null,
+            ],
+            // 12. Фразовый запрос должен проходить через пунктуацию и до 5 слов между якорями.
+            'phrase query tolerates punctuation and gaps' => [
+                'markdown' => implode("\n", [
+                    'prefix',
+                    '',
+                    'Коэффициент, налоговой локализации и прочей производимой товарной продукции: финальные расчеты, а также результаты.',
+                    '',
+                    'suffix',
+                ]),
+                'fromChar' => 0,
+                'regex' => 'коэффициент локализация производимая продукция расчеты результаты',
+                'maxChars' => 400,
+                'expectFound' => true,
+                'expectOversized' => false,
+                'mustContain' => 'финальные расчеты',
+                'mustNotContain' => null,
+            ],
+            // 13. Control-байты между словами не матчатся разделителем [\s\pP]+ -> якорь не находится.
+            'phrase query with control chars is not found' => [
+                'markdown' => implode("\n", [
+                    'prefix',
+                    '',
+                    "коэффициент\x00\x01 локализация ### производимая $$$ продукция\tрасчеты\x07 результаты",
+                    '',
+                    'suffix',
+                ]),
+                'fromChar' => 0,
+                'regex' => 'коэффициент локализация производимая продукция расчеты результаты',
+                'maxChars' => 400,
+                'expectFound' => false,
+                'expectOversized' => false,
+                'mustContain' => null,
+                'mustNotContain' => null,
+            ],
+            // 14. Непечатаемые/спецсимволы вне якорной фразы не должны мешать поиску.
+            'phrase query with punctuation noise is found' => [
+                'markdown' => implode("\n", [
+                    "prefix\x00\x01@@@",
+                    '',
+                    'коэффициент локализация производимая продукция расчеты результаты',
+                    '',
+                    "suffix###\x07",
+                ]),
+                'fromChar' => 0,
+                'regex' => 'коэффициент локализация производимая продукция расчеты результаты',
+                'maxChars' => 400,
+                'expectFound' => true,
+                'expectOversized' => false,
+                'mustContain' => 'коэффициент локализация производимая продукция',
+                'mustNotContain' => null,
+            ],
         ];
     }
 

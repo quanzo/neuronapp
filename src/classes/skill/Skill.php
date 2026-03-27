@@ -226,9 +226,15 @@ class Skill extends AbstractPromptWithParams implements ISkill
 
         return \Amp\async(function () use ($agentCfg, $text, $role, $attachments, $runId): mixed {
 
-            $sessionCfg = $this->isPureContext()
+            $sessionCfg_0 = $this->isPureContext()
                 ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) // здесь агент без истории сообщений
                 : $agentCfg->cloneForSession(ChatHistoryCloneMode::COPY_CONTEXT); // здесь агент с копией, которая не влияет на сессию
+
+            /**
+             * Когда выполняется skill то может быть подключение к агенту дополнительных инструментов, изменение настроек и т.п.
+             * Чтобы это не влияло на агент для всех остальных - клонируем
+             */
+            $sessionCfg = clone $sessionCfg_0;
 
             // здесь передаем в skill другие навыки, которые указаны в его параметрах
             $this->attachSkillToolsToSession($sessionCfg, $role);

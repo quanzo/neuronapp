@@ -12,13 +12,17 @@ class ConsoleHelper
     /**
      * Отформатировать вывод команды в соответствии с форматом
      *
-     * @param string $content
+     * @param mixed $content
      * @param string $sessionId
      * @param string $formatOut
      * @return string
      */
-    public static function formatOut(string $content, string $sessionId, string $formatOut = 'md'): string
+    public static function formatOut(mixed $content, string $sessionId, string $formatOut = 'md'): string
     {
+        if (!is_string($content)) {
+            $content = (string) $content;
+        }
+        
         $out = '';
         switch ($formatOut) {
             case 'md':

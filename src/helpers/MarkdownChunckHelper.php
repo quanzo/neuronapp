@@ -13,9 +13,13 @@ use function count;
 use function explode;
 use function implode;
 use function mb_strlen;
+use function mb_strtolower;
+use function mb_substr;
 use function preg_match;
+use function preg_match_all;
 use function preg_quote;
 use function preg_split;
+use function str_ends_with;
 use function trim;
 use function in_array;
 use function is_string;
@@ -61,6 +65,82 @@ use function is_string;
  */
 class MarkdownChunckHelper
 {
+    /**
+     * Максимальное число промежуточных слов между соседними якорями в phrase->regex режиме.
+     */
+    private const int PHRASE_REGEX_MAX_GAP_WORDS = 5;
+
+    /**
+     * Слова длиной <= этого порога считаются короткими и не стеммятся.
+     */
+    private const int PHRASE_REGEX_SHORT_WORD_MAX_LENGTH = 4;
+
+    /**
+     * Минимальная длина основы после обрезки известного окончания.
+     */
+    private const int PHRASE_REGEX_MIN_STEM_LENGTH = 4;
+
+    /**
+     * Минимальная длина основы после fallback-обрезки.
+     */
+    private const int PHRASE_REGEX_MIN_FALLBACK_STEM_LENGTH = 3;
+
+    /**
+     * Явно заданный токен "слово" для Unicode-режима.
+     */
+    private const string PHRASE_REGEX_WORD_TOKEN = '[\p{L}\p{N}_]+';
+
+    /**
+     * Типовые русские окончания (от длинных к коротким), используемые в гибридной обрезке.
+     *
+     * @var list<string>
+     */
+    private const array PHRASE_REGEX_KNOWN_ENDINGS = [
+        'ование',
+        'овать',
+        'иями',
+        'остей',
+        'остью',
+        'ости',
+        'ость',
+        'цией',
+        'имая',
+        'иях',
+        'иям',
+        'ием',
+        'ыми',
+        'ими',
+        'ого',
+        'ему',
+        'ому',
+        'ями',
+        'ами',
+        'ий',
+        'ая',
+        'яя',
+        'ое',
+        'ее',
+        'ые',
+        'ие',
+        'ой',
+        'ей',
+        'ам',
+        'ям',
+        'ах',
+        'ях',
+        'ом',
+        'ем',
+        'ов',
+        'ев',
+        'а',
+        'я',
+        'ы',
+        'и',
+        'о',
+        'е',
+        'у',
+        'ю',
+    ];
     /**
      * Возвращает список непересекающихся чанков вокруг всех вхождений строки по regex.
      *
@@ -885,18 +965,22 @@ class MarkdownChunckHelper
      * Преобразует входной паттерн в корректное регулярное выражение для поиска по строкам.
      *
      * Если вход уже является корректным regex (с разделителями), он используется как есть.
-     * Если нет — вход трактуется как простой текст и оборачивается в `/.../u` с экранированием.
+     * Если нет — вход трактуется как фраза и преобразуется в "расстояниевый" regex.
      *
      * @param string $lineRegexOrText
+     * @param bool   $strict          Строгий режим для plain-text: строить literal-regex "как есть".
      *
      * @return string
      */
-    private static function buildLineRegex(string $lineRegexOrText): string
+    public static function buildLineRegex(string $lineRegexOrText, bool $strict = false): string
     {
         /**
          * Этот метод вводит “двухрежимный” паттерн:
          * - если вход выглядит как regex (например, "/TODO:/u"), то мы обязаны валидировать его как regex;
-         * - если вход не выглядит как regex, трактуем его как простой текст и безопасно экранируем.
+         * - если вход не выглядит как regex:
+         *   - strict=true: строим literal-regex "как есть";
+         *   - strict=false: трактуем как фразу и строим regex с допуском расстояния
+         *     между нормализованными словами.
          *
          * Это важно для UX инструментов: LLM/пользователь может передать просто "TODO:",
          * не думая о синтаксисе регулярных выражений.
@@ -905,19 +989,201 @@ class MarkdownChunckHelper
             throw new InvalidArgumentException('Параметр lineRegex не должен быть пустым.');
         }
 
-        if (self::looksLikeRegex($lineRegexOrText)) {
-            if (@preg_match($lineRegexOrText, '') === false) {
-                throw new InvalidArgumentException('Параметр lineRegex должен быть корректным регулярным выражением.');
-            }
+        if (self::isRegexp($lineRegexOrText)) { // регулярка опознана - вернем ее
             return $lineRegexOrText;
         }
+        if (self::looksLikeRegex($lineRegexOrText)) {
+            throw new InvalidArgumentException('Параметр lineRegex должен быть корректным регулярным выражением.');
+        }
 
-        $regex = '/' . preg_quote($lineRegexOrText, '/') . '/u';
+        $regex = $strict
+            ? self::buildStrictLineRegex($lineRegexOrText)
+            : self::buildPhraseLineRegex($lineRegexOrText);
         if (@preg_match($regex, '') === false) {
             throw new InvalidArgumentException('Не удалось построить регулярное выражение из lineRegex.');
         }
 
         return $regex;
+    }
+
+    /**
+     * Распознаем в строке регулярку
+     *
+     * @param string $lineRegexOrText
+     * @return boolean
+     */
+    public static function isRegexp(string $lineRegexOrText): bool {
+        if (self::looksLikeRegex($lineRegexOrText)) {
+            if (@preg_match($lineRegexOrText, '') === false) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Эвристика: похоже ли значение на regex с разделителями.
+     *
+     * Нужна, чтобы различать "текст для поиска" и "regex". Если строка выглядит как regex,
+     * но является невалидной — это ошибка, а не текст.
+     *
+     * @param string $value
+     *
+     * @return bool
+     */
+    public static function looksLikeRegex(string $value): bool
+    {
+        if ($value === '' || mb_strlen($value) < 3) {
+            return false;
+        }
+
+        $delim = $value[0];
+        if (!in_array($delim, ['/', '#', '~'], true)) {
+            return false;
+        }
+
+        $endPos = null;
+        $len = mb_strlen($value);
+        for ($i = $len - 1; $i >= 1; $i--) {
+            if ($value[$i] !== $delim) {
+                continue;
+            }
+
+            $slashes = 0;
+            for ($j = $i - 1; $j >= 0; $j--) {
+                if ($value[$j] === '\\') {
+                    $slashes++;
+                } else {
+                    break;
+                }
+            }
+            if (($slashes % 2) === 0) {
+                $endPos = $i;
+                break;
+            }
+        }
+
+        return $endPos !== null && $endPos > 0;
+    }
+
+    /**
+     * Строит строгий regex из plain-text строки "как есть".
+     *
+     * @param string $lineText
+     *
+     * @return string
+     */
+    private static function buildStrictLineRegex(string $lineText): string
+    {
+        return '/' . preg_quote($lineText, '/') . '/iu';
+    }
+
+    /**
+     * Преобразует фразу в regex для "разреженного" поиска по словам.
+     *
+     * @param string $phrase
+     *
+     * @return string
+     */
+    private static function buildPhraseLineRegex(string $phrase): string
+    {
+        $words = self::extractRegexWords($phrase);
+        if ($words === []) {
+            throw new InvalidArgumentException('Параметр lineRegex не содержит валидных слов для построения паттерна.');
+        }
+
+        $stems = [];
+        foreach ($words as $word) {
+            $stems[] = self::stemWordForRegex($word);
+        }
+
+        return self::buildDistanceRegexFromStems($stems);
+    }
+
+    /**
+     * Извлекает слова из произвольной фразы и отбрасывает одиночные буквы.
+     *
+     * @param string $phrase
+     *
+     * @return list<string>
+     */
+    private static function extractRegexWords(string $phrase): array
+    {
+        $matches = [];
+        preg_match_all('/' . self::PHRASE_REGEX_WORD_TOKEN . '/u', $phrase, $matches);
+        $words = $matches[0] ?? [];
+        if ($words === []) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($words as $word) {
+            $word = mb_strtolower(trim($word));
+            if ($word === '' || mb_strlen($word) <= 1) {
+                continue;
+            }
+            $result[] = $word;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Ставит слово в "поисковую основу":
+     * короткие слова (<=4) не режем, длинные режем гибридно.
+     *
+     * @param string $word
+     *
+     * @return string
+     */
+    private static function stemWordForRegex(string $word): string
+    {
+        if (mb_strlen($word) <= self::PHRASE_REGEX_SHORT_WORD_MAX_LENGTH) {
+            return $word;
+        }
+
+        foreach (self::PHRASE_REGEX_KNOWN_ENDINGS as $ending) {
+            if (!str_ends_with($word, $ending)) {
+                continue;
+            }
+
+            $candidate = mb_substr($word, 0, mb_strlen($word) - mb_strlen($ending));
+            if (mb_strlen($candidate) >= self::PHRASE_REGEX_MIN_STEM_LENGTH) {
+                return $candidate;
+            }
+        }
+
+        if ((bool) preg_match('/[аяыиоеуюёэьй]$/u', $word)) {
+            $fallback = mb_substr($word, 0, mb_strlen($word) - 1);
+            if ($fallback !== '' && mb_strlen($fallback) >= self::PHRASE_REGEX_MIN_FALLBACK_STEM_LENGTH) {
+                return $fallback;
+            }
+        }
+
+        return $word;
+    }
+
+    /**
+     * Строит итоговый regex по списку слов-основ.
+     *
+     * @param list<string> $stems
+     *
+     * @return string
+     */
+    private static function buildDistanceRegexFromStems(array $stems): string
+    {
+        $parts = [];
+        $count = count($stems);
+        foreach ($stems as $index => $stem) {
+            $parts[] = preg_quote($stem, '/') . '[\p{L}\p{N}_]*';
+            if ($index < $count - 1) {
+                $parts[] = '(?:[\s\pP]+' . self::PHRASE_REGEX_WORD_TOKEN . '){0,' . self::PHRASE_REGEX_MAX_GAP_WORDS . '}[\s\pP]+';
+            }
+        }
+
+        return '/' . implode('', $parts) . '/ui';
     }
 
     /**
@@ -966,51 +1232,6 @@ class MarkdownChunckHelper
             }
         }
         return false;
-    }
-
-    /**
-     * Эвристика: похоже ли значение на regex с разделителями.
-     *
-     * Нужна, чтобы различать "текст для поиска" и "regex". Если строка выглядит как regex,
-     * но является невалидной — это ошибка, а не текст.
-     *
-     * @param string $value
-     *
-     * @return bool
-     */
-    private static function looksLikeRegex(string $value): bool
-    {
-        if ($value === '' || mb_strlen($value) < 3) {
-            return false;
-        }
-
-        $delim = $value[0];
-        if (!in_array($delim, ['/', '#', '~'], true)) {
-            return false;
-        }
-
-        $endPos = null;
-        $len = mb_strlen($value);
-        for ($i = $len - 1; $i >= 1; $i--) {
-            if ($value[$i] !== $delim) {
-                continue;
-            }
-
-            $slashes = 0;
-            for ($j = $i - 1; $j >= 0; $j--) {
-                if ($value[$j] === '\\') {
-                    $slashes++;
-                } else {
-                    break;
-                }
-            }
-            if (($slashes % 2) === 0) {
-                $endPos = $i;
-                break;
-            }
-        }
-
-        return $endPos !== null && $endPos > 0;
     }
 
     /**

@@ -140,12 +140,12 @@ final class ChunckGrepTool extends AChunckTool
      * - объём ответа ограничивается `max_chars`.
      *
      * @param string $path      Путь к файлу (абсолютный или относительный к basePath).
-     * @param string $query     Строка поиска: regex (с разделителями) или обычный текст.
+     * @param string|array $query     Строка поиска: regex (с разделителями) или обычный текст.
      * @param int|null $max_chars Максимальный суммарный размер возвращаемого контента (в символах). По умолчанию 20000.
      *
      * @return string JSON
      */
-    public function __invoke(string $path, string $query, ?int $max_chars = null): string
+    public function __invoke(string $path, string|array $query, ?int $max_chars = null): string
     {
         $validated = $this->validateTextFile($path);
         if (!is_array($validated)) {
@@ -168,9 +168,19 @@ final class ChunckGrepTool extends AChunckTool
         }
 
         $maxCharsPerBlock = $max_chars > 5000 ? 5000 : $max_chars;
+        if (is_string($query)) {
+            $arQuery = explode('|', $query);
+            if (sizeof($arQuery) == 1) {
+                $arQuery = explode(',', $query);
+            }
+            $arQuery = array_filter(array_map(trim(...), $arQuery));
+        } else {
+            $arQuery = $query;
+        }
+
         $chunksResult     = MarkdownChunckHelper::chunksAroundAllAnchorLineRegex(
             $content,
-            $query,
+            $arQuery,
             $maxCharsPerBlock,
             $max_chars,
         );
