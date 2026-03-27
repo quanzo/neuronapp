@@ -8,6 +8,7 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\events\SkillEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\events\subscribers\SkillLoggingSubscriber;
+use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\enums\EventNameEnum;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
@@ -50,12 +51,13 @@ final class SkillLoggingSubscriberTest extends TestCase
         $agentCfg->setSessionKey('s1');
         $agentCfg->setLogger($agentLogger);
 
+        $skill = new Skill('', 'search');
         $event = (new SkillEventDto())
             ->setSessionKey('s1')
             ->setRunId('r1')
             ->setTimestamp('2026-03-24T12:00:00+00:00')
             ->setAgent($agentCfg)
-            ->setSkillName('search')
+            ->setSkill($skill)
             ->setSuccess(true);
 
         EventBus::trigger(EventNameEnum::SKILL_STARTED->value, '*', $event);

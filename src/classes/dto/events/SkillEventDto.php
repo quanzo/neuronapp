@@ -4,35 +4,41 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\events;
 
+use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\interfaces\IArrayable;
 
 /**
  * DTO события Skill.
  *
- * Содержит имя навыка и диагностическую информацию выполнения.
+ * Содержит ссылку на объект навыка и диагностическую информацию выполнения.
  *
  * Пример использования:
  * ```php
  * $event = (new SkillEventDto())
- *     ->setSkillName('search')
+ *     ->setSkill($skill)
  *     ->setSuccess(true);
  * ```
  */
 class SkillEventDto extends BaseEventDto implements IArrayable
 {
-    private string $skillName     = '';
+    private ?Skill $skill         = null;
     private bool $success         = false;
     private ?string $errorClass   = null;
     private ?string $errorMessage = null;
 
     public function getSkillName(): string
     {
-        return $this->skillName;
+        return $this->skill?->getName() ?? '';
     }
 
-    public function setSkillName(string $skillName): self
+    public function getSkill(): ?Skill
     {
-        $this->skillName = $skillName;
+        return $this->skill;
+    }
+
+    public function setSkill(Skill $skill): self
+    {
+        $this->skill = $skill;
         return $this;
     }
 
@@ -75,7 +81,7 @@ class SkillEventDto extends BaseEventDto implements IArrayable
     public function toArray(): array
     {
         return parent::toArray() + [
-            'skillName' => $this->skillName,
+            'skillName' => $this->getSkillName(),
             'success' => $this->success,
             'errorClass' => $this->errorClass,
             'errorMessage' => $this->errorMessage,

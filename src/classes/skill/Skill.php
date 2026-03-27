@@ -151,8 +151,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
             ));
         }
 
-        $skillName = $this->getName();
-        $tool->setCallable(function (mixed ...$args) use ($role, $skillName): mixed {
+        $tool->setCallable(function (mixed ...$args) use ($role): mixed {
             try {
                 $future = $this->execute($role, [], $args);
                 $result = $future->await();
@@ -168,7 +167,6 @@ class Skill extends AbstractPromptWithParams implements ISkill
                     EventNameEnum::SKILL_FAILED->value,
                     $this,
                     $this->buildSkillEventDto($this->getConfigurationAgent(), '')
-                        ->setSkillName($skillName)
                         ->setSuccess(false)
                         ->setErrorClass($e::class)
                         ->setErrorMessage($e->getMessage())
@@ -312,7 +310,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
             ->setRunId($runId)
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
             ->setAgent($agentCfg)
-            ->setSkillName($this->getName());
+            ->setSkill($this);
     }
 
     /**
