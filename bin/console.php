@@ -14,16 +14,15 @@ use app\modules\neuron\classes\command\ClearSessionCommand;
 use app\modules\neuron\classes\command\OrchestrateCommand;
 use app\modules\neuron\classes\command\WikiCommand;
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\console\TimedConsoleApplication;
 use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\logger\FileLogger;
 use app\modules\neuron\classes\producers\AgentProducer;
 use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\classes\producers\TodoListProducer;
-use Symfony\Component\Console\Application;
-
 define('APP_ID', 'neuronapp');
 
-$app = new Application('neuronapp', '0.0.1');
+$app = new TimedConsoleApplication('neuronapp', '0.0.1');
 $arDirs = [];
 
 /**

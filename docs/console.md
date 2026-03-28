@@ -4,6 +4,7 @@
 
 ### Общие правила
 
+- Точка входа: `bin/console.php` использует `TimedConsoleApplication` — после выполнения команды в stderr выводится строка вида `Время выполнения: X.XXX с` (в режиме `--quiet` / `-q` не показывается).
 - Все команды используют `ConfigurationApp` и producers для поиска агентов и todolist.
 - История чата и `sessionKey` позволяют продолжать диалог между запусками.
 - Формат `session_id` валидируется через `ConfigurationApp::isValidSessionKey()` и должен соответствовать `YYYYMMDD-HHMMSS-μs`.
