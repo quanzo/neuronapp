@@ -21,6 +21,7 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\CommentsHelper;
+use app\modules\neuron\helpers\LlmCycleHelper;
 use app\modules\neuron\interfaces\ISkill;
 use app\modules\neuron\traits\HasNeedSkillsTrait;
 use app\modules\neuron\traits\AttachesSkillToolsTrait;
@@ -253,7 +254,13 @@ class Skill extends AbstractPromptWithParams implements ISkill
             try {
                 $message = new NeuronMessage($role, $text);
                 $result = $sessionCfg->sendMessageWithAttachments($message, $attachments);
-                
+
+                // здесь проверим, что LLM исполнила - спросим ее прямо
+                $arRes = LlmCycleHelper::waitCycle($sessionCfg);
+                if ($arRes['cycles'] > 1) {
+                    $result = LlmCycleHelper::repeateResultMsg($sessionCfg);
+                }
+
                 $eventDto = clone $baseSkillEvent;
                 EventBus::trigger(
                     EventNameEnum::SKILL_COMPLETED->value,

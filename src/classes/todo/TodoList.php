@@ -20,6 +20,7 @@ use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\helpers\CommentsHelper;
+use app\modules\neuron\helpers\LlmCycleHelper;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\interfaces\ITodoList;
 use app\modules\neuron\traits\HasNeedSkillsTrait;
@@ -228,6 +229,10 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                         }
                     }
                     $todoSessionCfg->sendMessageWithAttachments($message, $todoAttachments);
+
+                    // здесь проверим, что пункт LLM исполнила - спросим ее прямо
+                    $arRes = LlmCycleHelper::waitCycle($todoSessionCfg);
+
                     ++$stepsExecuted;
 
                     /**
@@ -324,6 +329,10 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                     }
                 } else {
                     ++$currentTodoIndex;
+                }
+                if ($currentTodoIndex == $todoCount) { // индекс вышел за последний элемент
+                    // LLM отработала задание и если сообщение последнее в цикле заданий, то надо, чтобы последнее сообщение истории было итоговым сообщением по заданиям
+                    LlmCycleHelper::repeateResultMsg($todoSessionCfg);
                 }
             } // end while
 
