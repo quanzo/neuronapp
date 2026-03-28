@@ -1,6 +1,7 @@
 ---
-agent: agent-file
+agent: agent-main
 pure_context: false
+tools: todo_goto, glob, todo_completed, grep, chunk_view, chunk_size
 ---
 
 1. **Определи путь к файлу**  

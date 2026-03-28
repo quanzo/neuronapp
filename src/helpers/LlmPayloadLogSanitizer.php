@@ -52,7 +52,7 @@ final class LlmPayloadLogSanitizer
      *
      * @return mixed
      */
-    public static function sanitize(mixed $value, int $maxStringLength = 1500, int $maxDepth = 8): mixed
+    public static function sanitize(mixed $value, int $maxStringLength = 2000, int $maxDepth = 8): mixed
     {
         return self::sanitizeValue($value, null, $maxStringLength, $maxDepth);
     }
@@ -65,7 +65,7 @@ final class LlmPayloadLogSanitizer
      *
      * @return array{preview: string, length: int}
      */
-    public static function preview(?string $text, int $maxLength = 1200): array
+    public static function preview(?string $text, int $maxLength = 2000): array
     {
         $text = (string) $text;
 

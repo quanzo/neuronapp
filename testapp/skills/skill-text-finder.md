@@ -3,6 +3,7 @@ description: Поиск информации в файле по строке
 params: {"query":{"type":"string","description":"Строка, которую надо найти в файле","required":true},"path":{"type":"string","description":"Путь к файлу, в котором проводим поиск","required":true}}
 tools: chunk_grep
 pure_context: true
+agent: agent-main
 ---
 
 Твоя задача, используя `chunk_grep` найти в файле все блоки/чанки с интересующим контентом.

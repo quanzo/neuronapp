@@ -447,8 +447,8 @@ class ConfigurationAgent implements IDependConfigApp
                     ConfigurationApp::getInstance()->getSessionDir(),
                     $this->getSessionKey(),
                     $this->contextWindow,
-                    '_' . (string)time() . '_' . rand(1, 999) . '_',
-                    '.chat',
+                    '_',
+                    (string)time() . '_' . rand(1, 999) . '_.chat',
                     new HistoryTrimmer(new TokenCounter())
                 );
             }
