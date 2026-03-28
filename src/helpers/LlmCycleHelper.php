@@ -21,7 +21,7 @@ use NeuronAI\Chat\Messages\Message as NeuronMessage;
  */
 class LlmCycleHelper
 {
-    const MSG_CHECK_WORK = "Have you completed the current task? Answer YES or NO! If you're waiting, answer WAITING!";
+    const MSG_CHECK_WORK = "Have you completed the all current task? Strict answer only `YES` or `NO`! If you're waiting, strict answer `WAITING` only! If your answer is `NO`, then continue execute!";
     const MSG_CONTINUE =  "Сontinue with the task";
     const MSG_RESULT = "Repeat the final message";
     const MSG_CHECK_WORK2 = "Is the task complete? Answer only YES or NO! If NO, continue!";
@@ -68,6 +68,7 @@ class LlmCycleHelper
 
             $msgAnswer = $agentCfg->sendMessage($msgTest);
             $cleanup = LlmCycleStatusCheckHelper::resolveCleanupDecision($msgAnswer);
+            //$cleanup = null;
             if ($cleanup !== null) {
                 StatusCheckHistoryCleanupHelper::apply($history, $cleanup, $countBefore);
             }
