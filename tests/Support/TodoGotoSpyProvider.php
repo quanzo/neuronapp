@@ -144,7 +144,11 @@ final class TodoGotoSpyProvider implements AIProviderInterface
      */
     private function recordAndMaybeGoto(string $content): void
     {
-        if ($content === LlmCycleHelper::MSG_CHECK_WORK2 || $content === LlmCycleHelper::MSG_RESULT) {
+        if (
+            $content === LlmCycleHelper::MSG_CHECK_WORK
+            || $content === LlmCycleHelper::MSG_CHECK_WORK2
+            || $content === LlmCycleHelper::MSG_RESULT
+        ) {
             return;
         }
 

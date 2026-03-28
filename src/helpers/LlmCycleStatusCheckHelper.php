@@ -17,6 +17,8 @@ use NeuronAI\Chat\Messages\Message as NeuronMessage;
  * if ($decision !== null) {
  *     StatusCheckHistoryCleanupHelper::apply($history, $decision, $countBefore);
  * }
+ * $raw = LlmCycleStatusCheckHelper::decisionForNeuronRawAndNormalizedText(['text'], '');
+ * // null — непустой массив блоков, пару не трогаем
  * </code>
  */
 final class LlmCycleStatusCheckHelper
@@ -36,12 +38,41 @@ final class LlmCycleStatusCheckHelper
             return StatusCheckCleanupDecision::RemovePair;
         }
 
+        /** @var mixed $rawContent Реализация может отдавать массив блоков; у стандартного {@see NeuronMessage} — строка или null. */
+        $rawContent = $msgAnswer->getContent();
+        if (\is_array($rawContent)) {
+            return self::decisionForNeuronRawAndNormalizedText($rawContent, '');
+        }
+
         $text = self::normalizeMessageContentAsString($msgAnswer);
-        if ($text === '') {
+
+        return self::decisionForNeuronRawAndNormalizedText($rawContent, $text);
+    }
+
+    /**
+     * Решение по «сырому» getContent и нормализованному тексту (для тестов и нестандартных сообщений).
+     *
+     * Непустой массив в $rawContent — контент-блоки; пару сообщений не удаляем (null).
+     * Пустой массив — как пустой ответ, удаляем пару.
+     *
+     * @param mixed $rawContent Значение getContent() у сообщения.
+     * @param string $normalizedText Текст после trim, если $rawContent не массив.
+     */
+    public static function decisionForNeuronRawAndNormalizedText(
+        mixed $rawContent,
+        string $normalizedText
+    ): ?StatusCheckCleanupDecision {
+        if (\is_array($rawContent)) {
+            return $rawContent === []
+                ? StatusCheckCleanupDecision::RemovePair
+                : null;
+        }
+
+        if ($normalizedText === '') {
             return StatusCheckCleanupDecision::RemovePair;
         }
 
-        if (self::hasExplicitStatusKeyword($text)) {
+        if (self::hasExplicitStatusKeyword($normalizedText)) {
             return StatusCheckCleanupDecision::RemovePair;
         }
 
@@ -62,17 +93,13 @@ final class LlmCycleStatusCheckHelper
     }
 
     /**
-     * Приводит содержимое сообщения к строке для анализа.
+     * Приводит содержимое сообщения к строке для анализа (массив блоков обрабатывается в {@see resolveCleanupDecision()}).
      */
     private static function normalizeMessageContentAsString(NeuronMessage $message): string
     {
         $content = $message->getContent();
-        if (is_string($content)) {
+        if (\is_string($content)) {
             return trim($content);
-        }
-
-        if (is_array($content)) {
-            return '';
         }
 
         return trim((string) $content);

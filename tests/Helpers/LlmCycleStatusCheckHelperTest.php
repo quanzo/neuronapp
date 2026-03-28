@@ -137,6 +137,27 @@ final class LlmCycleStatusCheckHelperTest extends TestCase
     }
 
     /**
+     * Непустой массив в getContent — пару не удаляем (решение null), чтобы не терять блочный/мультимодальный ответ.
+     */
+    public function testDecisionForNeuronRawNonEmptyArrayReturnsNull(): void
+    {
+        $this->assertNull(
+            LlmCycleStatusCheckHelper::decisionForNeuronRawAndNormalizedText(['block'], '')
+        );
+    }
+
+    /**
+     * Пустой массив блоков — как пустой ответ, удаляем пару.
+     */
+    public function testDecisionForNeuronRawEmptyArrayReturnsRemovePair(): void
+    {
+        $this->assertSame(
+            StatusCheckCleanupDecision::RemovePair,
+            LlmCycleStatusCheckHelper::decisionForNeuronRawAndNormalizedText([], '')
+        );
+    }
+
+    /**
      * Длинный текст без ключевых слов — неоднозначный ответ, оставляем только удаление user-запроса.
      */
     public function testResolveCleanupDecisionLongGibberishReturnsRemoveUserOnly(): void
