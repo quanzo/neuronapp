@@ -17,7 +17,7 @@ final class VarExistTool extends AVarTool
 {
     public function __construct(
         string $name = 'var_exist',
-        string $description = 'Проверяет наличие переменной с  таким именем.',
+        string $description = 'Проверяет наличие переменной с таким именем.',
     ) {
         parent::__construct(name: $name, description: $description);
     }

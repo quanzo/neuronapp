@@ -61,6 +61,28 @@ final class ChatHistoryEditHelper
     }
 
     /**
+     * Удаляет последние $count сообщений из полной истории (с конца).
+     *
+     * @param AbstractFullChatHistory $history История с полной проекцией.
+     * @param int $count Сколько сообщений снять с хвоста (0 — ничего не делать).
+     */
+    public static function deleteLastFullMessages(AbstractFullChatHistory $history, int $count): void
+    {
+        if ($count <= 0) {
+            return;
+        }
+
+        for ($i = 0; $i < $count; $i++) {
+            $n = count($history->getFullMessages());
+            if ($n === 0) {
+                return;
+            }
+
+            self::deleteFullMessageAt($history, $n - 1);
+        }
+    }
+
+    /**
      * Вставляет сообщение в полную историю по индексу.
      *
      * Вставка допускает индекс в диапазоне 0..count (включая вставку в конец).

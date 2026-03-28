@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use app\modules\neuron\helpers\LlmCycleHelper;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use Generator;
 use app\modules\neuron\helpers\RunStateCheckpointHelper;
@@ -91,12 +92,7 @@ final class TodoGotoSpyProvider implements AIProviderInterface
     public function chat(Message ...$messages): Message
     {
         $content = $this->extractLastUserContent($messages);
-        self::$calls[] = ['content' => $content];
-
-        $callIndex = count(self::$calls);
-        if (isset(self::$gotoPlan[$callIndex])) {
-            $this->invokeGotoTool(self::$gotoPlan[$callIndex]);
-        }
+        $this->recordAndMaybeGoto($content);
 
         return new AssistantMessage($content);
     }
@@ -104,12 +100,7 @@ final class TodoGotoSpyProvider implements AIProviderInterface
     public function stream(Message ...$messages): Generator
     {
         $content = $this->extractLastUserContent($messages);
-        self::$calls[] = ['content' => $content];
-
-        $callIndex = count(self::$calls);
-        if (isset(self::$gotoPlan[$callIndex])) {
-            $this->invokeGotoTool(self::$gotoPlan[$callIndex]);
-        }
+        $this->recordAndMaybeGoto($content);
 
         $messageId = spl_object_hash($this);
         yield new TextChunk($messageId, $content);
@@ -121,12 +112,7 @@ final class TodoGotoSpyProvider implements AIProviderInterface
     {
         $array = is_array($messages) ? $messages : [$messages];
         $content = $this->extractLastUserContent($array);
-        self::$calls[] = ['content' => $content];
-
-        $callIndex = count(self::$calls);
-        if (isset(self::$gotoPlan[$callIndex])) {
-            $this->invokeGotoTool(self::$gotoPlan[$callIndex]);
-        }
+        $this->recordAndMaybeGoto($content);
 
         return new AssistantMessage($content);
     }
@@ -149,6 +135,25 @@ final class TodoGotoSpyProvider implements AIProviderInterface
         }
 
         return '';
+    }
+
+    /**
+     * Записывает только пользовательские тексты todo; индекс goto совпадает с номером такого вызова.
+     *
+     * @param string $content Текст последнего user-сообщения.
+     */
+    private function recordAndMaybeGoto(string $content): void
+    {
+        if ($content === LlmCycleHelper::MSG_CHECK_WORK2 || $content === LlmCycleHelper::MSG_RESULT) {
+            return;
+        }
+
+        self::$calls[] = ['content' => $content];
+
+        $callIndex = count(self::$calls);
+        if (isset(self::$gotoPlan[$callIndex])) {
+            $this->invokeGotoTool(self::$gotoPlan[$callIndex]);
+        }
     }
 
     /**

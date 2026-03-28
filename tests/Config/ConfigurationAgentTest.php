@@ -324,8 +324,8 @@ JSONC;
     }
 
     /**
-     * cloneForSession(RESET_EMPTY) создаёт клон с новой in-memory историей,
-     * отличной от исходной файловой истории при включённом enableChatHistory.
+     * cloneForSession(RESET_EMPTY) при enableChatHistory и pure_history.save (по умолчанию true)
+     * создаёт отдельную файловую историю с другим префиксом файла.
      */
     public function testCloneForSessionResetEmptyUsesInMemoryHistory(): void
     {
@@ -341,13 +341,12 @@ JSONC;
         $this->assertNotSame($cfg, $clone);
 
         $cloneHistory = $clone->getChatHistory();
-        $this->assertInstanceOf(InMemoryChatHistory::class, $cloneHistory);
+        $this->assertInstanceOf(FileFullChatHistory::class, $cloneHistory);
         $this->assertNotSame($originalHistory, $cloneHistory);
     }
 
     /**
-     * cloneForSession(COPY_CONTEXT) также создаёт отдельную in-memory историю,
-     * не совпадающую с исходной файловой историей.
+     * cloneForSession(COPY_CONTEXT) копирует контекст в отдельную файловую историю клона.
      */
     public function testCloneForSessionCopyContextUsesSeparateInMemoryHistory(): void
     {
@@ -363,7 +362,7 @@ JSONC;
         $this->assertNotSame($cfg, $clone);
 
         $cloneHistory = $clone->getChatHistory();
-        $this->assertInstanceOf(InMemoryChatHistory::class, $cloneHistory);
+        $this->assertInstanceOf(FileFullChatHistory::class, $cloneHistory);
         $this->assertNotSame($originalHistory, $cloneHistory);
     }
 

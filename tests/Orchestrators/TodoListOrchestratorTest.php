@@ -153,7 +153,7 @@ final class TodoListOrchestratorTest extends TestCase
 
         $orchestrator = new TestableTodoListOrchestrator($this->configApp);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(\Error::class);
         $orchestrator->run($this->init, $this->step, $this->finish, 5, false, 0);
     }
 

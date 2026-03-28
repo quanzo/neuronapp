@@ -7,6 +7,7 @@ namespace app\modules\neuron\helpers;
 use NeuronAI\Chat\History\ChatHistoryInterface;
 
 use function array_slice;
+use function array_splice;
 use function count;
 
 /**
@@ -67,5 +68,41 @@ final class ChatHistoryTruncateHelper
         $methodSet = $ref->getMethod('setMessages');
         $methodSet->setAccessible(true);
         $methodSet->invoke($history, $truncated);
+    }
+
+    /**
+     * Удаляет одно сообщение по индексу в текущем массиве истории (окно InMemoryChatHistory).
+     *
+     * @param ChatHistoryInterface $history Реализация с полем history и методом setMessages.
+     * @param int $index Индекс удаляемого сообщения (0..count-1).
+     * @throws \InvalidArgumentException Если индекс вне диапазона.
+     * @throws \ReflectionException Если рефлексия недоступна.
+     * @throws \RuntimeException Если реализация не поддерживает правку.
+     */
+    public static function deleteMessageAtIndex(ChatHistoryInterface $history, int $index): void
+    {
+        $messages = $history->getMessages();
+        $count = count($messages);
+        if ($index < 0 || $index >= $count) {
+            throw new \InvalidArgumentException('Некорректный индекс сообщения для удаления: ' . $index);
+        }
+
+        $newMessages = $messages;
+        array_splice($newMessages, $index, 1);
+
+        $ref = new \ReflectionClass($history);
+        if (!$ref->hasProperty('history')) {
+            throw new \RuntimeException('История чата не поддерживает удаление: отсутствует свойство history.');
+        }
+        $propHistory = $ref->getProperty('history');
+        $propHistory->setAccessible(true);
+        $propHistory->setValue($history, $newMessages);
+
+        if (!$ref->hasMethod('setMessages')) {
+            throw new \RuntimeException('История чата не поддерживает удаление: отсутствует метод setMessages.');
+        }
+        $methodSet = $ref->getMethod('setMessages');
+        $methodSet->setAccessible(true);
+        $methodSet->invoke($history, $newMessages);
     }
 }

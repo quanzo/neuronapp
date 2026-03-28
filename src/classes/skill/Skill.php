@@ -258,7 +258,9 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 // здесь проверим, что LLM исполнила - спросим ее прямо
                 $arRes = LlmCycleHelper::waitCycle($sessionCfg);
                 if ($arRes['cycles'] > 1) {
+                    /* т.к. удаляем пару вопрос-ответ статус задачи то и итоговое сообщение будет последним в истории
                     $result = LlmCycleHelper::repeateResultMsg($sessionCfg);
+                    */
                 }
 
                 $eventDto = clone $baseSkillEvent;

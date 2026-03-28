@@ -332,7 +332,9 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                 }
                 if ($currentTodoIndex == $todoCount) { // индекс вышел за последний элемент
                     // LLM отработала задание и если сообщение последнее в цикле заданий, то надо, чтобы последнее сообщение истории было итоговым сообщением по заданиям
+                    /* т.к. удаляем пару вопрос-ответ статус задачи то и итоговое сообщение будет последним в истории
                     LlmCycleHelper::repeateResultMsg($todoSessionCfg);
+                    */
                 }
             } // end while
 

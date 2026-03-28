@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use app\modules\neuron\helpers\LlmCycleHelper;
 use Generator;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\AssistantMessage;
@@ -72,7 +73,7 @@ final class SpyProvider implements AIProviderInterface
     public function chat(Message ...$messages): Message
     {
         $content = $this->extractLastUserContent($messages);
-        self::$calls[] = ['label' => $this->label, 'content' => $content];
+        self::recordCallIfNotInternal($this->label, $content);
 
         return new AssistantMessage($content);
     }
@@ -80,7 +81,7 @@ final class SpyProvider implements AIProviderInterface
     public function stream(Message ...$messages): Generator
     {
         $content = $this->extractLastUserContent($messages);
-        self::$calls[] = ['label' => $this->label, 'content' => $content];
+        self::recordCallIfNotInternal($this->label, $content);
 
         $messageId = spl_object_hash($this);
         yield new TextChunk($messageId, $content);
@@ -92,7 +93,7 @@ final class SpyProvider implements AIProviderInterface
     {
         $array = is_array($messages) ? $messages : [$messages];
         $content = $this->extractLastUserContent($array);
-        self::$calls[] = ['label' => $this->label, 'content' => $content];
+        self::recordCallIfNotInternal($this->label, $content);
 
         return new AssistantMessage($content);
     }
@@ -115,5 +116,20 @@ final class SpyProvider implements AIProviderInterface
         }
 
         return '';
+    }
+
+    /**
+     * Не логируем служебные реплики LlmCycleHelper (проверка статуса / повтор итога), чтобы тесты видели только тексты todo.
+     *
+     * @param string $label Метка провайдера.
+     * @param string $content Текст последнего user-сообщения.
+     */
+    private static function recordCallIfNotInternal(string $label, string $content): void
+    {
+        if ($content === LlmCycleHelper::MSG_CHECK_WORK2 || $content === LlmCycleHelper::MSG_RESULT) {
+            return;
+        }
+
+        self::$calls[] = ['label' => $label, 'content' => $content];
     }
 }

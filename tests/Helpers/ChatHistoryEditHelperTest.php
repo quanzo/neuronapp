@@ -142,6 +142,23 @@ final class ChatHistoryEditHelperTest extends TestCase
     }
 
     /**
+     * deleteLastFullMessages() снимает несколько сообщений с конца полной истории.
+     */
+    public function testDeleteLastFullMessagesRemovesTail(): void
+    {
+        $history = new FileFullChatHistory($this->tmpDir, 's12', contextWindow: 50);
+        $history->addMessage(new Message(MessageRole::USER, 'a'));
+        $history->addMessage(new Message(MessageRole::ASSISTANT, 'b'));
+        $history->addMessage(new Message(MessageRole::USER, 'c'));
+
+        ChatHistoryEditHelper::deleteLastFullMessages($history, 2);
+        $full = $history->getFullMessages();
+
+        $this->assertCount(1, $full);
+        $this->assertSame('a', $full[0]->getContent());
+    }
+
+    /**
      * insertFullMessageAt() вставляет сообщение в начало.
      */
     public function testInsertAtBeginning(): void

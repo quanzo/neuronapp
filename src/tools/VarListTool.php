@@ -24,7 +24,7 @@ final class VarListTool extends AVarTool
 {
     public function __construct(
         string $name = 'var_list',
-        string $description = 'Список всех результатов в .store для текущего sessionKey (метки и метаданные).',
+        string $description = 'Список всех переменных с именами, описаниями и метаданными.',
     ) {
         parent::__construct(name: $name, description: $description);
     }

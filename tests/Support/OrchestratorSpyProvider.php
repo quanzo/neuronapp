@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use Generator;
-use RuntimeException;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\AssistantMessage;
 use NeuronAI\Chat\Messages\Message;
@@ -109,7 +108,9 @@ final class OrchestratorSpyProvider implements AIProviderInterface
         if ($label === 'step') {
             self::$stepCalls++;
             if (in_array(self::$stepCalls, self::$failOnStepCalls, true)) {
-                throw new RuntimeException('Step failure from OrchestratorSpyProvider');
+                // Error, а не Exception: иначе WaitSuccess в sendMessage перехватывает RuntimeException и повторяет chat(),
+                // из‑за чего stepCalls растёт и условие fail сбивается.
+                throw new \Error('Step failure from OrchestratorSpyProvider');
             }
 
             if (self::$stepCalls >= self::$completeOnStepCall) {

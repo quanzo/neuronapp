@@ -28,7 +28,7 @@ final class VarPadTool extends AVarTool
 
     public function __construct(
         string $name = 'var_pad',
-        string $description = 'Дополняет (append) строковые данные по метке, сохраняя переводы строк. Если метки нет — создаёт новую запись.',
+        string $description = 'Дополняет (append) строковые данные в переменной по ее имени, сохраняя переводы строк. Если переменная не существует - создаёт новую запись.',
     ) {
         parent::__construct(name: $name, description: $description);
     }

@@ -80,3 +80,14 @@
 
 Подробнее о конфигурации приложения и сессиях см. `docs/config.md`, о skills и todolist — в `docs/skills.md` и `docs/todolist.md`.
 
+### Опрос «задача завершена?» и очистка истории (`LlmCycleHelper`)
+
+После выполнения пункта списка задач или skill вызывается `LlmCycleHelper::waitCycle(ConfigurationAgent)` — цикл прямых вопросов к модели, пока не будет получено подтверждение (YES/WAITING в тексте или структурированный ответ; логика завершения — `checkEndCycle()`).
+
+Чтобы в сохранённой истории сессии не копились служебные реплики проверки, после **каждого** раунда «user: запрос статуса → assistant: ответ» выполняется очистка:
+
+- классификация ответа: `LlmCycleStatusCheckHelper::resolveCleanupDecision()`;
+- применение: `StatusCheckHistoryCleanupHelper::apply()` с учётом типа истории (`AbstractFullChatHistory` через `ChatHistoryEditHelper`, `InMemoryChatHistory` через `ChatHistoryTruncateHelper` / `deleteMessageAtIndex()`).
+
+Правила: явные слова **YES**, **NO**, **WAITING** (как отдельные слова латиницей, без ложных срабатываний вроде подстроки в «KNOW»), пустой ответ ассистента или не-текстовый (структурированный) ответ — из истории убирается **пара** сообщений; неоднозначный текст — удаляется **только** пользовательское сообщение с проверкой, ответ модели остаётся. Решение зафиксировано в перечислении `StatusCheckCleanupDecision` (`src/enums/StatusCheckCleanupDecision.php`).
+

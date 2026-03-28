@@ -17,7 +17,7 @@ final class VarUnsetTool extends AVarTool
 {
     public function __construct(
         string $name = 'var_unset',
-        string $description = 'Удаляет переменную (результат) по метке для текущего sessionKey (если она существует).',
+        string $description = 'Удаляет переменную по её имени.',
     ) {
         parent::__construct(name: $name, description: $description);
     }

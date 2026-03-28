@@ -4,25 +4,20 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\helpers;
 
-use function array_filter;
-use function count;
-use function file_get_contents;
-use function fnmatch;
-use function is_link;
-use function realpath;
-use function str_contains;
-use function str_starts_with;
-use function strlen;
-use function substr;
-
-use const DIRECTORY_SEPARATOR;
-
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
 
 /**
- * Вспомогательный класс
+ * Циклы ожидания завершения задачи LLM и повтор итогового сообщения.
+ *
+ * Пример:
+ *
+ * <code>
+ * LlmCycleHelper::waitCycle($sessionCfg);
+ * LlmCycleHelper::repeateResultMsg($sessionCfg);
+ * </code>
  */
 class LlmCycleHelper
 {
@@ -32,12 +27,13 @@ class LlmCycleHelper
     const MSG_CHECK_WORK2 = "Is the task complete? Answer only YES or NO! If NO, continue!";
 
     /**
-     * Проверяем по ответу от LLM что она заверщила работу
+     * Определяет, можно ли завершить цикл ожидания по ответу LLM (YES/WAITING или структурированный ответ).
      *
-     * @param mixed $msgAnswer
-     * @return boolean
+     * @param mixed $msgAnswer Ответ агента (сообщение или DTO).
+     * @return bool true — цикл waitCycle можно завершить.
      */
-    public static function checkEndCycle(mixed $msgAnswer): bool {
+    public static function checkEndCycle(mixed $msgAnswer): bool
+    {
         if ($msgAnswer) {
             if ($msgAnswer instanceof NeuronMessage) {
                 $cnt = $msgAnswer->getContent();
@@ -55,36 +51,48 @@ class LlmCycleHelper
     }
 
     /**
-     * Цикл для проверки завершения исполнения задания полностью
+     * Цикл опроса LLM до подтверждения завершения задачи; служебные реплики проверки убираются из истории чата.
      *
-     * @param ConfigurationAgent $agentCfg
-     * @return array
+     * @param ConfigurationAgent $agentCfg Конфигурация агента с историей сессии.
+     * @return array{ok: bool, cycles: int} Результат и число итераций опроса.
      */
-    public static function waitCycle(ConfigurationAgent $agentCfg): array {
-        // здесь проверим, что пункт LLM исполнила - спросим ее прямо
-        $msgTest = new NeuronMessage(MessageRole::USER, LlmCycleHelper::MSG_CHECK_WORK2);
+    public static function waitCycle(ConfigurationAgent $agentCfg): array
+    {
+        $msgTest = new NeuronMessage(MessageRole::USER, LlmCycleHelper::MSG_CHECK_WORK);
         $cycleCount = 0;
         do {
+            $history = $agentCfg->getChatHistory();
+            $countBefore = $history instanceof AbstractFullChatHistory
+                ? ChatHistoryEditHelper::getFullMessageCount($history)
+                : ChatHistoryTruncateHelper::getMessageCount($history);
+
             $msgAnswer = $agentCfg->sendMessage($msgTest);
+            $cleanup = LlmCycleStatusCheckHelper::resolveCleanupDecision($msgAnswer);
+            if ($cleanup !== null) {
+                StatusCheckHistoryCleanupHelper::apply($history, $cleanup, $countBefore);
+            }
+
             $cycleIsEnd = static::checkEndCycle($msgAnswer);
             $cycleCount++;
-        } while(!$cycleIsEnd);
+        } while (!$cycleIsEnd);
+
         return [
             'ok'     => true,
-            'cycles' => $cycleCount
+            'cycles' => $cycleCount,
         ];
     }
 
     /**
-     * Просим LLM повторить итоговое сообщение ибо в конце истории ждем именно его
+     * Запрашивает у LLM повтор итогового сообщения (ожидаемое последнее сообщение в истории по задачам).
      *
-     * @param ConfigurationAgent $agentCfg
-     * @return NeuronMessage|null|object
+     * @param ConfigurationAgent $agentCfg Конфигурация агента.
+     * @return NeuronMessage|object|null Ответ агента.
      */
-    public static function repeateResultMsg(ConfigurationAgent $agentCfg): mixed {
-        // LLM отработала задание и если сообщение последнее в цикле заданий, то надо, чтобы последнее сообщение истории было итоговым сообщением по заданиям
+    public static function repeateResultMsg(ConfigurationAgent $agentCfg): mixed
+    {
         $msgTest = new NeuronMessage(MessageRole::USER, LlmCycleHelper::MSG_RESULT);
         $msgAnswer = $agentCfg->sendMessage($msgTest);
+
         return $msgAnswer;
     }
 }
