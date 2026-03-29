@@ -137,9 +137,13 @@ class FileLogger implements LoggerInterface
         if ($this->stream === null || !is_resource($this->stream)) {
             return;
         }
-        $context = $this->normalizeContext($context);
+        $context     = $this->normalizeContext($context);
         $contextJson = $context !== [] ? ' ' . json_encode($context, JSON_UNESCAPED_UNICODE) : '';
-        $line = '[' . date(self::DATE_FORMAT) . '] ' . $level . ': ' . $this->interpolate($message, $context) . $contextJson . "\n";
+        $line        = '[' . date(self::DATE_FORMAT) . '] ' . $level . ': ' . $this->interpolate($message, $context) . $contextJson . "\n";
+
+        // записи лога будем отделять пустой строкой
+        $line .= "\n";
+
         @fwrite($this->stream, $line);
     }
 

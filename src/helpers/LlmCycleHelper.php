@@ -54,12 +54,14 @@ class LlmCycleHelper
      * Цикл опроса LLM до подтверждения завершения задачи; служебные реплики проверки убираются из истории чата.
      *
      * @param ConfigurationAgent $agentCfg Конфигурация агента с историей сессии.
+     * @param int $maxCycleCount максимальное число итераций
      * @return array{ok: bool, cycles: int} Результат и число итераций опроса.
      */
-    public static function waitCycle(ConfigurationAgent $agentCfg): array
+    public static function waitCycle(ConfigurationAgent $agentCfg, int $maxCycleCount = 5): array
     {
         $msgTest = new NeuronMessage(MessageRole::USER, LlmCycleHelper::MSG_CHECK_WORK);
         $cycleCount = 0;
+        $ok = false;
         do {
             $history = $agentCfg->getChatHistory();
             $countBefore = $history instanceof AbstractFullChatHistory
@@ -68,17 +70,19 @@ class LlmCycleHelper
 
             $msgAnswer = $agentCfg->sendMessage($msgTest);
             $cleanup = LlmCycleStatusCheckHelper::resolveCleanupDecision($msgAnswer);
-            //$cleanup = null;
+            $cleanup = null;
             if ($cleanup !== null) {
                 StatusCheckHistoryCleanupHelper::apply($history, $cleanup, $countBefore);
             }
 
             $cycleIsEnd = static::checkEndCycle($msgAnswer);
             $cycleCount++;
-        } while (!$cycleIsEnd);
+        } while (!$cycleIsEnd && $cycleCount < $maxCycleCount);
+
+        $ok = $cycleCount < $maxCycleCount;
 
         return [
-            'ok'     => true,
+            'ok'     => $ok,
             'cycles' => $cycleCount,
         ];
     }

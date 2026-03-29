@@ -115,7 +115,11 @@ final class LlmPayloadLogSanitizer
         }
 
         if (is_object($value)) {
-            return sprintf('[object:%s]', $value::class);
+            $cnt = '';
+            if (method_exists($value, 'getContent')) {
+                $cnt = $value->getContent();
+            }
+            return sprintf('[object:%s]%s', $value::class, $cnt);
         }
 
         if (in_array(get_debug_type($value), ['string'], true)) {
