@@ -1,6 +1,7 @@
 ---
-agent: agent-file
+agent: agent-main
 pure_context: false
+tools: glob, grep, chunk_view, chunk_size
 ---
 
 1. 

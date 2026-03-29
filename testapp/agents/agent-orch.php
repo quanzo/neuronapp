@@ -65,7 +65,7 @@ return [
                 'think'          => false,
             ],
         ],
-        'model' => 'qwen3.5:9b',
+        'model' => 'qwen3.5:4b',
     ],
 
     'instructions' => [
@@ -104,32 +104,9 @@ TEXT
     ],
 
     'tools' => [
-        //[CurrentDateTimeTool::class, 'make'],
-        /*
-        [ChatHistorySizeTool::class, 'make'],
-        [ChatHistoryMetaTool::class, 'make'],
-        [ChatHistoryMessageTool::class, 'make'],
-        */
-
-        /*[TodoGotoTool::class, 'make'],
-
-        [GlobTool::class, 'make'],
-        //[GrepTool::class, 'make'],
-        
-
-        [VarPadTool::class, 'make'],
-        [VarListTool::class, 'make'],
-        [VarExistTool::class, 'make'],
-        [VarUnsetTool::class, 'make'],
-        [VarGetTool::class, 'make'],
-        [VarSetTool::class, 'make'],
-        */
         [VarGetTool::class, 'make'],
         [VarSetTool::class, 'make'],
         [VarListTool::class, 'make'],
         [VarPadTool::class, 'make'],
-        [ChunckViewTool::class, 'make'],
-        [ChunckSizeTool::class, 'make'],
-
     ],
 ];

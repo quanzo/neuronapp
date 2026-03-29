@@ -92,6 +92,7 @@
 
 - **Подключение**: через `tools: var_set`, `var_get`, `var_list`, `var_exist`, `var_unset`, `var_pad` — создаются через `ToolRegistry::makeTool(...)`.
 - **Хранилище**: директория `.store` (через `ConfigurationApp::getStoreDir()`).
+- **Формат ответов**: инструменты возвращают LLM-friendly JSON через `VarToolResultDto`; поля со значением `null` **не включаются** в результат.
 - **Имена файлов**:
   - результат: `.store/var_{sessionKey}_{label}.json` (небезопасные символы в частях имени заменяются на `_`);
   - индекс: `.store/var_index_{sessionKey}.json` (для ускорения `list`).

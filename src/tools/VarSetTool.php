@@ -93,17 +93,19 @@ final class VarSetTool extends AVarTool
             ));
         }
 
-        return $this->resultJson(new VarToolResultDto(
-            action     : 'set',
-            success    : true,
-            message    : 'OK',
-            sessionKey : $sessionKey,
-            name      : $item->name,
-            fileName   : $item->fileName,
-            description: $item->description,
-            savedAt    : $item->savedAt,
-            dataType   : $item->dataType,
-        ));
+        return $this->resultJson(
+            new VarToolResultDto(
+                action     : 'set',
+                success    : true,
+                message    : 'OK',
+                sessionKey : $sessionKey,
+                name       : $item->name,
+                fileName   : $item->fileName,
+                description: $item->description,
+                savedAt    : $item->savedAt,
+                dataType   : $item->dataType,
+            )
+        );
     }
 
     private function parseDataString(string $raw): mixed

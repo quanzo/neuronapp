@@ -47,10 +47,11 @@ return [
                 'top_p'          => 0.95,
                 'repeat_penalty' => 1.1,
                 'num_ctx'        => $contextWindow,
-                //'think'          => false,
+                'think'          => false,
             ],
         ],
-        'model' => 'qwen3.5:9b',
+        'model' => 'qwen3.5:4b',
+        //'model' => 'qwen3.5:cloud',
     ],
 
     'instructions' => [

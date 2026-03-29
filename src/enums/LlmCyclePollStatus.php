@@ -20,12 +20,12 @@ use NeuronAI\Chat\Messages\ToolCallMessage;
 enum LlmCyclePollStatus
 {
     /**
-     * Модель явно подтвердила завершение текущей задачи (обычно ответ YES).
+     * Модель явно подтвердила завершение текущей задачи (обычно ответ YES или WAITING).
      */
     case Completed;
 
     /**
-     * Модель явно сообщила, что работа ещё идёт (NO или WAITING).
+     * Модель явно сообщила, что работа ещё идёт (NO).
      */
     case InProgress;
 
@@ -86,7 +86,7 @@ enum LlmCyclePollStatus
             if (preg_match('/^(YES|NO|WAITING)\b/iu', $t, $matches)) {
                 $word = mb_strtoupper($matches[1]);
 
-                return $word === 'YES'
+                return $word === 'YES' || $word === 'WAITING'
                     ? self::Completed
                     : self::InProgress;
             }

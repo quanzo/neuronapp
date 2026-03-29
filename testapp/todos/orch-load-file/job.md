@@ -1,7 +1,7 @@
 ---
 tools: chunk_view
 pure_context: false
-agent: agent-orch
+agent: agent-main
 ---
 
 1. **Прочитай очередной чанк**  

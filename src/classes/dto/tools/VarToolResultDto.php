@@ -71,7 +71,7 @@ final class VarToolResultDto implements IArrayable
      */
     public function toArray(): array
     {
-        return [
+        $result = [
             'action'      => $this->action,
             'success'     => $this->success,
             'message'     => $this->message,
@@ -96,5 +96,10 @@ final class VarToolResultDto implements IArrayable
             'totalLines' => $this->totalLines,
             'truncated'  => $this->truncated,
         ];
+
+        return array_filter(
+            $result,
+            static fn(mixed $value): bool => $value !== null,
+        );
     }
 }

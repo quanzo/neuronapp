@@ -29,11 +29,11 @@ class LlmCycleHelper
     /**
      * Цикл опроса LLM до подтверждения завершения задачи; служебные реплики проверки при необходимости убираются из истории.
      *
-     * Явные ответы NO/WAITING увеличивают счётчик «ясных» незавершений (не более $maxCycleCount).\n
+     * Явные ответы NO увеличивают счётчик «ясных» незавершений (не более $maxCycleCount).\n
      * Невнятные ответы не увеличивают этот счётчик, но увеличивают число раундов sendMessage; при превышении $maxTotalRounds цикл прерывается (защита от зацикливания).
      *
      * @param ConfigurationAgent $agentCfg        Конфигурация агента с историей сессии.
-     * @param int                $maxCycleCount   Максимум явных ответов «ещё в работе» (NO/WAITING).
+     * @param int                $maxCycleCount   Максимум явных ответов «ещё в работе» (NO).
      * @param int|null           $maxTotalRounds  Верхняя граница числа вызовов sendMessage в этом waitCycle; null — max(30, maxCycleCount * 6).
      *
      * @return array{ok: bool, cycles: int, clearProgressCount: int, totalRounds: int}
