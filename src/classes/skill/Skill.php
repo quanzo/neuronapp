@@ -256,7 +256,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 $result = $sessionCfg->sendMessageWithAttachments($message, $attachments);
 
                 // здесь проверим, что LLM исполнила - спросим ее прямо
-                $arRes = LlmCycleHelper::waitCycle($sessionCfg);
+                $arRes = LlmCycleHelper::waitCycle($sessionCfg, $sessionCfg->llmMaxCycleCount, $sessionCfg->llmMaxTotalRounds);
                 if ($arRes['cycles'] > 1) {
                     /* т.к. удаляем пару вопрос-ответ статус задачи то и итоговое сообщение будет последним в истории
                     $result = LlmCycleHelper::repeateResultMsg($sessionCfg);

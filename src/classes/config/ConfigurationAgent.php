@@ -188,6 +188,21 @@ class ConfigurationAgent implements IDependConfigApp
     public string $llmPayloadLogMode = 'summary';
 
     /**
+     * Для рабочего цикла задает максимум явных ответов «ещё в работе».
+     * Максимальное количество итераций, которые будут выполнены в цикле вопрос-ответ статуса задачи LLM.
+     *
+     * @var integer
+     */
+    public int $llmMaxCycleCount = 10;
+    
+    /**
+     * Это максимальное количество всех итераций, даже когда LLM не будет внятно отвечать свой статус.
+     *
+     * @var integer
+     */
+    public int $llmMaxTotalRounds = 60;
+
+    /**
      * MCP серверы.
      *
      * Здесь надо сконфигурировать NeuronAI\MCP\McpConnector. Дальше инструменты от MCP сервера будут добавлены в список инструментов.

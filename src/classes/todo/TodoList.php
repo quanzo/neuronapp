@@ -231,7 +231,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                     $todoSessionCfg->sendMessageWithAttachments($message, $todoAttachments);
 
                     // здесь проверим, что пункт LLM исполнила - спросим ее прямо
-                    $arRes = LlmCycleHelper::waitCycle($todoSessionCfg);
+                    $arRes = LlmCycleHelper::waitCycle($todoSessionCfg, $todoSessionCfg->llmMaxCycleCount, $todoSessionCfg->llmMaxTotalRounds);
 
                     ++$stepsExecuted;
 
