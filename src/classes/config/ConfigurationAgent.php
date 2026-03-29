@@ -304,9 +304,11 @@ class ConfigurationAgent implements IDependConfigApp
                 }
             }
 
-            $history      = $this->getChatHistory();
-            $countBefore  = ChatHistoryRollbackHelper::getSnapshotCount($history);
-            $response     = null;
+            $history               = $this->getChatHistory();
+            $countBefore           = ChatHistoryRollbackHelper::getSnapshotCount($history);
+            $response              = null;
+            $llmRetryDelayMicrosec = 100000;
+            $maxLlmAttempts        = 5;
             WaitSuccess::waitSuccess(
                 function () use (&$response, $message, $agent) {
                     if ($this->reponseStructClass) {
@@ -320,10 +322,26 @@ class ConfigurationAgent implements IDependConfigApp
                         $response = $handler->getMessage();
                     }
                 },
-                100000,
-                5,
-                function (\Throwable $e, int $execCount) use ($history, $countBefore): void {
+                $llmRetryDelayMicrosec,
+                $maxLlmAttempts,
+                function (\Throwable $e, int $execCount) use ($history, $countBefore, $maxLlmAttempts): void {
                     ChatHistoryRollbackHelper::rollbackToSnapshot($history, $countBefore);
+                    // execCount — индекс неудачной попытки (0 при первом сбое), как в WaitSuccess.
+                    $failedAttempt = $execCount + 1;
+                    $willRetry     = $failedAttempt < $maxLlmAttempts;
+                    $this->getLogger()->warning(
+                        $willRetry
+                            ? 'Вызов LLM завершился ошибкой, история откатана, запланирован повтор'
+                            : 'Вызов LLM завершился ошибкой, история откатана, повторов больше не будет',
+                        array_merge($this->getLogContext(), [
+                            'llm_retry'     => true,
+                            'failedAttempt' => $failedAttempt,
+                            'maxAttempts'   => $maxLlmAttempts,
+                            'willRetry'     => $willRetry,
+                            'errorClass'    => $e::class,
+                            'errorMessage'  => $e->getMessage(),
+                        ])
+                    );
                 }
             );
         } catch (\Throwable $e) {

@@ -18,7 +18,7 @@
 
 - создание и кеширование `AgentInterface` (обычный агент или RAG‑агент);
 - отправка сообщений с вложениями (`sendMessageWithAttachments()`);
-- повтор при ошибке провайдера: вызов обёрнут в `WaitSuccess`, после каждой неудачной попытки в `funcAfterError` вызывается `ChatHistoryRollbackHelper::rollbackToSnapshot()` к снимку размера истории до попытки (`getSnapshotCount()`), чтобы NeuronAI не оставлял дубликат пользовательского сообщения в истории;
+- повтор при ошибке провайдера: вызов обёрнут в `WaitSuccess`, после каждой неудачной попытки в `funcAfterError` вызывается `ChatHistoryRollbackHelper::rollbackToSnapshot()` к снимку размера истории до попытки (`getSnapshotCount()`), чтобы NeuronAI не оставлял дубликат пользовательского сообщения в истории; факт ошибки, номер попытки и то, будет ли ещё повтор, пишутся в лог уровня `warning` (контекст `failedAttempt`, `maxAttempts`, `willRetry`, класс и текст ошибки);
 - управление историей чата (`getChatHistory()`, `setChatHistory()`, `resetChatHistory()`);
 - работа с состоянием запуска todolist (`getBlankRunStateDto()`, `getExistRunStateDto()`);
 - клоны конфигурации для отдельных запусков (`cloneForSession()`).
