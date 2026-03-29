@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace app\modules\neuron\helpers;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
-use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
 
@@ -63,10 +62,8 @@ class LlmCycleHelper
         $cycleCount = 0;
         $ok = false;
         do {
-            $history = $agentCfg->getChatHistory();
-            $countBefore = $history instanceof AbstractFullChatHistory
-                ? ChatHistoryEditHelper::getFullMessageCount($history)
-                : ChatHistoryTruncateHelper::getMessageCount($history);
+            $history     = $agentCfg->getChatHistory();
+            $countBefore = ChatHistoryRollbackHelper::getSnapshotCount($history);
 
             $msgAnswer = $agentCfg->sendMessage($msgTest);
             $cleanup = LlmCycleStatusCheckHelper::resolveCleanupDecision($msgAnswer);

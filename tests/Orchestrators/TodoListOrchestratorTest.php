@@ -130,7 +130,8 @@ final class TodoListOrchestratorTest extends TestCase
      */
     public function testRunRestartsOnFailWhenEnabled(): void
     {
-        OrchestratorSpyProvider::setFailOnStepCalls([1]);
+        // Три провала подряд соответствуют трём попыткам WaitSuccess в sendMessage; затем оркестратор рестартует.
+        OrchestratorSpyProvider::setFailOnStepCalls([1, 2, 3]);
         OrchestratorSpyProvider::setCompleteOnStepCall(2);
 
         $orchestrator = new TestableTodoListOrchestrator($this->configApp);
@@ -148,7 +149,7 @@ final class TodoListOrchestratorTest extends TestCase
      */
     public function testRunThrowsWithoutRestart(): void
     {
-        OrchestratorSpyProvider::setFailOnStepCalls([1]);
+        OrchestratorSpyProvider::setFailOnStepCalls([1, 2, 3]);
         OrchestratorSpyProvider::setCompleteOnStepCall(2);
 
         $orchestrator = new TestableTodoListOrchestrator($this->configApp);

@@ -12,6 +12,7 @@ use app\modules\neuron\enums\EventNameEnum;
 use NeuronAI\Agent\AgentHandler;
 use NeuronAI\Agent\AgentInterface;
 use NeuronAI\Chat\Enums\MessageRole;
+use NeuronAI\Chat\History\InMemoryChatHistory;
 use NeuronAI\Chat\Messages\ContentBlocks\TextContent;
 use NeuronAI\Chat\Messages\Message;
 use PHPUnit\Framework\TestCase;
@@ -60,6 +61,8 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
         $cfg = new class ($agent) extends ConfigurationAgent {
             public function __construct(private AgentInterface $agent)
             {
+                // sendMessageWithAttachments делает снимок истории до WaitSuccess; без in-memory истории потребовался бы ConfigurationApp.
+                $this->setChatHistory(new InMemoryChatHistory());
             }
 
             public function getAgent(): AgentInterface
@@ -107,6 +110,7 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
         $cfg = new class ($agent) extends ConfigurationAgent {
             public function __construct(private AgentInterface $agent)
             {
+                $this->setChatHistory(new InMemoryChatHistory());
             }
 
             public function getAgent(): AgentInterface
@@ -149,6 +153,7 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
         };
         $cfg->agentName = 'assistant';
         $cfg->setSessionKey('s1');
+        $cfg->setChatHistory(new InMemoryChatHistory());
 
         $events = [];
         EventBus::on(EventNameEnum::AGENT_MESSAGE_STARTED->value, static function (mixed $payload) use (&$events): void {
@@ -184,6 +189,7 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
             }
         };
         $cfg->setSessionKey('s1');
+        $cfg->setChatHistory(new InMemoryChatHistory());
 
         $failedPayload = null;
         EventBus::on(EventNameEnum::AGENT_MESSAGE_FAILED->value, static function (mixed $payload) use (&$failedPayload): void {

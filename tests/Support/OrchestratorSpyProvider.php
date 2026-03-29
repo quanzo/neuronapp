@@ -108,8 +108,9 @@ final class OrchestratorSpyProvider implements AIProviderInterface
         if ($label === 'step') {
             self::$stepCalls++;
             if (in_array(self::$stepCalls, self::$failOnStepCalls, true)) {
-                // Error, а не Exception: иначе WaitSuccess в sendMessage перехватывает RuntimeException и повторяет chat(),
-                // из‑за чего stepCalls растёт и условие fail сбивается.
+                // Error: перехватывается WaitSuccess вместе с Exception (Throwable). Каждая повторная попытка
+                // снова вызывает chat() и увеличивает stepCalls, поэтому для «полного» провала sendMessage
+                // (исчерпание ретраев) в тестах задают несколько индексов, например [1,2,3] при maxExecCount=3.
                 throw new \Error('Step failure from OrchestratorSpyProvider');
             }
 

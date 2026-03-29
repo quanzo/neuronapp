@@ -41,6 +41,7 @@ use app\modules\neuron\interfaces\IDependConfigApp;
 use app\modules\neuron\classes\storage\VarStorage;
 use app\modules\neuron\classes\WaitSuccess;
 use app\modules\neuron\exceptions\RunStateNotFoundException;
+use app\modules\neuron\helpers\ChatHistoryRollbackHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\tools\ATool;
 use app\modules\neuron\traits\DependConfigAppTrait;
@@ -303,7 +304,9 @@ class ConfigurationAgent implements IDependConfigApp
                 }
             }
 
-            $response = null;
+            $history      = $this->getChatHistory();
+            $countBefore  = ChatHistoryRollbackHelper::getSnapshotCount($history);
+            $response     = null;
             WaitSuccess::waitSuccess(
                 function () use (&$response, $message, $agent) {
                     if ($this->reponseStructClass) {
@@ -317,10 +320,12 @@ class ConfigurationAgent implements IDependConfigApp
                         $response = $handler->getMessage();
                     }
                 },
-                10000,
-                3
+                100000,
+                5,
+                function (\Throwable $e, int $execCount) use ($history, $countBefore): void {
+                    ChatHistoryRollbackHelper::rollbackToSnapshot($history, $countBefore);
+                }
             );
-
         } catch (\Throwable $e) {
             $duration = round(microtime(true) - $start, 2);
             EventBus::trigger(
