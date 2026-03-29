@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\helpers\FileSystemHelper;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
@@ -12,10 +13,7 @@ use function filesize;
 use function getcwd;
 use function is_file;
 use function is_readable;
-use function json_encode;
 use function sprintf;
-
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Абстрактный базовый класс для инструментов, работающих с текстовыми файлами чанками.
@@ -82,39 +80,39 @@ abstract class AChunckTool extends ATool
         $resolvedPath = FileSystemHelper::resolvePath($this->basePath, $path);
 
         if (!FileSystemHelper::isPathSafe($resolvedPath, $this->basePath)) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Доступ запрещён: путь выходит за пределы базовой директории.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         if (!is_file($resolvedPath)) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Файл '{$path}' не существует.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         if (!is_readable($resolvedPath)) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Файл '{$path}' недоступен для чтения.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $size = filesize($resolvedPath);
         if ($size === false || $size > $this->maxFileSize) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => sprintf(
                     "Файл '%s' слишком большой (%d байт). Максимум: %d байт.",
                     $path,
                     $size ?: 0,
                     $this->maxFileSize,
                 ),
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         if (!FileSystemHelper::isTextFile($resolvedPath)) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Файл '{$path}' является бинарным и не может быть обработан.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         return [

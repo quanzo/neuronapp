@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\ViewResultDto;
 use app\modules\neuron\helpers\FileSystemHelper;
 use app\modules\neuron\tools\ATool;
@@ -19,13 +20,11 @@ use function getcwd;
 use function implode;
 use function is_file;
 use function is_readable;
-use function json_encode;
 use function min;
 use function sprintf;
 use function str_pad;
 use function strlen;
 
-use const JSON_UNESCAPED_UNICODE;
 use const STR_PAD_LEFT;
 
 /**
@@ -138,46 +137,46 @@ class ViewTool extends ATool
         $resolvedPath = FileSystemHelper::resolvePath($this->basePath, $path);
 
         if (!FileSystemHelper::isPathSafe($resolvedPath, $this->basePath)) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Доступ запрещён: путь выходит за пределы базовой директории.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         if (!is_file($resolvedPath)) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Файл '{$path}' не существует.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         if (!is_readable($resolvedPath)) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Файл '{$path}' недоступен для чтения.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $size = filesize($resolvedPath);
         if ($size === false || $size > $this->maxFileSize) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => sprintf(
                     "Файл '%s' слишком большой (%d байт). Максимум: %d байт.",
                     $path,
                     $size ?: 0,
                     $this->maxFileSize,
                 ),
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         if (!FileSystemHelper::isTextFile($resolvedPath)) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Файл '{$path}' является бинарным и не может быть отображён.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $content = file_get_contents($resolvedPath);
         if ($content === false) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Не удалось прочитать файл '{$path}'.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $allLines = explode("\n", $content);
@@ -187,13 +186,13 @@ class ViewTool extends ATool
         $effectiveEnd = $end_line !== null ? min($end_line, $totalLines) : $totalLines;
 
         if ($effectiveStart > $totalLines) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => sprintf(
                     "Начальная строка %d превышает общее количество строк в файле (%d).",
                     $effectiveStart,
                     $totalLines,
                 ),
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $selectedLines = array_slice($allLines, $effectiveStart - 1, $effectiveEnd - $effectiveStart + 1);
@@ -220,7 +219,7 @@ class ViewTool extends ATool
             truncated: $truncated,
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 
     /**

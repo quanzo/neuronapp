@@ -56,7 +56,7 @@ class LlmCycleHelper
 
             $msgAnswer = $agentCfg->sendMessage($msgTest);
             $cleanup   = LlmCycleStatusCheckHelper::resolveCleanupDecision($msgAnswer);
-            $cleanup     = null;
+            //$cleanup     = null;
             if ($cleanup !== null) {
                 StatusCheckHistoryCleanupHelper::apply($history, $cleanup, $countBefore);
             }

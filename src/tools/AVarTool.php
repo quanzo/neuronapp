@@ -7,7 +7,7 @@ namespace app\modules\neuron\tools;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\tools\VarToolResultDto;
 use app\modules\neuron\classes\storage\VarStorage;
-use JSON_UNESCAPED_UNICODE;
+use app\modules\neuron\helpers\JsonHelper;
 
 /**
  * Инструмент для работы с результатами в `.store`.
@@ -34,6 +34,6 @@ class AVarTool extends ATool
      */
     protected function resultJson(VarToolResultDto $dto): string
     {
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 }

@@ -4,6 +4,7 @@
 
 namespace app\modules\neuron\classes\search\wiki;
 
+use app\modules\neuron\helpers\JsonHelper;
 use Amp\Future;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\classes\loader\wiki\ContentLoaderManager;
@@ -90,7 +91,7 @@ class RuWikiArticleSearcher extends ArticleSearcherAbstract
             'format' => 'json',
         ])->await();
 
-        return json_decode($body, true);
+        return JsonHelper::decodeAssociative($body);
     }
 
     /**

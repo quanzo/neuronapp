@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\ChatHistorySizeResultDto;
 use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
 
 use function count;
-use function json_encode;
-
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Инструмент получения размера полной истории чата.
@@ -45,6 +43,6 @@ final class ChatHistorySizeTool extends ATool
 
         $dto = new ChatHistorySizeResultDto($count);
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 }

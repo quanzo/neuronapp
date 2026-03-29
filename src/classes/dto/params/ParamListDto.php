@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\params;
 
+use app\modules\neuron\helpers\JsonHelper;
+
 /**
  * DTO‑обёртка над списком параметров, описанных в опции "params".
  *
@@ -94,7 +96,7 @@ final class ParamListDto
                 return [new self([]), []];
             }
 
-            $decoded = json_decode($trimmed, true);
+            $decoded = JsonHelper::decodeAssociative($trimmed);
             if (json_last_error() !== JSON_ERROR_NONE) {
                 return [null, [[
                     'type' => 'invalid_params_json',

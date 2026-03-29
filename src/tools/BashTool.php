@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\BashResultDto;
 use app\modules\neuron\tools\ATool;
 use NeuronAI\Tools\PropertyType;
@@ -15,7 +16,6 @@ use function fclose;
 use function fread;
 use function getcwd;
 use function is_resource;
-use function json_encode;
 use function microtime;
 use function preg_match;
 use function proc_close;
@@ -27,7 +27,6 @@ use function strlen;
 use function substr;
 use function usleep;
 
-use const JSON_UNESCAPED_UNICODE;
 use const SIGTERM;
 
 /**
@@ -164,7 +163,7 @@ class BashTool extends ATool
                 exitCode: -1,
                 timedOut: false,
             );
-            return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+            return JsonHelper::encodeThrow($dto->toArray());
         }
 
         $effectiveTimeout = $timeout ?? $this->defaultTimeout;
@@ -189,7 +188,7 @@ class BashTool extends ATool
                 exitCode: -1,
                 timedOut: false,
             );
-            return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+            return JsonHelper::encodeThrow($dto->toArray());
         }
 
         fclose($pipes[0]);
@@ -262,7 +261,7 @@ class BashTool extends ATool
             timedOut: $timedOut,
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 
     /**

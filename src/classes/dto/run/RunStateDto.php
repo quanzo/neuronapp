@@ -271,7 +271,7 @@ final class RunStateDto implements IArrayable
     }
 
     /**
-     * Создаёт DTO из массива (например, после json_decode).
+     * Создаёт DTO из массива (например, после {@see \app\modules\neuron\helpers\JsonHelper::decodeAssociative()}).
      *
      * @param array<string, mixed> $data Массив с ключами, соответствующими полям DTO.
      * @return self

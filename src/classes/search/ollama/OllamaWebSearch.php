@@ -4,6 +4,7 @@
 
 namespace app\modules\neuron\classes\search\ollama;
 
+use app\modules\neuron\helpers\JsonHelper;
 use Amp\Future;
 use Amp\Http\Client\HttpClientBuilder;
 use Amp\Http\Client\Request;
@@ -33,7 +34,7 @@ class OllamaWebSearch
      */
     protected function makeRequest(string $query, string $part = '/web_search'): Request
     {
-        $request = new Request($this->ollamaUrl . $part, 'POST', json_encode(['query' => $query]));
+        $request = new Request($this->ollamaUrl . $part, 'POST', JsonHelper::encodeThrow(['query' => $query]));
         $request->setHeader('Authorization', 'Bearer ' . $this->apiKey);
         $request->setHeader('Content-Type', 'application/json');
         $request->setHeader('Accept', 'application/json');
@@ -86,10 +87,7 @@ class OllamaWebSearch
         foreach ($results as $r) {
             if ($r['isSuccess']) {
                 $prepResult[$r['query']] = [];
-                $arr = json_decode(
-                    $r['body'],
-                    true
-                );
+                $arr = JsonHelper::decodeAssociative($r['body']);
                 if (!empty($arr['results'])) {
                     foreach ($arr['results'] as $row) {
                         $prepResult[$r['query']][] = WebSearchResultDto::fromArray($row);

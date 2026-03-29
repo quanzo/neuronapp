@@ -6,17 +6,13 @@ namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\dto\tools\SearchReplaceResultDto;
 use app\modules\neuron\helpers\FileSystemHelper;
+use app\modules\neuron\helpers\JsonHelper;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
 use function array_key_exists;
 use function array_map;
-use function json_decode;
-use function json_encode;
 use function strlen;
-
-use const JSON_THROW_ON_ERROR;
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Высокоуровневый инструмент поиска и замены текста в файлах.
@@ -126,11 +122,10 @@ class SearchReplaceTool extends ATool
             : $this->basePath;
 
         if (!FileSystemHelper::isPathSafe($searchPath, $this->basePath)) {
-            return json_encode(
+            return JsonHelper::encodeThrow(
                 [
                     'error' => 'Путь выходит за пределы базовой директории.',
-                ],
-                JSON_UNESCAPED_UNICODE
+                ]
             );
         }
 
@@ -138,22 +133,20 @@ class SearchReplaceTool extends ATool
 
         try {
             /** @var array<string,mixed> $decoded */
-            $decoded = json_decode($grepJson, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = JsonHelper::decodeAssociativeThrow($grepJson);
         } catch (\Throwable $e) {
-            return json_encode(
+            return JsonHelper::encodeThrow(
                 [
                     'error' => 'Не удалось разобрать результат GrepTool: ' . $e->getMessage(),
-                ],
-                JSON_UNESCAPED_UNICODE
+                ]
             );
         }
 
         if (array_key_exists('error', $decoded)) {
-            return json_encode(
+            return JsonHelper::encodeThrow(
                 [
                     'error' => 'Ошибка поиска: ' . (string) $decoded['error'],
-                ],
-                JSON_UNESCAPED_UNICODE
+                ]
             );
         }
 
@@ -174,7 +167,7 @@ class SearchReplaceTool extends ATool
                 $errors
             );
 
-            return json_encode($resultDto->toArray(), JSON_UNESCAPED_UNICODE);
+            return JsonHelper::encodeThrow($resultDto->toArray());
         }
 
         $groupedByFile = [];
@@ -197,7 +190,7 @@ class SearchReplaceTool extends ATool
                 $editJson = $editTool->__invoke($relativeFile, $pattern, $replacement);
                 try {
                     /** @var array<string,mixed> $editDecoded */
-                    $editDecoded = json_decode($editJson, true, 512, JSON_THROW_ON_ERROR);
+                    $editDecoded = JsonHelper::decodeAssociativeThrow($editJson);
                 } catch (\Throwable $e) {
                     $errors[] = 'Ошибка правки файла ' . $relativeFile . ': ' . $e->getMessage();
                     continue;
@@ -230,7 +223,7 @@ class SearchReplaceTool extends ATool
             $errors
         );
 
-        return json_encode($resultDto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($resultDto->toArray());
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\neuron\history;
 
 use app\modules\neuron\helpers\ChatHistoryToolMessageHelper;
+use app\modules\neuron\helpers\JsonHelper;
 use NeuronAI\Chat\History\HistoryTrimmerInterface;
 use NeuronAI\Exceptions\ChatHistoryException;
 use NeuronAI\Chat\Messages\ToolCallMessage;
@@ -15,8 +16,6 @@ use function file_get_contents;
 use function file_put_contents;
 use function is_dir;
 use function is_file;
-use function json_decode;
-use function json_encode;
 use function mkdir;
 use function array_values;
 use function count;
@@ -99,7 +98,7 @@ final class FileFullChatHistory extends AbstractFullChatHistory
             return;
         }
 
-        $decoded = json_decode($raw, true) ?? [];
+        $decoded = JsonHelper::decodeAssociativeOrEmpty($raw);
         $this->fullHistory = $this->deserializeMessages($decoded);
     }
 
@@ -110,7 +109,7 @@ final class FileFullChatHistory extends AbstractFullChatHistory
      */
     protected function persistFullHistory(): void
     {
-        $content = json_encode($this->jsonSerialize(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        $content = JsonHelper::encodeUnicodePrettyThrow($this->jsonSerialize());
         $filePath = $this->getFilePath();
 
         $result = @file_put_contents($filePath, $content, LOCK_EX);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\ChatHistoryMessageDto;
 use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
 use app\modules\neuron\helpers\ChatHistoryToolMessageHelper;
@@ -14,9 +15,6 @@ use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
 use function count;
-use function json_encode;
-
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Инструмент получения сообщения истории по индексу.
@@ -69,13 +67,13 @@ final class ChatHistoryMessageTool extends ATool
 
         $count = count($messages);
         if ($index < 0 || $index >= $count) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error'    => 'Index out of range.',
                 'index'    => $index,
                 'count'    => $count,
                 'minIndex' => 0,
                 'maxIndex' => $count > 0 ? $count - 1 : -1,
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $msg = $messages[$index];
@@ -91,6 +89,6 @@ final class ChatHistoryMessageTool extends ATool
             toolSignature: $sig,
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 }

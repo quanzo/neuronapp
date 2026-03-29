@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\neuron\trimmers;
 
+use app\modules\neuron\helpers\JsonHelper;
 use NeuronAI\Chat\History\TokenCounter as NeuronAiTokenCounter;
 use NeuronAI\Chat\Messages\ContentBlocks\TextContent;
 
@@ -23,7 +24,7 @@ class TokenCounter extends NeuronAiTokenCounter
         /**
          * Стандартная переключалка символы юникода превращает в \u0438 и размер текстового блока становится нереальным
          */
-        $txt = preg_replace(['/\s+/is'], [' '], json_encode($block->toArray(), JSON_UNESCAPED_UNICODE));
+        $txt = preg_replace(['/\s+/is'], [' '], JsonHelper::encodeThrow($block->toArray()));
         return mb_strlen($txt);
     }
 }

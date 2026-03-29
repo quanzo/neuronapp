@@ -6,6 +6,7 @@ namespace app\modules\neuron\classes\storage;
 
 use app\modules\neuron\classes\dto\tools\VarIndexDto;
 use app\modules\neuron\classes\dto\tools\VarIndexItemDto;
+use app\modules\neuron\helpers\JsonHelper;
 
 use function dirname;
 use function file_exists;
@@ -15,8 +16,6 @@ use function filesize;
 use function is_array;
 use function is_int;
 use function is_string;
-use function json_decode;
-use function json_encode;
 use function preg_replace;
 use function rename;
 use function scandir;
@@ -28,8 +27,6 @@ use function time;
 use function unlink;
 
 use const DIRECTORY_SEPARATOR;
-use const JSON_THROW_ON_ERROR;
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * VarStorage — файловое хранилище переменных (результатов) в директории `.store`.
@@ -221,7 +218,7 @@ final class VarStorage
             items: $items,
         );
 
-        $json = json_encode($updated->toArray(), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $json = JsonHelper::encodeThrow($updated->toArray());
         $this->atomicWrite($this->indexFilePath($sessionKey), $json);
     }
 
@@ -262,15 +259,7 @@ final class VarStorage
 
         $path = $this->resultFilePath($sessionKey, $name);
 
-        try {
-            $err = false;
-            $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-        } catch (\Throwable $e) {
-            $err = true;
-        }
-        if ($err) {
-            $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-        }
+        $json = JsonHelper::encodeUnicodeWithUtf8Fallback($payload);
 
         $this->atomicWrite($path, $json);
 
@@ -317,8 +306,8 @@ final class VarStorage
             return null;
         }
 
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
+        $decoded = JsonHelper::tryDecodeAssociativeArray($raw);
+        if ($decoded === null) {
             return null;
         }
 
@@ -363,8 +352,8 @@ final class VarStorage
             return null;
         }
 
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
+        $decoded = JsonHelper::tryDecodeAssociativeArray($raw);
+        if ($decoded === null) {
             return null;
         }
 
@@ -407,7 +396,7 @@ final class VarStorage
             items: $updated,
         );
 
-        $json = json_encode($index->toArray(), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $json = JsonHelper::encodeThrow($index->toArray());
         $this->atomicWrite($this->indexFilePath($sessionKey), $json);
     }
 
@@ -449,8 +438,8 @@ final class VarStorage
             if (!is_string($raw)) {
                 continue;
             }
-            $decoded = json_decode($raw, true);
-            if (!is_array($decoded)) {
+            $decoded = JsonHelper::tryDecodeAssociativeArray($raw);
+            if ($decoded === null) {
                 continue;
             }
 

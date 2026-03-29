@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\dto\tools\VarToolResultDto;
+use app\modules\neuron\helpers\JsonHelper;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
-use function json_decode;
 use function json_last_error;
 use function trim;
 
@@ -113,7 +113,7 @@ final class VarSetTool extends AVarTool
             return '';
         }
 
-        $decoded = json_decode($trimmed, true);
+        $decoded = JsonHelper::decodeAssociative($trimmed);
         if (json_last_error() === JSON_ERROR_NONE) {
             return $decoded;
         }

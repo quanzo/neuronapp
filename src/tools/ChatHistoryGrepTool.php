@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\ChatHistoryGrepMatchDto;
 use app\modules\neuron\classes\dto\tools\ChatHistoryGrepResultDto;
 use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
@@ -16,7 +17,6 @@ use NeuronAI\Tools\ToolProperty;
 
 use function count;
 use function explode;
-use function json_encode;
 use function mb_strlen;
 use function mb_substr;
 use function preg_last_error_msg;
@@ -25,7 +25,6 @@ use function preg_match_all;
 use function preg_quote;
 use function str_contains;
 
-use const JSON_UNESCAPED_UNICODE;
 use const PREG_OFFSET_CAPTURE;
 
 /**
@@ -109,9 +108,9 @@ final class ChatHistoryGrepTool extends ATool
     ): string {
         $regex = $this->buildRegex($pattern, $caseInsensitive);
         if ($regex === null) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Некорректный паттерн: '{$pattern}'. " . preg_last_error_msg(),
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $agentCfg = $this->getAgentCfg();
@@ -204,7 +203,7 @@ final class ChatHistoryGrepTool extends ATool
             messagesSearched: $messagesSearched,
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 
     /**

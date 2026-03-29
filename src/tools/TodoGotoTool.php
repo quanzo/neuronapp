@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\TodoGotoResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
-use function json_encode;
 use function trim;
-
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Инструмент `TodoGotoTool`: запрашивает переход к указанному пункту TodoList.
@@ -143,6 +141,6 @@ final class TodoGotoTool extends ATool
      */
     private function resultJson(TodoGotoResultDto $dto): string
     {
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 }

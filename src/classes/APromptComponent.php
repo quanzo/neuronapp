@@ -8,6 +8,7 @@ use Amp\Future;
 use app\modules\neuron\classes\producers\AgentProducer;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
+use app\modules\neuron\helpers\JsonHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 
 /**
@@ -162,7 +163,7 @@ abstract class APromptComponent
     /**
      * Пытается декодировать строковое значение опции как JSON.
      *
-     * При успешном декодировании возвращает результат json_decode(),
+     * При успешном декодировании возвращает результат {@see JsonHelper::decodeAssociative()},
      * иначе возвращает исходную строку.
      *
      * @param string $rawValue Строковое значение опции.
@@ -179,7 +180,7 @@ abstract class APromptComponent
         $looksLikeJson = strpbrk($firstChar, '{["tfn-0123456789') !== false;
 
         if ($looksLikeJson) {
-            $decoded = json_decode($rawValue, true);
+            $decoded = JsonHelper::decodeAssociative($rawValue);
 
             if (json_last_error() === JSON_ERROR_NONE) {
                 return $decoded;

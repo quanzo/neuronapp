@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\HttpFetchRequestHeadersDto;
 use app\modules\neuron\classes\dto\tools\HttpFetchResultDto;
 use NeuronAI\Tools\PropertyType;
@@ -14,7 +15,6 @@ use function fopen;
 use function fgets;
 use function filter_var;
 use function fclose;
-use function json_encode;
 use function parse_url;
 use function rtrim;
 use function stream_context_create;
@@ -23,7 +23,6 @@ use function strtolower;
 use function trim;
 
 use const FILTER_VALIDATE_URL;
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Инструмент безопасного HTTP-запроса (fetch) для LLM.
@@ -151,21 +150,19 @@ class HttpFetchTool extends ATool
     ): string {
         $validationError = $this->validateUrl($url);
         if ($validationError !== null) {
-            return json_encode(
+            return JsonHelper::encodeThrow(
                 [
                     'error' => $validationError,
-                ],
-                JSON_UNESCAPED_UNICODE
+                ]
             );
         }
 
         $methodNormalized = strtoupper($method ?? 'GET');
         if (!in_array($methodNormalized, ['GET', 'HEAD'], true)) {
-            return json_encode(
+            return JsonHelper::encodeThrow(
                 [
                     'error' => 'Поддерживаются только методы GET и HEAD.',
-                ],
-                JSON_UNESCAPED_UNICODE
+                ]
             );
         }
 
@@ -187,11 +184,10 @@ class HttpFetchTool extends ATool
 
         $resource = @fopen($url, 'r', false, $context);
         if ($resource === false) {
-            return json_encode(
+            return JsonHelper::encodeThrow(
                 [
                     'error' => 'Не удалось открыть URL или произошла сетевая ошибка.',
-                ],
-                JSON_UNESCAPED_UNICODE
+                ]
             );
         }
 
@@ -230,7 +226,7 @@ class HttpFetchTool extends ATool
             $truncated
         );
 
-        return json_encode($resultDto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($resultDto->toArray());
     }
 
     /**

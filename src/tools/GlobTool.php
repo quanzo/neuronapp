@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\GlobResultDto;
 use app\modules\neuron\helpers\FileSystemHelper;
 use app\modules\neuron\tools\ATool;
@@ -121,9 +122,9 @@ class GlobTool extends ATool
     public function __invoke(string $pattern): string
     {
         if (!is_dir($this->basePath)) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Базовая директория '{$this->basePath}' не существует.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $isRecursive = str_starts_with($pattern, '**/');
@@ -154,7 +155,7 @@ class GlobTool extends ATool
             totalFound: $totalFound,
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 
     /**

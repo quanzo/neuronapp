@@ -2,6 +2,7 @@
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\classes\dto\wiki\SearchToolResultDto;
 use app\modules\neuron\classes\search\wiki\ArticleSearchManager;
@@ -95,6 +96,6 @@ class UniSearchTool extends ATool
 
         $resultDto = new SearchToolResultDto($articles);
 
-        return json_encode($resultDto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($resultDto->toArray());
     }
 }

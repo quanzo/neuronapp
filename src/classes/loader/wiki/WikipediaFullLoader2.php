@@ -4,6 +4,7 @@
 
 namespace app\modules\neuron\classes\loader\wiki;
 
+use app\modules\neuron\helpers\JsonHelper;
 use Amp\Http\Client\Request;
 
 /**
@@ -42,7 +43,7 @@ class WikipediaFullLoader2 extends WikipediaLoader
             $response = $this->httpClient->request($request);
             $body = $response->getBody()->buffer();
             if ($body) {
-                $data = json_decode($body, true);
+                $data = JsonHelper::decodeAssociative($body);
             } else {
                 $data = [];
             }

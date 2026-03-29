@@ -13,6 +13,7 @@ use app\modules\neuron\classes\todo\TodoList;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\logger\ContextualLogger;
 use app\modules\neuron\helpers\CommentsHelper;
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
 use app\modules\neuron\classes\storage\VarStorage;
@@ -488,23 +489,6 @@ class ConfigurationApp
         // Убираем комментарии формата JSONC, чтобы получить валидный JSON.
         $cleanJson = CommentsHelper::stripComments($contents);
 
-        $decoded = json_decode($cleanJson, true);
-
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException(sprintf(
-                'Invalid JSONC in configuration file %s: %s',
-                $this->configPath,
-                json_last_error_msg()
-            ));
-        }
-
-        if (!is_array($decoded)) {
-            throw new RuntimeException(sprintf(
-                'Configuration file %s must decode to an associative array.',
-                $this->configPath
-            ));
-        }
-
-        $this->config = $decoded;
+        $this->config = JsonHelper::decodeAssociativeForConfigFile($cleanJson, $this->configPath);
     }
 }

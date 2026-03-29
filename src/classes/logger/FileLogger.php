@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\logger;
 
-use Psr\Log\LoggerInterface;
+use app\modules\neuron\helpers\JsonHelper;
 use Psr\Log\InvalidArgumentException;
+use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Stringable;
 
@@ -13,10 +14,7 @@ use function date;
 use function fclose;
 use function fopen;
 use function is_resource;
-use function json_encode;
 use function str_replace;
-
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Логгер, записывающий сообщения в файл (PSR-3).
@@ -138,7 +136,8 @@ class FileLogger implements LoggerInterface
             return;
         }
         $context     = $this->normalizeContext($context);
-        $contextJson = $context !== [] ? ' ' . json_encode($context, JSON_UNESCAPED_UNICODE) : '';
+        $encoded     = JsonHelper::encode($context);
+        $contextJson = $context !== [] ? ' ' . (is_string($encoded) ? $encoded : '{}') : '';
         $line        = '[' . date(self::DATE_FORMAT) . '] ' . $level . ': ' . $this->interpolate($message, $context) . $contextJson . "\n";
 
         // записи лога будем отделять пустой строкой

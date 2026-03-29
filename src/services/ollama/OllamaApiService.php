@@ -2,6 +2,7 @@
 
 namespace app\modules\neuron\services\ollama;
 
+use app\modules\neuron\helpers\JsonHelper;
 use Amp\Http\Client\HttpClient;
 use Amp\Http\Client\HttpClientBuilder;
 use Amp\Http\Client\Request;
@@ -48,7 +49,7 @@ class OllamaApiService
                 $request->setHeader('Authorization', 'Bearer ' . $this->apiKey);
             }
 
-            $body = json_encode([
+            $body = JsonHelper::encodeThrow([
                 'query' => $query,
             ]);
 
@@ -63,7 +64,7 @@ class OllamaApiService
                 );
             }
 
-            $data = json_decode($responseBody, true);
+            $data = JsonHelper::decodeAssociative($responseBody);
 
             if (!isset($data['results']) || !is_array($data['results'])) {
                 throw new \RuntimeException(
@@ -97,7 +98,7 @@ class OllamaApiService
                 $request->setHeader('Authorization', 'Bearer ' . $this->apiKey);
             }
 
-            $body = json_encode([
+            $body = JsonHelper::encodeThrow([
                 'url' => $url,
             ]);
 
@@ -112,7 +113,7 @@ class OllamaApiService
                 );
             }
 
-            $data = json_decode($responseBody, true);
+            $data = JsonHelper::decodeAssociative($responseBody);
 
             if (!isset($data['content'])) {
                 throw new \RuntimeException(

@@ -4,6 +4,7 @@
 
 namespace app\modules\neuron\classes\loader\wiki;
 
+use app\modules\neuron\helpers\JsonHelper;
 use Amp\Future;
 use Amp\Http\Client\HttpClient;
 use Amp\Http\Client\HttpClientBuilder;
@@ -177,7 +178,7 @@ class WikipediaLoader implements ContentLoaderInterface
         try {
             $response = $this->httpClient->request($request);
             $body     = $response->getBody()->buffer();
-            $data     = json_decode($body, true);
+            $data     = JsonHelper::decodeAssociative($body);
             if (isset($data['query']['pages'])) {
                 $page = reset($data['query']['pages']);
                 return $page['extract'] ?? '';
@@ -196,7 +197,7 @@ class WikipediaLoader implements ContentLoaderInterface
      */
     protected function extractTitleFromApiResponse(string $apiResponse): ?string
     {
-        $data = json_decode($apiResponse, true);
+        $data = JsonHelper::decodeAssociative($apiResponse);
 
         if (isset($data['query']['pages'])) {
             $page = reset($data['query']['pages']);

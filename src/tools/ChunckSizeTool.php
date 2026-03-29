@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\SizeChunkResultDto;
 use NeuronAI\Tools\ToolProperty;
 
@@ -12,10 +13,7 @@ use function fgets;
 use function fopen;
 use function is_array;
 use function is_resource;
-use function json_encode;
 use function mb_strlen;
-
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Инструмент получения размера текстового файла в символах и строках.
@@ -73,9 +71,9 @@ class ChunckSizeTool extends AChunckTool
 
         $handle = @fopen($validated['resolvedPath'], 'rb');
         if ($handle === false || !is_resource($handle)) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Не удалось открыть файл '{$path}' для чтения.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $totalLines = 0;
@@ -86,9 +84,9 @@ class ChunckSizeTool extends AChunckTool
             if ($line === false) {
                 if (!feof($handle)) {
                     fclose($handle);
-                    return json_encode([
+                    return JsonHelper::encodeThrow([
                         'error' => "Ошибка чтения файла '{$path}'.",
-                    ], JSON_UNESCAPED_UNICODE);
+                    ]);
                 }
                 break;
             }
@@ -105,6 +103,6 @@ class ChunckSizeTool extends AChunckTool
             totalLength: $totalLength,
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 }

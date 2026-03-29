@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\ViewChunkResultDto;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
@@ -14,10 +15,7 @@ use function fopen;
 use function implode;
 use function is_array;
 use function is_resource;
-use function json_encode;
 use function mb_strlen;
-
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Инструмент чтения текстового файла чанками строк.
@@ -124,9 +122,9 @@ class ChunckViewTool extends AChunckTool
 
         $handle = @fopen($validated['resolvedPath'], 'rb');
         if ($handle === false || !is_resource($handle)) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Не удалось открыть файл '{$path}' для чтения.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $totalLines          = 0;
@@ -142,9 +140,9 @@ class ChunckViewTool extends AChunckTool
             if ($line === false) {
                 if (!feof($handle)) {
                     fclose($handle);
-                    return json_encode([
+                    return JsonHelper::encodeThrow([
                         'error' => "Ошибка чтения файла '{$path}'.",
-                    ], JSON_UNESCAPED_UNICODE);
+                    ]);
                 }
                 break;
             }
@@ -169,13 +167,13 @@ class ChunckViewTool extends AChunckTool
         fclose($handle);
 
         if ($start >= $totalLines) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => sprintf(
                     "Начальная строка %d превышает общее количество строк в файле (%d).",
                     $start,
                     $totalLines,
                 ),
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $chunk = implode("\n", $chunkLines);
@@ -189,7 +187,7 @@ class ChunckViewTool extends AChunckTool
             totalLength: $totalLength,
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 
     // setBasePath и setMaxFileSize унаследованы из AChunckTool

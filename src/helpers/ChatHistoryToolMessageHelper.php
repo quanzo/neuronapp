@@ -12,7 +12,6 @@ use NeuronAI\Chat\Messages\ToolResultMessage;
 use function is_array;
 use function is_object;
 use function is_string;
-use function json_decode;
 use function method_exists;
 
 /**
@@ -151,7 +150,7 @@ final class ChatHistoryToolMessageHelper
 
         $content = $message->getContent();
         if (is_string($content) && $content !== '') {
-            $decoded = json_decode($content, true);
+            $decoded = JsonHelper::decodeAssociative($content);
             if (is_array($decoded)) {
                 return $decoded;
             }

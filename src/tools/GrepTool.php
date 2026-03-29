@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\GrepMatchDto;
 use app\modules\neuron\classes\dto\tools\GrepResultDto;
 use app\modules\neuron\helpers\FileSystemHelper;
@@ -143,9 +144,9 @@ class GrepTool extends ATool
     {
         $regex = $this->buildRegex($pattern);
         if ($regex === null) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Некорректный паттерн: '{$pattern}'. " . preg_last_error_msg(),
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $searchPath = $path !== null && $path !== ''
@@ -153,9 +154,9 @@ class GrepTool extends ATool
             : $this->basePath;
 
         if (!file_exists($searchPath)) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Путь '{$searchPath}' не существует.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $matches       = [];
@@ -199,7 +200,7 @@ class GrepTool extends ATool
             filesSearched: $filesSearched,
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 
     /**

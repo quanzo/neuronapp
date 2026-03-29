@@ -5,15 +5,11 @@ declare(strict_types=1);
 namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\dto\tools\GitSummaryResultDto;
+use app\modules\neuron\helpers\JsonHelper;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
-use function json_decode;
-use function json_encode;
 use function trim;
-
-use const JSON_THROW_ON_ERROR;
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Инструмент получения краткой сводки по git-репозиторию.
@@ -85,11 +81,10 @@ class GitSummaryTool extends ATool
 
         $status = $this->runGitCommand('git status --short --branch');
         if ($status['error'] !== null) {
-            return json_encode(
+            return JsonHelper::encodeThrow(
                 [
                     'error' => 'Ошибка git status: ' . $status['error'],
-                ],
-                JSON_UNESCAPED_UNICODE
+                ]
             );
         }
 
@@ -110,7 +105,7 @@ class GitSummaryTool extends ATool
             log: trim($log['stdout'])
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 
     /**
@@ -138,7 +133,7 @@ class GitSummaryTool extends ATool
 
         try {
             /** @var array<string,mixed> $decoded */
-            $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+            $decoded = JsonHelper::decodeAssociativeThrow($json);
         } catch (\Throwable $e) {
             return [
                 'stdout' => '',

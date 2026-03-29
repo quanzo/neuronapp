@@ -7,14 +7,11 @@ namespace app\modules\neuron\classes\command;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\params\SessionParamsDto;
 use app\modules\neuron\classes\orchestrators\TodoListOrchestrator;
+use app\modules\neuron\helpers\JsonHelper;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-
-use function json_encode;
-
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Консольная команда запуска внешнего оркестратора TodoList-циклов.
@@ -164,7 +161,7 @@ final class OrchestrateCommand extends AbstractAgentCommand
         }
 
         // 10) Печатаем JSON-результат в stdout для интеграций/скриптов.
-        $output->writeln((string) json_encode($result->toArray(), JSON_UNESCAPED_UNICODE));
+        $output->writeln(JsonHelper::encodeThrow($result->toArray()));
 
         // Неуспешный бизнес-результат оркестратора транслируем в non-zero exit code.
         return $result->isSuccess() ? Command::SUCCESS : Command::FAILURE;

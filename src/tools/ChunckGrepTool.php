@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\ChunckGrepResultDto;
 use app\modules\neuron\helpers\MarkdownChunckHelper;
 use NeuronAI\Tools\PropertyType;
@@ -11,9 +12,6 @@ use NeuronAI\Tools\ToolProperty;
 
 use function file_get_contents;
 use function is_array;
-use function json_encode;
-
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Инструмент поиска строки/regex в файле с возвратом семантических чанков markdown.
@@ -153,18 +151,18 @@ final class ChunckGrepTool extends AChunckTool
         }
 
         if ($max_chars !== null && $max_chars <= 0) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => 'Параметр max_chars должен быть больше 0.',
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $max_chars = $max_chars ?? 20000;
 
         $content = file_get_contents($validated['resolvedPath']);
         if ($content === false) {
-            return json_encode([
+            return JsonHelper::encodeThrow([
                 'error' => "Не удалось прочитать файл '{$path}'.",
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         $maxCharsPerBlock = $max_chars > 5000 ? 5000 : $max_chars;
@@ -193,6 +191,6 @@ final class ChunckGrepTool extends AChunckTool
             chunks          : $chunksResult->chunks,
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 }

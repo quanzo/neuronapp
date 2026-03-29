@@ -12,6 +12,7 @@ use app\modules\neuron\events\Event;
 use app\modules\neuron\helpers\CallableWrapper;
 use app\modules\neuron\helpers\ChatHistoryCopyHelper;
 use app\modules\neuron\helpers\CommentsHelper;
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\models\Message;
 use NeuronAI\Agent\AgentInterface;
 use NeuronAI\Chat\Enums\MessageRole;
@@ -194,7 +195,7 @@ class ConfigurationAgent implements IDependConfigApp
      * @var integer
      */
     public int $llmMaxCycleCount = 10;
-    
+
     /**
      * Это максимальное количество всех итераций, даже когда LLM не будет внятно отвечать свой статус.
      *
@@ -1032,14 +1033,11 @@ class ConfigurationAgent implements IDependConfigApp
                     return null;
                 }
 
-                $cleanJson = CommentsHelper::stripComments($contents);
-                $decoded = json_decode($cleanJson, true);
-
-                if (json_last_error() !== JSON_ERROR_NONE) {
+                $cleanJson   = CommentsHelper::stripComments($contents);
+                $configArray = JsonHelper::tryDecodeAssociativeArray($cleanJson);
+                if ($configArray === null) {
                     return null;
                 }
-
-                $configArray = $decoded;
             } else {
                 // Неподдерживаемое расширение файла.
                 return null;

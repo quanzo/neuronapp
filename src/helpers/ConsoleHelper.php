@@ -32,12 +32,11 @@ class ConsoleHelper
                 $out = $content . PHP_EOL . PHP_EOL . 'sessionKey=' . $sessionId . PHP_EOL;
                 break;
             case 'json':
-                $out = json_encode(
+                $out = JsonHelper::encodeThrow(
                     [
                         'response' => $content,
                         'sessionKey' => $sessionId
-                    ],
-                    \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR
+                    ]
                 );
                 break;
         }

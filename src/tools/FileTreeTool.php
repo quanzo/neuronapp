@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\FileTreeResultDto;
 use app\modules\neuron\helpers\FileSystemHelper;
 use NeuronAI\Tools\PropertyType;
@@ -14,13 +15,11 @@ use function array_values;
 use function count;
 use function getcwd;
 use function is_dir;
-use function json_encode;
 use function scandir;
 use function strlen;
 use function substr;
 
 use const DIRECTORY_SEPARATOR;
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Инструмент построения дерева файлов/директорий.
@@ -106,20 +105,18 @@ class FileTreeTool extends ATool
             : $this->basePath;
 
         if (!FileSystemHelper::isPathSafe($startDir, $this->basePath)) {
-            return json_encode(
+            return JsonHelper::encodeThrow(
                 [
                     'error' => 'Путь выходит за пределы базовой директории.',
-                ],
-                JSON_UNESCAPED_UNICODE
+                ]
             );
         }
 
         if (!is_dir($startDir)) {
-            return json_encode(
+            return JsonHelper::encodeThrow(
                 [
                     'error' => 'Указанный путь не является директорией.',
-                ],
-                JSON_UNESCAPED_UNICODE
+                ]
             );
         }
 
@@ -141,7 +138,7 @@ class FileTreeTool extends ATool
             totalNodes: $totalNodes
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 
     /**

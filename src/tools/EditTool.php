@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\EditResultDto;
 use app\modules\neuron\helpers\FileSystemHelper;
 use app\modules\neuron\tools\ATool;
@@ -19,15 +20,12 @@ use function getcwd;
 use function is_dir;
 use function is_file;
 use function is_writable;
-use function json_encode;
 use function mkdir;
 use function rename;
 use function sprintf;
 use function str_replace;
 use function substr_count;
 use function tempnam;
-
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Инструмент редактирования файлов с точечной заменой текста.
@@ -191,7 +189,7 @@ class EditTool extends ATool
             message: "Файл '{$displayPath}' успешно создан.",
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 
     /**
@@ -262,7 +260,7 @@ class EditTool extends ATool
             message: "Файл '{$displayPath}' успешно отредактирован.",
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 
     /**
@@ -311,7 +309,7 @@ class EditTool extends ATool
             message: $message,
         );
 
-        return json_encode($dto->toArray(), JSON_UNESCAPED_UNICODE);
+        return JsonHelper::encodeThrow($dto->toArray());
     }
 
     /**

@@ -6,20 +6,17 @@ namespace app\modules\neuron\helpers;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\run\RunStateDto;
+use app\modules\neuron\helpers\JsonHelper;
 
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
 use function is_string;
-use function json_decode;
-use function json_encode;
 use function preg_replace;
 use function rename;
 use function unlink;
 
 use const DIRECTORY_SEPARATOR;
-use const JSON_THROW_ON_ERROR;
-use const JSON_UNESCAPED_UNICODE;
 
 /**
  * Хелпер чтения и записи чекпоинтов состояния выполнения run (TodoList) в рамках сессии.
@@ -75,8 +72,8 @@ final class RunStateCheckpointHelper
         if (!is_string($raw)) {
             return null;
         }
-        $data = json_decode($raw, true);
-        if (!is_array($data)) {
+        $data = JsonHelper::tryDecodeAssociativeArray($raw);
+        if ($data === null) {
             return null;
         }
         return RunStateDto::fromArray($data);
@@ -96,7 +93,7 @@ final class RunStateCheckpointHelper
         $path = self::filePath($state->getSessionKey(), $state->getAgentName());
         $dir = dirname($path);
         $tmp = $dir . DIRECTORY_SEPARATOR . 'run_state_' . uniqid('', true) . '.tmp';
-        $json = json_encode($state->toArray(), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $json = JsonHelper::encodeThrow($state->toArray());
         if (file_put_contents($tmp, $json) === false) {
             if (file_exists($tmp)) {
                 @unlink($tmp);
