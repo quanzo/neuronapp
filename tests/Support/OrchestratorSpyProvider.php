@@ -102,15 +102,23 @@ final class OrchestratorSpyProvider implements AIProviderInterface
     public function chat(Message ...$messages): Message
     {
         $content = $this->extractLastUserContent($messages);
+
+        // Сообщение проверки из LlmCycleHelper::waitCycle — иначе эхо длинного текста даёт «Unclear» и цикл съедает maxTotalRounds.
+        if (str_contains($content, 'Have you completed the all current task')) {
+            self::$calls[] = ['label' => 'status_check', 'content' => $content];
+
+            return new AssistantMessage('YES');
+        }
+
         $label = $this->resolveLabel($content);
         self::$calls[] = ['label' => $label, 'content' => $content];
 
         if ($label === 'step') {
             self::$stepCalls++;
             if (in_array(self::$stepCalls, self::$failOnStepCalls, true)) {
-                // Error: перехватывается WaitSuccess вместе с Exception (Throwable). Каждая повторная попытка
-                // снова вызывает chat() и увеличивает stepCalls, поэтому для «полного» провала sendMessage
-                // (исчерпание ретраев) в тестах задают несколько индексов, например [1,2,3] при maxExecCount=3.
+                // Error: перехватывается WaitSuccess. Каждая повторная попытка снова вызывает chat() и увеличивает
+                // stepCalls, поэтому для исчерпания ретраев sendMessage нужно задать сбой на каждом из N вызовов,
+                // например [1,2,3,4,5] при maxLlmAttempts=5 в ConfigurationAgent::sendMessageWithAttachments.
                 throw new \Error('Step failure from OrchestratorSpyProvider');
             }
 

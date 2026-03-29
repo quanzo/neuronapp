@@ -58,3 +58,15 @@
 2. `orchestrator.failed` (reason=`error`)
 3. `orchestrator.restarted`
 4. повторный цикл
+
+## Тесты (`OrchestratorSpyProvider`)
+
+В `tests/Support/OrchestratorSpyProvider.php` счётчик `stepCalls` увеличивается на **каждый** вызов
+`chat()` с пользовательским текстом, содержащим `STEP`. Внутри одного `sendMessage` ошибки LLM
+повторяются через `WaitSuccess` (`maxLlmAttempts = 5` в `ConfigurationAgent`). Чтобы смоделировать
+**исчерпание** ретраев и довести исключение до оркестратора, в сценариях нужно задавать сбой на
+индексах `[1, 2, 3, 4, 5]` — иначе на четвёртом вызове `stepCalls` уже равен `4` и не попадает в
+короткий список `[1, 2, 3]`, ответ считается успешным и рестарт не происходит.
+
+Для быстрых циклов `LlmCycleHelper::waitCycle` в шпионе отдельно обрабатывается текст проверки
+(`Have you completed the all current task`), чтобы не расходовать `maxTotalRounds` на «Unclear».

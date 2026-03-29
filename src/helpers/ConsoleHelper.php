@@ -22,7 +22,7 @@ class ConsoleHelper
         if (!is_string($content)) {
             $content = (string) $content;
         }
-        
+
         $out = '';
         switch ($formatOut) {
             case 'md':

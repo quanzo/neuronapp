@@ -130,8 +130,9 @@ final class TodoListOrchestratorTest extends TestCase
      */
     public function testRunRestartsOnFailWhenEnabled(): void
     {
-        // Три провала подряд соответствуют трём попыткам WaitSuccess в sendMessage; затем оркестратор рестартует.
-        OrchestratorSpyProvider::setFailOnStepCalls([1, 2, 3]);
+        // Пять провалов подряд — по одному на каждую попытку WaitSuccess в sendMessage (maxLlmAttempts=5);
+        // иначе на 4-м вызове chat() stepCalls=4 уже не в списке сбоев и LLM «успешно» отвечает без исключения.
+        OrchestratorSpyProvider::setFailOnStepCalls([1, 2, 3, 4, 5]);
         OrchestratorSpyProvider::setCompleteOnStepCall(2);
 
         $orchestrator = new TestableTodoListOrchestrator($this->configApp);
@@ -149,7 +150,7 @@ final class TodoListOrchestratorTest extends TestCase
      */
     public function testRunThrowsWithoutRestart(): void
     {
-        OrchestratorSpyProvider::setFailOnStepCalls([1, 2, 3]);
+        OrchestratorSpyProvider::setFailOnStepCalls([1, 2, 3, 4, 5]);
         OrchestratorSpyProvider::setCompleteOnStepCall(2);
 
         $orchestrator = new TestableTodoListOrchestrator($this->configApp);
