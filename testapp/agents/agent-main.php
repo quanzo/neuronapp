@@ -19,7 +19,7 @@ if ($homeDir === false || $homeDir === '') {
     $homeDir = $_SERVER['HOME'] ?? '';
 }
 
-$contextWindow = 8192 * 4;
+$contextWindow = 8192 * 4 * 2;
 
 $url = 'http://localhost:11434/api';
 
@@ -50,7 +50,7 @@ return [
                 'think'          => false,
             ],
         ],
-        'model' => 'qwen3.5:4b',
+        'model' => 'qwen3.5:9b',
         //'model' => 'qwen3.5:cloud',
     ],
 

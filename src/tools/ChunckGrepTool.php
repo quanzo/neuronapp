@@ -116,7 +116,7 @@ final class ChunckGrepTool extends AChunckTool
             ToolProperty::make(
                 name       : 'query',
                 type       : PropertyType::STRING,
-                description: 'Строка поиска: регулярное выражение (с разделителями) или обычный текст.',
+                description: 'Строка поиска: регулярное выражение (с разделителями), обычный текст.',
                 required   : true,
             ),
             ToolProperty::make(
