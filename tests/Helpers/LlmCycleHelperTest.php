@@ -104,12 +104,12 @@ final class LlmCycleHelperTest extends TestCase
     }
 
     /**
-     * WAITING — явно в работе.
+     * WAITING — подтверждение завершения (как «YES, но жду»).
      */
     public function testCheckEndCycleWaitingReturnsInProgress(): void
     {
         $msg = new Message(MessageRole::ASSISTANT, 'WAITING');
-        $this->assertSame(LlmCyclePollStatus::InProgress, self::classify($msg));
+        $this->assertSame(LlmCyclePollStatus::Completed, self::classify($msg));
     }
 
     /**

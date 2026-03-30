@@ -40,6 +40,37 @@
   - `context_files` — управление подключением файлов по @‑ссылкам (см. `docs/directories.md`, `docs/files.md`);
   - любые дополнительные опции, которые читаются через `ConfigurationApp::get()`.
 
+### Опции оркестратора (`TodoListOrchestrator`)
+
+Оркестратор (`src/classes/orchestrators/TodoListOrchestrator.php`) поддерживает опциональное поведение
+«суммаризация истории step-цикла» через Skill.
+
+Ключи `config.jsonc`:
+
+- `orchestrator.step_history_summarize.enabled` (bool, default=`false`) — включить/выключить поведение.
+- `orchestrator.step_history_summarize.skill` (string) — имя skill, который будет вызван для суммаризации
+  (разрешается через `ConfigurationApp::getSkill()`).
+
+Поведение:
+
+- перед началом step-цикла снимается размер истории;
+- после окончания step-цикла копируются все сообщения, добавленные в step;
+- после выполнения `finish` вызывается skill с параметром `transcript` (строка) и результатом заменяется
+  **вся** история сессии (остаётся одно сообщение с summary).
+
+Пример:
+
+```jsonc
+{
+  "orchestrator": {
+    "step_history_summarize": {
+      "enabled": true,
+      "skill": "summarize/step_history"
+    }
+  }
+}
+```
+
 ### Конфигурация агента (`ConfigurationAgent`)
 
 Класс `ConfigurationAgent` (`src/classes/config/ConfigurationAgent.php`) представляет отдельного агента LLM:

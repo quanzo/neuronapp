@@ -20,6 +20,16 @@
 Это не отменяет внешнюю логику по флагу `completed` в `IntermediateStorage`. Переходы `todo_goto`
 остаются внутренним механизмом одного запуска `TodoList::execute()`.
 
+## Опциональная суммаризация step-истории
+
+Оркестратор может (по фиче-флагу в `config.jsonc`) после завершения step-цикла:
+
+- снять диапазон сообщений, добавленных именно во время step;
+- передать их в skill суммаризации;
+- заменить всю историю сессии одним summary-сообщением.
+
+Ключи и пример конфигурации см. в `docs/config.md` (раздел «Опции оркестратора»).
+
 ## События
 
 - `orchestrator.resume_history_missing` — при resume списка в оркестраторе в `RunStateDto` нет `history_message_count` (возможны дубликаты сообщений); payload: `OrchestratorResumeHistoryMissingEventDto`; логирование через `OrchestratorLoggingSubscriber`.

@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\TestableTodoListOrchestrator;
 use Tests\Support\OrchestratorSpyProvider;
+use Tests\Support\SummarySpyProvider;
 
 /**
  * Тесты внешнего оркестратора {@see TodoListOrchestrator}.
@@ -190,6 +191,83 @@ final class TodoListOrchestratorTest extends TestCase
         $this->assertContains(EventNameEnum::ORCHESTRATOR_CYCLE_STARTED->value, $events);
         $this->assertContains(EventNameEnum::ORCHESTRATOR_STEP_COMPLETED->value, $events);
         $this->assertContains(EventNameEnum::ORCHESTRATOR_COMPLETED->value, $events);
+    }
+
+    /**
+     * При включенной опции суммаризации step-истории оркестратор заменяет всю историю одним summary-сообщением.
+     */
+    public function testStepHistorySummarizationReplacesHistoryWithSummary(): void
+    {
+        // Пересоздаём конфигурацию, чтобы включить фичу через config.jsonc.
+        $config = [
+            'orchestrator' => [
+                'step_history_summarize' => [
+                    'enabled' => true,
+                    'skill' => 'summarize/step_history',
+                ],
+            ],
+        ];
+        file_put_contents(
+            $this->tmpDir . '/config.jsonc',
+            json_encode($config, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        );
+
+        // Добавляем отдельного агента под skill, чтобы вызов суммаризации не влиял на step/init/finish сценарии.
+        file_put_contents(
+            $this->tmpDir . '/agents/summarizer.php',
+            '<?php return [
+                "enableChatHistory" => true,
+                "provider" => new \\Tests\\Support\\SummarySpyProvider(),
+                "tools" => []
+            ];'
+        );
+
+        // Создаём skill, который будет выполнен после step-цикла.
+        mkdir($this->tmpDir . '/skills', 0777, true);
+        mkdir($this->tmpDir . '/skills/summarize', 0777, true);
+        file_put_contents(
+            $this->tmpDir . '/skills/summarize/step_history.md',
+            "-----\n"
+            . "description: \"Summarize step history\"\n"
+            . "params: {\"transcript\": {\"type\": \"string\", \"description\": \"Transcript\", \"required\": true}}\n"
+            . "agent: summarizer\n"
+            . "pure_context: 1\n"
+            . "-----\n"
+            . "Summarize this transcript:\n"
+            . '"$transcript"' . "\n"
+        );
+
+        $this->resetConfigurationAppSingleton();
+        ConfigurationApp::init(new DirPriority([$this->tmpDir]), 'config.jsonc');
+        $configApp = ConfigurationApp::getInstance();
+        $configApp->setSessionKey('20250101-120000-1-0');
+
+        $agent = $configApp->getAgent('default');
+        $this->assertNotNull($agent);
+
+        $init = $configApp->getTodoList('init');
+        $step = $configApp->getTodoList('step');
+        $finish = $configApp->getTodoList('finish');
+        $this->assertNotNull($init);
+        $this->assertNotNull($step);
+        $this->assertNotNull($finish);
+
+        $init->setDefaultConfigurationAgent($agent);
+        $step->setDefaultConfigurationAgent($agent);
+        $finish->setDefaultConfigurationAgent($agent);
+
+        OrchestratorSpyProvider::setCompleteOnStepCall(2);
+
+        $orchestrator = new TestableTodoListOrchestrator($configApp);
+        $result = $orchestrator->run($init, $step, $finish, 5, false, 0);
+        $this->assertTrue($result->isSuccess());
+
+        $history = $agent->getChatHistory();
+        $messages = method_exists($history, 'getFullMessages') ? $history->getFullMessages() : $history->getMessages();
+        $contents = array_map(static fn ($m) => (string) ($m->getContent() ?? ''), $messages);
+
+        // init + 2 итерации step + finish: init/finish остаются, каждый step-диапазон заменяется одним "SUMMARY".
+        $this->assertSame(2, substr_count(implode("\n", $contents), 'SUMMARY'));
     }
 
     /**

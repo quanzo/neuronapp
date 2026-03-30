@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace app\modules\neuron\helpers;
 
 use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
+use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\Messages\Message;
 
+use function array_slice;
 use function array_splice;
 use function count;
 
@@ -103,6 +105,91 @@ final class ChatHistoryEditHelper
         array_splice($messages, $index, 0, [$message]);
 
         self::replaceFullHistory($history, $messages);
+    }
+
+    /**
+     * Делает копию сообщений истории в диапазоне снимков [before..after).
+     *
+     * Назначение: получить «дельту» сообщений, добавленных между двумя измерениями размера истории.
+     *
+     * Важно:
+     * - для {@see AbstractFullChatHistory} диапазон считается по полной истории (`getFullMessages()`),
+     *   для остальных реализаций — по окну (`getMessages()`).
+     *
+     * @param ChatHistoryInterface $history История агента.
+     * @param int $countBefore Количество сообщений в истории «до».
+     * @param int $countAfter Количество сообщений в истории «после».
+     *
+     * @return array<int, Message>
+     */
+    public static function copyMessagesBySnapshotRange(
+        ChatHistoryInterface $history,
+        int $countBefore,
+        int $countAfter
+    ): array {
+        if ($countBefore < 0 || $countAfter < 0) {
+            return [];
+        }
+        if ($countAfter <= $countBefore) {
+            return [];
+        }
+
+        $messages = $history instanceof AbstractFullChatHistory
+            ? $history->getFullMessages()
+            : $history->getMessages();
+
+        return array_slice($messages, $countBefore, $countAfter - $countBefore);
+    }
+
+    /**
+     * Заменяет сообщения в диапазоне снимков [before..after) одним сообщением.
+     *
+     * Назначение: схлопнуть «дельту» сообщений (например, одного шага внешнего цикла) в summary,
+     * не затрагивая остальную историю.
+     *
+     * Важно:
+     * - для {@see AbstractFullChatHistory} редактируется полная история (`fullHistory`) через публичные методы этого хелпера;
+     * - для остальных реализаций считается, что «вся история = окно» и используется обрезка до `$countBefore`,
+     *   затем добавление одного сообщения.
+     *
+     * @param ChatHistoryInterface $history История агента.
+     * @param int $countBefore Количество сообщений в истории «до».
+     * @param int $countAfter Количество сообщений в истории «после».
+     * @param Message $replacement Сообщение, которым заменяем диапазон.
+     */
+    public static function replaceMessagesBySnapshotRange(
+        ChatHistoryInterface $history,
+        int $countBefore,
+        int $countAfter,
+        Message $replacement
+    ): void {
+        if ($countBefore < 0 || $countAfter < 0) {
+            return;
+        }
+        if ($countAfter < $countBefore) {
+            return;
+        }
+
+        $delta = $countAfter - $countBefore;
+
+        if ($history instanceof AbstractFullChatHistory) {
+            if ($delta <= 0) {
+                return;
+            }
+
+            for ($i = 0; $i < $delta; $i++) {
+                self::deleteFullMessageAt($history, $countBefore);
+            }
+
+            self::insertFullMessageAt($history, $countBefore, $replacement);
+
+            return;
+        }
+
+        // Для обычной истории считаем, что можно заменить только хвост (дельта всегда на хвосте).
+        // Поэтому сначала обрезаем к состоянию "до", затем добавляем одно сообщение.
+        ChatHistoryTruncateHelper::truncateToMessageCount($history, $countBefore);
+        $history->addMessage($replacement);
     }
 
     /**

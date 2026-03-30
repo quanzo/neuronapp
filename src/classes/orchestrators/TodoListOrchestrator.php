@@ -12,8 +12,13 @@ use app\modules\neuron\classes\dto\params\SessionParamsDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\classes\todo\TodoList;
+use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
+use app\modules\neuron\classes\skill\Skill;
+use app\modules\neuron\helpers\ChatHistoryEditHelper;
+use app\modules\neuron\helpers\ChatHistoryRollbackHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use NeuronAI\Chat\Enums\MessageRole;
+use NeuronAI\Chat\Messages\Message as NeuronMessage;
 use Revolt\EventLoop;
 
 /**
@@ -74,6 +79,9 @@ use Revolt\EventLoop;
  */
 class TodoListOrchestrator
 {
+    private const CFG_STEP_HISTORY_SUMMARY_ENABLED = 'orchestrator.step_history_summarize.enabled';
+    private const CFG_STEP_HISTORY_SUMMARY_SKILL = 'orchestrator.step_history_summarize.skill';
+
     /**
      * @param ConfigurationApp $configApp Глобальная конфигурация приложения.
      *
@@ -152,8 +160,30 @@ class TodoListOrchestrator
 
                 for ($i = 1; $i <= $maxIterations; $i++) {
                     // Один шаг внешнего цикла.
+                    $stepHistoryCountBefore = null;
+                    if ($this->isStepHistorySummarizationEnabled()) {
+                        $history = $stepTodoList->getConfigurationAgent()->getChatHistory();
+                        $stepHistoryCountBefore = ChatHistoryRollbackHelper::getSnapshotCount($history);
+                    }
+
                     $this->executeTodoList($stepTodoList, $sessionParams);
                     $iterations = $i;
+
+                    if ($stepHistoryCountBefore !== null) {
+                        $history = $stepTodoList->getConfigurationAgent()->getChatHistory();
+                        $stepHistoryCountAfter = ChatHistoryRollbackHelper::getSnapshotCount($history);
+                        $stepMessagesCopy = ChatHistoryEditHelper::copyMessagesBySnapshotRange(
+                            $history,
+                            $stepHistoryCountBefore,
+                            $stepHistoryCountAfter
+                        );
+                        $this->summarizeAndReplaceStepRangeIfConfigured(
+                            $stepTodoList,
+                            $stepHistoryCountBefore,
+                            $stepHistoryCountAfter,
+                            $stepMessagesCopy
+                        );
+                    }
 
                     // Читаем completed, который должен выставляться шагами.
                     $completedRaw = $this->readCompletedRaw();
@@ -460,5 +490,98 @@ class TodoListOrchestrator
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
             ->setAgent(null)
             ->setRestartCount($restartCount);
+    }
+
+    /**
+     * Возвращает true, если включено суммаризирование истории step-цикла через Skill.
+     *
+     * @return bool
+     */
+    private function isStepHistorySummarizationEnabled(): bool
+    {
+        return (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_ENABLED, false);
+    }
+
+    /**
+     * Если включено в конфиге, создаёт summary по копии сообщений одного шага и заменяет только диапазон шага.
+     *
+     * @param TodoList $stepTodoList TodoList шага (нужен, чтобы получить агента/историю).
+     * @param int $countBefore Размер истории до выполнения одной итерации step.
+     * @param int $countAfter Размер истории после выполнения одной итерации step.
+     * @param array<int, \NeuronAI\Chat\Messages\Message> $stepMessagesCopy Копия сообщений, появившихся во время этой итерации step.
+     */
+    private function summarizeAndReplaceStepRangeIfConfigured(
+        TodoList $stepTodoList,
+        int $countBefore,
+        int $countAfter,
+        array $stepMessagesCopy
+    ): void {
+        if (!$this->isStepHistorySummarizationEnabled()) {
+            return;
+        }
+
+        $skillName = (string) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_SKILL, '');
+        if ($skillName === '') {
+            return;
+        }
+
+        $skill = $this->configApp->getSkill($skillName);
+        if (!$skill instanceof Skill) {
+            return;
+        }
+
+        $agentCfg = $stepTodoList->getConfigurationAgent();
+        $skill->setDefaultConfigurationAgent($agentCfg);
+
+        $transcript = $this->renderTranscript($stepMessagesCopy);
+        $summaryRaw = $skill->execute(MessageRole::USER, [], ['transcript' => $transcript])->await();
+        $summary = $this->normalizeSummaryToString($summaryRaw);
+        if (trim($summary) === '') {
+            return;
+        }
+
+        $history = $agentCfg->getChatHistory();
+        $summaryMessage = new NeuronMessage(MessageRole::ASSISTANT, $summary);
+        ChatHistoryEditHelper::replaceMessagesBySnapshotRange($history, $countBefore, $countAfter, $summaryMessage);
+    }
+
+    /**
+     * Формирует простой транскрипт из массива сообщений.
+     *
+     * @param array<int, \NeuronAI\Chat\Messages\Message> $messages
+     */
+    private function renderTranscript(array $messages): string
+    {
+        $lines = [];
+        foreach ($messages as $m) {
+            $role = (string) $m->getRole();
+            $content = (string) ($m->getContent() ?? '');
+            $lines[] = sprintf("[%s]\n%s", $role, $content);
+        }
+
+        return implode("\n\n", $lines);
+    }
+
+    /**
+     * Нормализует результат выполнения skill к строке summary.
+     */
+    private function normalizeSummaryToString(mixed $summaryRaw): string
+    {
+        if ($summaryRaw instanceof NeuronMessage) {
+            return (string) ($summaryRaw->getContent() ?? '');
+        }
+        if (is_string($summaryRaw)) {
+            return $summaryRaw;
+        }
+        if ($summaryRaw instanceof \JsonSerializable) {
+            $encoded = json_encode($summaryRaw->jsonSerialize(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            return $encoded !== false ? $encoded : '';
+        }
+        if (is_array($summaryRaw)) {
+            $encoded = json_encode($summaryRaw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            return $encoded !== false ? $encoded : '';
+        }
+
+        return (string) $summaryRaw;
     }
 }
