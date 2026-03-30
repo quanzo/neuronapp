@@ -24,7 +24,7 @@ class LlmCycleHelper
     /*
     public const MSG_CHECK_WORK = "Have you completed the all current task? Strict answer only `YES` or `NO`! If you're waiting, strict answer `WAITING` only! If your answer is `NO`, then continue execute!";
     */
-    public const MSG_CHECK_WORK = "Ready to take on a new challenge? Strict answer only `YES` or `NO`! If your answer is `NO`, then continue execute!";
+    public const MSG_CHECK_WORK = "Ready to take on a new challenge? STRICT ANSWER ONLY `YES` or `NO`! If your answer is `NO`, then continue execute!";
     public const MSG_CONTINUE = 'Сontinue with the task';
     public const MSG_RESULT = 'Repeat the final message';
     public const MSG_CHECK_WORK2 = 'Is the task complete? Answer only YES or NO! If NO, continue!';
