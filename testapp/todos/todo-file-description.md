@@ -2,7 +2,7 @@
 agent: agent-main
 pure_context: false
 tools: todo_goto
-skills: file-block-summarize
+skills: skill-file-block-summarize
 ---
 
 1. Загрузи все фрагменты файла `temp/otrochestvo.txt` и составь краткое изложение содержимого
