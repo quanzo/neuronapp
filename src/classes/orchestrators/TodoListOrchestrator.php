@@ -650,7 +650,7 @@ class TodoListOrchestrator
         $dedupConsecutive   = (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_FILTER_DEDUP_CONSECUTIVE, true);
 
         return new SummarizeService(
-            useSkill                    : $useSkill,
+            useSkill                    : $useSkill && $skill,
             skill                       : $skill instanceof \app\modules\neuron\classes\skill\Skill ? $skill : null,
             mode                        : $mode,
             role                        : $role,
