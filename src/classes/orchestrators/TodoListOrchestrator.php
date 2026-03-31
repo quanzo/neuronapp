@@ -12,8 +12,6 @@ use app\modules\neuron\classes\dto\params\SessionParamsDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\classes\todo\TodoList;
-use app\modules\neuron\classes\neuron\summarize\SummarizeService;
-use app\modules\neuron\helpers\ChatHistoryEditHelper;
 use app\modules\neuron\helpers\ChatHistoryRollbackHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use NeuronAI\Chat\Enums\MessageRole;
@@ -77,126 +75,6 @@ use Revolt\EventLoop;
  */
 class TodoListOrchestrator
 {
-    /**
-     * Ключ `config.jsonc`: включение/выключение суммаризации step-шага.
-     *
-     * Тип: bool.
-     * Дефолт: false.
-     *
-     * Если выключено — оркестратор не считает snapshots и не вызывает {@see SummarizeService}.
-     */
-    private const CFG_STEP_HISTORY_SUMMARY_ENABLED = 'orchestrator.step_history_summarize.enabled';
-
-    /**
-     * Ключ `config.jsonc`: имя skill для суммаризации transcript.
-     *
-     * Тип: string.
-     * Пример: "summarize/step_history".
-     *
-     * Используется только когда {@see CFG_STEP_HISTORY_SUMMARY_USE_SKILL} = true.
-     * Разрешение skill выполняется через {@see \app\modules\neuron\classes\config\ConfigurationApp::getSkill()}.
-     */
-    private const CFG_STEP_HISTORY_SUMMARY_SKILL = 'orchestrator.step_history_summarize.skill';
-
-    /**
-     * Ключ `config.jsonc`: debug-логирование суммаризации.
-     *
-     * Тип: bool.
-     * Дефолт: false.
-     *
-     * Если true — {@see SummarizeService} пишет события skip/apply с метриками
-     * (delta, keptCount, transcriptChars, summaryChars, mode, role и т.п.) в PSR-3 логгер.
-     */
-    private const CFG_STEP_HISTORY_SUMMARY_DEBUG = 'orchestrator.step_history_summarize.debug';
-
-    /**
-     * Ключ `config.jsonc`: режим применения summary к истории.
-     *
-     * Тип: string.
-     * Дефолт: "replace_range".
-     * Допустимые значения:
-     * - "replace_range": заменить сообщения текущего step-шага одним summary-сообщением;
-     * - "append_summary": не удалять сообщения шага, а добавить summary отдельным сообщением после шага.
-     */
-    private const CFG_STEP_HISTORY_SUMMARY_MODE = 'orchestrator.step_history_summarize.mode';
-
-    /**
-     * Ключ `config.jsonc`: роль summary-сообщения.
-     *
-     * Тип: string.
-     * Дефолт: "assistant".
-     * Допустимые значения:
-     * - "assistant"
-     * - "system"
-     *
-     * Важно: роль влияет на то, как LLM будет воспринимать summary в дальнейших шагах
-     * (как ответ ассистента или как системный контекст).
-     */
-    private const CFG_STEP_HISTORY_SUMMARY_ROLE = 'orchestrator.step_history_summarize.role';
-
-    /**
-     * Ключ `config.jsonc`: использовать ли Skill (LLM-вызов) для получения summary.
-     *
-     * Тип: bool.
-     * Дефолт: false.
-     *
-     * Если false — summary = `transcript` (после фильтрации/дедупликации), без вызова LLM.
-     * Если true  — summary вычисляется через skill {@see CFG_STEP_HISTORY_SUMMARY_SKILL}.
-     */
-    private const CFG_STEP_HISTORY_SUMMARY_USE_SKILL = 'orchestrator.step_history_summarize.use_skill';
-
-    /**
-     * Ключ `config.jsonc`: минимальная длина transcript для запуска суммаризации шага.
-     *
-     * Тип: int.
-     * Дефолт: 50.
-     *
-     * Проверка выполняется после фильтрации и построения transcript.
-     * Если transcript короче — шаг пропускается (summary не применяется к истории).
-     */
-    private const CFG_STEP_HISTORY_SUMMARY_MIN_TRANSCRIPT_CHARS = 'orchestrator.step_history_summarize.min_transcript_chars';
-
-    /**
-     * Ключ `config.jsonc`: фильтровать ли tool-call/tool-result сообщения из дельты шага.
-     *
-     * Тип: bool.
-     * Дефолт: true.
-     *
-     * Обычно полезно, т.к. результаты инструментов могут быть большими и/или дублирующимися.
-     */
-    private const CFG_STEP_HISTORY_SUMMARY_FILTER_TOOL_MESSAGES = 'orchestrator.step_history_summarize.filter.tool_messages';
-
-    /**
-     * Ключ `config.jsonc`: фильтровать ли "history inspection tools" (`chat_history.*`).
-     *
-     * Тип: bool.
-     * Дефолт: true.
-     *
-     * Это подмножество tool-сообщений; их ответы часто содержат большие дампы истории и резко раздувают transcript.
-     */
-    private const CFG_STEP_HISTORY_SUMMARY_FILTER_HISTORY_TOOLS = 'orchestrator.step_history_summarize.filter.history_tools';
-
-    /**
-     * Ключ `config.jsonc`: минимальная длина отдельного сообщения, чтобы оно попало в transcript.
-     *
-     * Тип: int.
-     * Дефолт: 3.
-     *
-     * Нужен, чтобы выкидывать низкосигнальные реплики вроде ".", "ok", "да" и т.п.
-     */
-    private const CFG_STEP_HISTORY_SUMMARY_FILTER_MIN_MESSAGE_CHARS = 'orchestrator.step_history_summarize.filter.min_message_chars';
-
-    /**
-     * Ключ `config.jsonc`: удалять ли подряд повторяющиеся сообщения в дельте шага.
-     *
-     * Тип: bool.
-     * Дефолт: true.
-     *
-     * Важно: дедупликация здесь только "consecutive" (подряд), чтобы не потерять смысл диалога.
-     * Глобальная дедупликация контента внутри transcript дополнительно выполняется внутри {@see SummarizeService}.
-     */
-    private const CFG_STEP_HISTORY_SUMMARY_FILTER_DEDUP_CONSECUTIVE = 'orchestrator.step_history_summarize.filter.dedup_consecutive';
-
     /**
      * @param ConfigurationApp $configApp Глобальная конфигурация приложения.
      *
@@ -273,36 +151,10 @@ class TodoListOrchestrator
                 $completedNormalized = null;
                 $iterations          = 0;
 
-                $summarizeService = $this->buildSummarizeServiceForStep();
-
                 for ($i = 1; $i <= $maxIterations; $i++) {
                     // Один шаг внешнего цикла.
-                    $stepHistoryCountBefore = null;
-                    if ($summarizeService !== null) {
-                        $history = $stepTodoList->getConfigurationAgent()->getChatHistory();
-                        $stepHistoryCountBefore = ChatHistoryRollbackHelper::getSnapshotCount($history);
-                    }
-
                     $this->executeTodoList($stepTodoList, $sessionParams);
                     $iterations = $i;
-
-                    if ($summarizeService !== null && $stepHistoryCountBefore !== null) {
-                        $history               = $stepTodoList->getConfigurationAgent()->getChatHistory();
-                        $stepHistoryCountAfter = ChatHistoryRollbackHelper::getSnapshotCount($history);
-                        $stepMessagesCopy      = ChatHistoryEditHelper::copyMessagesBySnapshotRange(
-                            $history,
-                            $stepHistoryCountBefore,
-                            $stepHistoryCountAfter
-                        );
-                        $summarizeService->summarizeAndApply(
-                            agentCfg    : $stepTodoList->getConfigurationAgent(),
-                            history     : $history,
-                            countBefore : $stepHistoryCountBefore,
-                            countAfter  : $stepHistoryCountAfter,
-                            stepMessages: $stepMessagesCopy,
-                            contextName : $stepTodoList->getName()
-                        );
-                    }
 
                     // Читаем completed, который должен выставляться шагами.
                     $completedRaw = $this->readCompletedRaw();
@@ -609,60 +461,5 @@ class TodoListOrchestrator
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
             ->setAgent(null)
             ->setRestartCount($restartCount);
-    }
-
-    /**
-     * Возвращает true, если включено суммаризирование истории step-цикла через Skill.
-     *
-     * @return bool
-     */
-    private function isStepHistorySummarizationEnabled(): bool
-    {
-        return (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_ENABLED, false);
-    }
-
-    /**
-     * Создаёт сервис суммаризации шага на основе конфигурации приложения.
-     *
-     * Возвращает null, если фича выключена.
-     */
-    private function buildSummarizeServiceForStep(): ?SummarizeService
-    {
-        if (!$this->isStepHistorySummarizationEnabled()) {
-            return null;
-        }
-
-        $useSkill  = (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_USE_SKILL, false);
-        $skillName = (string) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_SKILL, '');
-        $skill     = $useSkill && $skillName !== '' ? $this->configApp->getSkill($skillName) : null;
-
-        $mode = (string) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_MODE, 'replace_range');
-        $role = strtolower(trim((string) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_ROLE, 'assistant'))) === 'system'
-            ? MessageRole::SYSTEM
-            : MessageRole::ASSISTANT;
-
-        $minTranscriptChars = max(0, (int) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_MIN_TRANSCRIPT_CHARS, 50));
-        $debug              = (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_DEBUG, false);
-
-        $filterTools        = (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_FILTER_TOOL_MESSAGES, true);
-        $filterHistoryTools = (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_FILTER_HISTORY_TOOLS, true);
-        $minMsgChars        = max(0, (int) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_FILTER_MIN_MESSAGE_CHARS, 3));
-        $dedupConsecutive   = (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_FILTER_DEDUP_CONSECUTIVE, true);
-
-        return new SummarizeService(
-            useSkill                    : $useSkill && $skill,
-            skill                       : $skill instanceof \app\modules\neuron\classes\skill\Skill ? $skill : null,
-            mode                        : $mode,
-            role                        : $role,
-            minTranscriptChars          : $minTranscriptChars,
-            debug                       : $debug,
-            logger                      : $debug ? $this->configApp->getLoggerWithContext() : null,
-            filterToolMessages          : $filterTools,
-            filterHistoryTools          : $filterHistoryTools,
-            minMessageChars             : $minMsgChars,
-            dedupConsecutive            : $dedupConsecutive,
-            dedupTranscriptGlobal       : true,
-            excludeLlmCycleHelperPrompts: true,
-        );
     }
 }
