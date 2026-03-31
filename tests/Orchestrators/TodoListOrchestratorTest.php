@@ -480,11 +480,16 @@ final class TodoListOrchestratorTest extends TestCase
         $history = $agent->getChatHistory();
         $messages = method_exists($history, 'getFullMessages') ? $history->getFullMessages() : $history->getMessages();
         $contents = array_map(static fn ($m) => (string) ($m->getContent() ?? ''), $messages);
-        $joined = implode("\n", $contents);
 
-        // Transcript строится как "[role]\ncontent", а OrchestratorSpyProvider эхо-ответом возвращает "STEP".
-        $this->assertStringContainsString('[assistant]', strtolower($joined));
-        $this->assertStringContainsString('STEP', $joined);
+        // В режиме append_summary сервис добавляет по одному transcript-summary на каждую итерацию step.
+        $summaryTranscripts = array_values(array_filter($contents, static function (string $c): bool {
+            return str_contains($c, '[') && str_contains($c, 'STEP');
+        }));
+        $this->assertCount(2, $summaryTranscripts);
+
+        // Внутри каждого transcript step-дельта должна быть дедуплицирована.
+        $this->assertSame(1, substr_count($summaryTranscripts[0], 'STEP'));
+        $this->assertSame(1, substr_count($summaryTranscripts[1], 'STEP'));
     }
 
     /**

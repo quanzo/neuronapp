@@ -45,6 +45,9 @@
 Оркестратор (`src/classes/orchestrators/TodoListOrchestrator.php`) поддерживает опциональное поведение
 «суммаризация истории step-шага (каждой итерации step-цикла)» через Skill.
 
+Реализация суммаризации вынесена в сервис `SummarizeService`
+(`src/classes/neuron/summarize/SummarizeService.php`).
+
 Ключи `config.jsonc`:
 
 - `orchestrator.step_history_summarize.enabled` (bool, default=`false`) — включить/выключить поведение.
@@ -72,6 +75,10 @@
 - на каждой итерации step-цикла перед выполнением шага снимается размер истории;
 - после выполнения шага копируются сообщения, добавленные **только этим шагом**;
 - сообщения шага фильтруются от «шума» и преобразуются в `transcript`;
+- при построении `transcript` дополнительно:
+  - исключаются пустые сообщения;
+  - исключаются дубликаты контента (role+content) в рамках одного transcript;
+  - исключаются служебные реплики проверки статуса из `LlmCycleHelper` (`MSG_CHECK_WORK`, `MSG_CHECK_WORK2`, `MSG_RESULT`).
 - если `transcript` слишком короткий — суммаризация пропускается;
 - иначе вызывается skill с параметром `transcript` (строка), а результат применяется по `mode`.
 
