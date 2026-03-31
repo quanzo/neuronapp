@@ -9,6 +9,7 @@ use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
 use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\helpers\ChatHistoryEditHelper;
 use app\modules\neuron\helpers\ChatHistoryToolMessageHelper;
+use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\helpers\LlmCycleHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\ChatHistoryInterface;
@@ -27,6 +28,7 @@ use function mb_strlen;
 use function sprintf;
 use function strtolower;
 use function trim;
+use function var_export;
 
 /**
  * Сервис суммаризации сообщений одного шага и применения результата к истории.
@@ -312,6 +314,30 @@ final class SummarizeService
                 continue;
             }
 
+            // Если tool-сообщения НЕ фильтруются, преобразуем tool-call/result в текст,
+            // т.к. getContent() у ToolResultMessage обычно пуст, а полезный payload лежит в tools.
+            if (!$this->filterToolMessages && ($m instanceof ToolCallMessage || $m instanceof ToolResultMessage)) {
+                if ($this->filterHistoryTools && ChatHistoryToolMessageHelper::isToolMessageInList($m, $this->historyToolNames)) {
+                    continue;
+                }
+
+                $toolText = $this->formatToolMessageAsText($m);
+                $trimmedTool = trim($toolText);
+                if ($trimmedTool === '') {
+                    continue;
+                }
+
+                $roleStr = (string) $m->getRole();
+                try {
+                    $roleEnum = MessageRole::from($roleStr);
+                } catch (\Throwable) {
+                    // На всякий случай: если роль неизвестна, считаем tool-result как user.
+                    $roleEnum = MessageRole::USER;
+                }
+
+                $m = new NeuronMessage($roleEnum, $trimmedTool);
+            }
+
             $content = (string) ($m->getContent() ?? '');
             $trimmed = trim($content);
             if ($trimmed === '') {
@@ -331,6 +357,46 @@ final class SummarizeService
         }
 
         return $out;
+    }
+
+    /**
+     * Преобразует tool-call/tool-result сообщение в текстовую форму для transcript.
+     *
+     * Требования:
+     * - "короткая шапка" (type + toolName, если найден) для читабельности;
+     * - "полный payload" инструмента без потерь (берём из __toString()/jsonSerialize).
+     *
+     * Формат:
+     * <code>
+     * TOOL_RESULT name=<toolName>
+     * <FULL_JSON_PAYLOAD>
+     * </code>
+     */
+    private function formatToolMessageAsText(NeuronMessage $message): string
+    {
+        $type = $message instanceof ToolResultMessage ? 'TOOL_RESULT' : 'TOOL_CALL';
+        $sig = ChatHistoryToolMessageHelper::extractToolSignature($message);
+        $name = $sig?->name;
+
+        $header = $name !== null && $name !== ''
+            ? sprintf('%s name=%s', $type, $name)
+            : $type;
+
+        $payload = '';
+        if ($message instanceof \JsonSerializable) {
+            try {
+                $arr = $message->jsonSerialize();
+                $encoded = JsonHelper::encodeUnicodeWithUtf8Fallback($arr);
+                $payload = (string) $encoded;
+            } catch (\Throwable $e) {}
+        }
+        if (!$payload) {
+            // Полный payload: у ToolCallMessage/ToolResultMessage __toString() возвращает json_encode(tools).
+            $payload = (string) $message;
+        }
+        $payload = trim($payload);
+
+        return $payload !== '' ? ($header . "\n" . $payload) : $header;
     }
 
     /**

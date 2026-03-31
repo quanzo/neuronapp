@@ -8,5 +8,54 @@
     "enabled": true,
     // Максимальный общий размер всех подключённых файлов в байтах (1 MiB по умолчанию в AttachmentHelper)
     "max_total_size": 1048576
+  },
+
+  // Опциональная суммаризация истории каждого шага step-цикла в TodoListOrchestrator.
+  //
+  // Реализация: src/classes/neuron/summarize/SummarizeService.php
+  // Ключи описаны в docs/config.md (раздел "Опции оркестратора").
+  "orchestrator": {
+    "step_history_summarize": {
+      // Включить/выключить суммаризацию (по умолчанию выключено).
+      "enabled": false,
+
+      // Использовать ли LLM-skill для суммаризации:
+      // - false: вместо summary будет вставляться transcript (после фильтрации/дедупликации), без вызова LLM.
+      // - true: будет вызван skill ниже, а в историю вставится ответ skill.
+      "use_skill": false,
+
+      // Имя skill для суммаризации (нужно только при use_skill=true).
+      // Пример: "summarize/step_history" (см. testapp/skills/summarize/step_history.md)
+      "skill": "summarize/step_history",
+
+      // Режим применения summary к истории:
+      // - replace_range: заменить сообщения текущего шага одним summary-сообщением
+      // - append_summary: не удалять сообщения шага, а добавить summary отдельным сообщением после шага
+      "mode": "replace_range",
+
+      // Роль summary-сообщения:
+      // - assistant
+      // - system
+      "role": "assistant",
+
+      // Минимальная длина transcript (после фильтрации) для запуска суммаризации шага.
+      // Если transcript короче — шаг пропускается и история не меняется.
+      "min_transcript_chars": 50,
+
+      // Debug-логирование (skip/apply) в PSR-3 лог сессии.
+      "debug": false,
+
+      // Фильтрация "шума" перед построением transcript.
+      "filter": {
+        // Исключать tool-call/tool-result сообщения.
+        "tool_messages": false,
+        // Исключать сообщения инструментов просмотра истории `chat_history.*`.
+        "history_tools": true,
+        // Минимальная длина сообщения (после trim), чтобы учитывать его в transcript.
+        "min_message_chars": 3,
+        // Убирать подряд повторяющиеся сообщения (role+content) в дельте шага.
+        "dedup_consecutive": true
+      }
+    }
   }
 }

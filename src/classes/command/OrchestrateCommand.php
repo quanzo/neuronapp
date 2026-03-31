@@ -157,6 +157,8 @@ final class OrchestrateCommand extends AbstractAgentCommand
         } catch (\Throwable $e) {
             // Ошибка исполнения оркестратора считается фатальной для команды.
             $output->writeln('<error>Ошибка оркестратора: ' . $e->getMessage() . '</error>');
+            $output->writeln('<error>' .  $e->getFile() . ' ' . $e->getLine() . '</error>');
+            $output->writeln('<error>' .  $e->getTraceAsString() . '</error>');
             return Command::FAILURE;
         }
 
