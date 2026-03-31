@@ -16,9 +16,12 @@ use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
 use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\helpers\ChatHistoryEditHelper;
 use app\modules\neuron\helpers\ChatHistoryRollbackHelper;
+use app\modules\neuron\helpers\ChatHistoryToolMessageHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
+use NeuronAI\Chat\Messages\ToolCallMessage;
+use NeuronAI\Chat\Messages\ToolResultMessage;
 use Revolt\EventLoop;
 
 /**
@@ -81,6 +84,15 @@ class TodoListOrchestrator
 {
     private const CFG_STEP_HISTORY_SUMMARY_ENABLED = 'orchestrator.step_history_summarize.enabled';
     private const CFG_STEP_HISTORY_SUMMARY_SKILL = 'orchestrator.step_history_summarize.skill';
+    private const CFG_STEP_HISTORY_SUMMARY_DEBUG = 'orchestrator.step_history_summarize.debug';
+    private const CFG_STEP_HISTORY_SUMMARY_MODE = 'orchestrator.step_history_summarize.mode'; // replace_range|append_summary
+    private const CFG_STEP_HISTORY_SUMMARY_ROLE = 'orchestrator.step_history_summarize.role'; // assistant|system
+    private const CFG_STEP_HISTORY_SUMMARY_USE_SKILL = 'orchestrator.step_history_summarize.use_skill';
+    private const CFG_STEP_HISTORY_SUMMARY_MIN_TRANSCRIPT_CHARS = 'orchestrator.step_history_summarize.min_transcript_chars';
+    private const CFG_STEP_HISTORY_SUMMARY_FILTER_TOOL_MESSAGES = 'orchestrator.step_history_summarize.filter.tool_messages';
+    private const CFG_STEP_HISTORY_SUMMARY_FILTER_HISTORY_TOOLS = 'orchestrator.step_history_summarize.filter.history_tools';
+    private const CFG_STEP_HISTORY_SUMMARY_FILTER_MIN_MESSAGE_CHARS = 'orchestrator.step_history_summarize.filter.min_message_chars';
+    private const CFG_STEP_HISTORY_SUMMARY_FILTER_DEDUP_CONSECUTIVE = 'orchestrator.step_history_summarize.filter.dedup_consecutive';
 
     /**
      * @param ConfigurationApp $configApp Глобальная конфигурация приложения.
@@ -502,6 +514,89 @@ class TodoListOrchestrator
         return (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_ENABLED, false);
     }
 
+    private function isStepHistorySummarizationDebugEnabled(): bool
+    {
+        return (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_DEBUG, false);
+    }
+
+    /**
+     * @return 'replace_range'|'append_summary'
+     */
+    private function getStepHistorySummarizationMode(): string
+    {
+        $mode = strtolower(trim((string) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_MODE, 'replace_range')));
+        return in_array($mode, ['replace_range', 'append_summary'], true) ? $mode : 'replace_range';
+    }
+
+    private function getStepHistorySummarizationRole(): MessageRole
+    {
+        $role = strtolower(trim((string) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_ROLE, 'assistant')));
+        return $role === 'system' ? MessageRole::SYSTEM : MessageRole::ASSISTANT;
+    }
+
+    private function getMinTranscriptChars(): int
+    {
+        return max(0, (int) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_MIN_TRANSCRIPT_CHARS, 50));
+    }
+
+    private function isStepHistorySummarizationUsingSkill(): bool
+    {
+        return (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_USE_SKILL, false);
+    }
+
+    /**
+     * Убирает "шум" из сообщений шага перед суммаризацией.
+     *
+     * Фильтры управляются через config.jsonc (см. ключи CFG_STEP_HISTORY_SUMMARY_FILTER_*).
+     *
+     * @param array<int, \NeuronAI\Chat\Messages\Message> $messages
+     * @return array<int, \NeuronAI\Chat\Messages\Message>
+     */
+    private function filterStepMessages(array $messages): array
+    {
+        if ($messages === []) {
+            return [];
+        }
+
+        $filterTools = (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_FILTER_TOOL_MESSAGES, true);
+        $filterHistoryTools = (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_FILTER_HISTORY_TOOLS, true);
+        $minMsgChars = max(0, (int) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_FILTER_MIN_MESSAGE_CHARS, 3));
+        $dedupConsecutive = (bool) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_FILTER_DEDUP_CONSECUTIVE, true);
+
+        $historyToolNames = ['chat_history.size', 'chat_history.meta', 'chat_history.message'];
+
+        $out = [];
+        $prevKey = null;
+        foreach ($messages as $m) {
+            if ($filterTools && ($m instanceof ToolCallMessage || $m instanceof ToolResultMessage)) {
+                // Отдельно выкидываем inspection tools, чтобы не тащить большие ответы в summary.
+                if ($filterHistoryTools && ChatHistoryToolMessageHelper::isToolMessageInList($m, $historyToolNames)) {
+                    continue;
+                }
+                continue;
+            }
+
+            $content = (string) ($m->getContent() ?? '');
+            $trimmed = trim($content);
+            if ($trimmed === '') {
+                continue;
+            }
+            if ($minMsgChars > 0 && mb_strlen($trimmed) < $minMsgChars) {
+                continue;
+            }
+
+            $key = (string) $m->getRole() . '|' . $trimmed;
+            if ($dedupConsecutive && $prevKey === $key) {
+                continue;
+            }
+            $prevKey = $key;
+
+            $out[] = $m;
+        }
+
+        return $out;
+    }
+
     /**
      * Если включено в конфиге, создаёт summary по копии сообщений одного шага и заменяет только диапазон шага.
      *
@@ -520,29 +615,101 @@ class TodoListOrchestrator
             return;
         }
 
-        $skillName = (string) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_SKILL, '');
-        if ($skillName === '') {
-            return;
-        }
-
-        $skill = $this->configApp->getSkill($skillName);
-        if (!$skill instanceof Skill) {
+        $delta = $countAfter - $countBefore;
+        if ($delta <= 0) {
             return;
         }
 
         $agentCfg = $stepTodoList->getConfigurationAgent();
-        $skill->setDefaultConfigurationAgent($agentCfg);
 
-        $transcript = $this->renderTranscript($stepMessagesCopy);
-        $summaryRaw = $skill->execute(MessageRole::USER, [], ['transcript' => $transcript])->await();
-        $summary = $this->normalizeSummaryToString($summaryRaw);
+        $filtered = $this->filterStepMessages($stepMessagesCopy);
+        if ($filtered === []) {
+            if ($this->isStepHistorySummarizationDebugEnabled()) {
+                $this->configApp->getLoggerWithContext()->info('Step summarization skipped: empty_after_filter', [
+                    'todolist'   => $stepTodoList->getName(),
+                    'before'     => $countBefore,
+                    'after'      => $countAfter,
+                    'delta'      => $delta,
+                    'rawCount'   => count($stepMessagesCopy),
+                    'keptCount'  => 0,
+                    'skill'      => (string) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_SKILL, ''),
+                    'useSkill'   => $this->isStepHistorySummarizationUsingSkill(),
+                ]);
+            }
+            return;
+        }
+
+        $transcript = $this->renderTranscript($filtered);
+        $minChars = $this->getMinTranscriptChars();
+        if ($minChars > 0 && mb_strlen(trim($transcript)) < $minChars) {
+            if ($this->isStepHistorySummarizationDebugEnabled()) {
+                $this->configApp->getLoggerWithContext()->info('Step summarization skipped: transcript_too_short', [
+                    'todolist'        => $stepTodoList->getName(),
+                    'before'          => $countBefore,
+                    'after'           => $countAfter,
+                    'delta'           => $delta,
+                    'rawCount'        => count($stepMessagesCopy),
+                    'keptCount'       => count($filtered),
+                    'transcriptChars' => mb_strlen(trim($transcript)),
+                    'minChars'        => $minChars,
+                    'skill'           => (string) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_SKILL, ''),
+                    'useSkill'        => $this->isStepHistorySummarizationUsingSkill(),
+                ]);
+            }
+            return;
+        }
+
+        $summary = $transcript;
+        $skillName = (string) $this->configApp->get(self::CFG_STEP_HISTORY_SUMMARY_SKILL, '');
+        if ($this->isStepHistorySummarizationUsingSkill()) {
+            if ($skillName === '') {
+                return;
+            }
+
+            $skill = $this->configApp->getSkill($skillName);
+            if (!$skill instanceof Skill) {
+                return;
+            }
+
+            $skill->setDefaultConfigurationAgent($agentCfg);
+            $summaryRaw = $skill->execute(MessageRole::USER, [], ['transcript' => $transcript])->await();
+            $summary = $this->normalizeSummaryToString($summaryRaw);
+        }
+
         if (trim($summary) === '') {
             return;
         }
 
         $history = $agentCfg->getChatHistory();
-        $summaryMessage = new NeuronMessage(MessageRole::ASSISTANT, $summary);
-        ChatHistoryEditHelper::replaceMessagesBySnapshotRange($history, $countBefore, $countAfter, $summaryMessage);
+        $summaryMessage = new NeuronMessage($this->getStepHistorySummarizationRole(), $summary);
+
+        $mode = $this->getStepHistorySummarizationMode();
+        if ($mode === 'append_summary') {
+            if ($history instanceof AbstractFullChatHistory) {
+                ChatHistoryEditHelper::insertFullMessageAt($history, $countAfter, $summaryMessage);
+            } else {
+                $history->addMessage($summaryMessage);
+            }
+        } else {
+            ChatHistoryEditHelper::replaceMessagesBySnapshotRange($history, $countBefore, $countAfter, $summaryMessage);
+        }
+
+        if ($this->isStepHistorySummarizationDebugEnabled()) {
+            $this->configApp->getLoggerWithContext()->info('Step summarization applied', [
+                'todolist'        => $stepTodoList->getName(),
+                'before'          => $countBefore,
+                'after'           => $countAfter,
+                'delta'           => $delta,
+                'rawCount'        => count($stepMessagesCopy),
+                'keptCount'       => count($filtered),
+                'transcriptChars' => mb_strlen(trim($transcript)),
+                'summaryChars'    => mb_strlen(trim($summary)),
+                'mode'            => $mode,
+                'role'            => $this->getStepHistorySummarizationRole()->value,
+                'skill'           => $skillName,
+                'useSkill'        => $this->isStepHistorySummarizationUsingSkill(),
+            ]);
+        }
     }
 
     /**

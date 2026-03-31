@@ -10,6 +10,7 @@ use NeuronAI\Chat\Messages\Message;
 
 use function array_slice;
 use function array_splice;
+use function array_values;
 use function count;
 
 /**
@@ -177,11 +178,10 @@ final class ChatHistoryEditHelper
                 return;
             }
 
-            for ($i = 0; $i < $delta; $i++) {
-                self::deleteFullMessageAt($history, $countBefore);
-            }
-
-            self::insertFullMessageAt($history, $countBefore, $replacement);
+            $full = $history->getFullMessages();
+            array_splice($full, $countBefore, $delta, [$replacement]);
+            $full = array_values($full);
+            self::replaceFullHistory($history, $full);
 
             return;
         }

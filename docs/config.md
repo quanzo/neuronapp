@@ -43,20 +43,37 @@
 ### Опции оркестратора (`TodoListOrchestrator`)
 
 Оркестратор (`src/classes/orchestrators/TodoListOrchestrator.php`) поддерживает опциональное поведение
-«суммаризация истории step-цикла» через Skill.
+«суммаризация истории step-шага (каждой итерации step-цикла)» через Skill.
 
 Ключи `config.jsonc`:
 
 - `orchestrator.step_history_summarize.enabled` (bool, default=`false`) — включить/выключить поведение.
 - `orchestrator.step_history_summarize.skill` (string) — имя skill, который будет вызван для суммаризации
   (разрешается через `ConfigurationApp::getSkill()`).
+- `orchestrator.step_history_summarize.use_skill` (bool, default=`false`) — использовать ли LLM-skill для суммаризации:
+  - `false`: в историю будет вставляться `transcript` (после фильтрации) как “суммаризованный” контент;
+  - `true`: будет вызван указанный `skill`, а в историю вставится ответ skill.
+- `orchestrator.step_history_summarize.mode` (string, default=`replace_range`) — как применять summary:
+  - `replace_range`: заменить сообщения **текущего шага** одним summary-сообщением;
+  - `append_summary`: не удалять сообщения шага, а добавить summary отдельным сообщением после шага.
+- `orchestrator.step_history_summarize.role` (string, default=`assistant`) — роль summary-сообщения:
+  - `assistant` или `system`.
+- `orchestrator.step_history_summarize.min_transcript_chars` (int, default=`50`) — минимальная длина transcript
+  (после фильтрации) для запуска суммаризации.
+- `orchestrator.step_history_summarize.debug` (bool, default=`false`) — включить подробное логирование skip/apply.
+- `orchestrator.step_history_summarize.filter.*` — фильтрация «шума» перед суммаризацией:
+  - `filter.tool_messages` (bool, default=`true`) — исключать tool-call/tool-result;
+  - `filter.history_tools` (bool, default=`true`) — исключать сообщения инструментов `chat_history.*`;
+  - `filter.min_message_chars` (int, default=`3`) — исключать слишком короткие сообщения;
+  - `filter.dedup_consecutive` (bool, default=`true`) — убирать подряд повторяющиеся сообщения.
 
 Поведение:
 
-- перед началом step-цикла снимается размер истории;
-- после окончания step-цикла копируются все сообщения, добавленные в step;
-- после выполнения `finish` вызывается skill с параметром `transcript` (строка) и результатом заменяется
-  **вся** история сессии (остаётся одно сообщение с summary).
+- на каждой итерации step-цикла перед выполнением шага снимается размер истории;
+- после выполнения шага копируются сообщения, добавленные **только этим шагом**;
+- сообщения шага фильтруются от «шума» и преобразуются в `transcript`;
+- если `transcript` слишком короткий — суммаризация пропускается;
+- иначе вызывается skill с параметром `transcript` (строка), а результат применяется по `mode`.
 
 Пример:
 
@@ -65,7 +82,18 @@
   "orchestrator": {
     "step_history_summarize": {
       "enabled": true,
-      "skill": "summarize/step_history"
+      "skill": "summarize/step_history",
+      "use_skill": true,
+      "mode": "replace_range",
+      "role": "assistant",
+      "min_transcript_chars": 50,
+      "debug": false,
+      "filter": {
+        "tool_messages": true,
+        "history_tools": true,
+        "min_message_chars": 3,
+        "dedup_consecutive": true
+      }
     }
   }
 }
