@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace app\modules\neuron\helpers;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
 use app\modules\neuron\enums\LlmCyclePollStatus;
 use NeuronAI\Chat\Enums\MessageRole;
+use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
+use NeuronAI\Chat\Messages\ToolCallMessage;
 
 /**
  * Циклы ожидания завершения задачи LLM и повтор итогового сообщения.
@@ -28,6 +31,190 @@ class LlmCycleHelper
     public const MSG_CONTINUE = 'Сontinue with the task';
     public const MSG_RESULT = 'Repeat the final message';
     public const MSG_CHECK_WORK2 = 'Is the task complete? Answer only YES or NO! If NO, continue!';
+
+    /**
+     * Нормализует роль сообщения (enum/строка) к нижнему регистру.
+     *
+     * @param NeuronMessage $message Сообщение NeuronAI.
+     *
+     * @return string|null 'user', 'assistant', ... либо null, если роль не строковая и не enum.
+     */
+    private static function normalizeRole(NeuronMessage $message): ?string
+    {
+        /** @var mixed $role */
+        $role = $message->getRole();
+
+        if ($role instanceof MessageRole) {
+            return mb_strtolower($role->value);
+        }
+
+        if (\is_string($role) && $role !== '') {
+            return mb_strtolower($role);
+        }
+
+        return null;
+    }
+
+    /**
+     * Проверяет, что сообщение является служебным вопросом цикла проверки статуса (waitCycle).
+     *
+     * Служебным считается user-сообщение с ровно одним из ожидаемых текстов проверки.
+     *
+     * Пример:
+     *
+     * <code>
+     * $isServiceQuestion = LlmCycleHelper::isCycleRequestMsg($message);
+     * </code>
+     *
+     * @param mixed $message Сообщение (обычно {@see NeuronMessage}) или иное значение.
+     */
+    public static function isCycleRequestMsg(mixed $message): bool
+    {
+        if (!$message instanceof NeuronMessage) {
+            return false;
+        }
+
+        if (self::normalizeRole($message) !== 'user') {
+            return false;
+        }
+
+        $content = $message->getContent();
+        if (!\is_string($content)) {
+            return false;
+        }
+
+        $text = trim($content);
+        if ($text === '') {
+            return false;
+        }
+
+        return \in_array($text, [self::MSG_CHECK_WORK, self::MSG_CHECK_WORK2], true);
+    }
+
+    /**
+     * Проверяет, что сообщение является служебным ответом на вопрос цикла проверки статуса (waitCycle).
+     *
+     * Служебным считается assistant-сообщение, которое содержит явный статус-код (YES/NO/WAITING)
+     * либо пустой текст (как «нет ответа» в текстовом канале).
+     *
+     * Пример:
+     *
+     * <code>
+     * $isServiceAnswer = LlmCycleHelper::isCycleResponseMsg($message);
+     * </code>
+     *
+     * @param mixed $message Сообщение (обычно {@see NeuronMessage}) или иное значение.
+     */
+    public static function isCycleResponseMsg(mixed $message): bool
+    {
+        if (!$message instanceof NeuronMessage) {
+            return false;
+        }
+
+        if ($message instanceof ToolCallMessage) {
+            return false;
+        }
+
+        if (self::normalizeRole($message) !== 'assistant') {
+            return false;
+        }
+
+        /** @var mixed $content */
+        $content = $message->getContent();
+        if ($content === null) {
+            return true;
+        }
+
+        if (\is_array($content)) {
+            return false;
+        }
+
+        $text = trim((string) $content);
+        if ($text === '') {
+            return true;
+        }
+
+        return 1 === preg_match(
+            '/(?<![A-Za-z])(YES|NO|WAITING)(?![A-Za-z])/i',
+            $text
+        );
+    }
+
+    /**
+     * Удаляет из истории служебные сообщения цикла проверки статуса по диапазону снимков [before..after).
+     *
+     * Метод не делает truncate «хвоста»: удаляются только те сообщения в дельте, которые распознаны
+     * как служебный запрос ({@see isCycleRequestMsg}) или служебный ответ ({@see isCycleResponseMsg}).
+     *
+     * Пример:
+     *
+     * <code>
+     * $history = $agentCfg->getChatHistory();
+     * $before = ChatHistoryRollbackHelper::getSnapshotCount($history);
+     * $agentCfg->sendMessage($msg);
+     * $after = ChatHistoryRollbackHelper::getSnapshotCount($history);
+     * LlmCycleHelper::cleanupCycleServiceMessagesBySnapshotRange($history, $before, $after);
+     * </code>
+     *
+     * @param ChatHistoryInterface $history История агента.
+     * @param int $countBefore Число сообщений в истории до раунда.
+     * @param int $countAfter Число сообщений в истории после раунда.
+     */
+    public static function cleanupCycleServiceMessagesBySnapshotRange(
+        ChatHistoryInterface $history,
+        int $countBefore,
+        int $countAfter
+    ): void {
+        if ($countBefore < 0 || $countAfter <= $countBefore) {
+            return;
+        }
+
+        $messages = $history instanceof AbstractFullChatHistory
+            ? $history->getFullMessages()
+            : $history->getMessages();
+
+        $max = count($messages);
+        if ($countBefore >= $max) {
+            return;
+        }
+
+        $end = min($countAfter, $max);
+        $indexesToDelete = [];
+        $awaitingServiceResponse = false;
+
+        for ($i = $countBefore; $i < $end; $i++) {
+            $msg = $messages[$i] ?? null;
+            if ($msg === null) {
+                continue;
+            }
+
+            if (self::isCycleRequestMsg($msg)) {
+                $indexesToDelete[] = $i;
+                $awaitingServiceResponse = true;
+                continue;
+            }
+
+            if ($awaitingServiceResponse && self::isCycleResponseMsg($msg)) {
+                $indexesToDelete[] = $i;
+                $awaitingServiceResponse = false;
+            }
+        }
+
+        if ($indexesToDelete === []) {
+            return;
+        }
+
+        rsort($indexesToDelete);
+
+        foreach ($indexesToDelete as $index) {
+            if ($history instanceof AbstractFullChatHistory) {
+                ChatHistoryEditHelper::deleteFullMessageAt($history, $index);
+                continue;
+            }
+
+            ChatHistoryTruncateHelper::deleteMessageAtIndex($history, $index);
+        }
+    }
 
     /**
      * Цикл опроса LLM до подтверждения завершения задачи; служебные реплики проверки при необходимости убираются из истории.
@@ -58,11 +245,8 @@ class LlmCycleHelper
             $countBefore = ChatHistoryRollbackHelper::getSnapshotCount($history);
 
             $msgAnswer = $agentCfg->sendMessage($msgTest);
-            $cleanup   = LlmCycleStatusCheckHelper::resolveCleanupDecision($msgAnswer);
-            //$cleanup     = null;
-            if ($cleanup !== null) {
-                StatusCheckHistoryCleanupHelper::apply($history, $cleanup, $countBefore);
-            }
+            $countAfter = ChatHistoryRollbackHelper::getSnapshotCount($history);
+            self::cleanupCycleServiceMessagesBySnapshotRange($history, $countBefore, $countAfter);
 
             $status = LlmCyclePollStatus::fromAgentAnswer($msgAnswer);
 
