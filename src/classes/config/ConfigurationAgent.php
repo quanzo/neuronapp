@@ -32,6 +32,8 @@ use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\logger\ContextualLogger;
 use app\modules\neuron\classes\neuron\providers\LoggingAIProviderDecorator;
 use app\modules\neuron\classes\neuron\history\FileFullChatHistory;
+use app\modules\neuron\classes\neuron\trimmers\CclCodeHistoryTrimmer;
+use app\modules\neuron\classes\neuron\trimmers\ConfigurationAgentHistoryHeadSummarizer;
 use app\modules\neuron\classes\neuron\trimmers\FluidContextWindowTrimmer;
 use app\modules\neuron\classes\neuron\trimmers\TokenCounter;
 use app\modules\neuron\helpers\AttachmentHelper;
@@ -689,7 +691,7 @@ class ConfigurationAgent implements IDependConfigApp
                 $this->contextWindow,
                 'neuron_',
                 '.chat',
-                new FluidContextWindowTrimmer()
+                $this->buildHistoryTrimmer()
             );
             /*
             $this->_chatHistory = new FileChatHistory(
@@ -703,6 +705,37 @@ class ConfigurationAgent implements IDependConfigApp
         }
 
         return $this->_chatHistory;
+    }
+
+    /**
+     * Создаёт триммер истории сообщений для формирования окна LLM.
+     *
+     * Триммер выбирается из конфигурации приложения:
+     * - `history.trimmer = fluid` (по умолчанию) — {@see FluidContextWindowTrimmer};
+     * - `history.trimmer = ccl_compact` — {@see CclCodeHistoryTrimmer} (microcompact + LLM-summary головы).
+     *
+     * Дополнительно можно настроить параметры:
+     * - `history.ccl_compact.tail_ratio` (float, default 0.6)
+     * - `history.ccl_compact.keep_recent_tool_results` (int, default 10)
+     *
+     * @return \NeuronAI\Chat\History\HistoryTrimmerInterface
+     */
+    private function buildHistoryTrimmer(): \NeuronAI\Chat\History\HistoryTrimmerInterface
+    {
+        $configApp = $this->getConfigurationApp() ?? ConfigurationApp::getInstance();
+        $mode = (string) $configApp->get('history.trimmer', 'fluid');
+
+        if ($mode === 'ccl_compact') {
+            $tailRatio = (float) $configApp->get('history.ccl_compact.tail_ratio', 0.6);
+            $keepRecent = (int) $configApp->get('history.ccl_compact.keep_recent_tool_results', 10);
+
+            $summarizer = new ConfigurationAgentHistoryHeadSummarizer($this);
+            return (new CclCodeHistoryTrimmer(new TokenCounter(), $summarizer))
+                ->withTailRatio($tailRatio)
+                ->withKeepRecentToolResults($keepRecent);
+        }
+
+        return new FluidContextWindowTrimmer();
     }
 
     /**

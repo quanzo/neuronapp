@@ -62,6 +62,31 @@
     - при `enableChatHistory === true` — `FileFullChatHistory` в директории `ConfigurationApp::getSessionDir()`, с префиксом `neuron_` и расширением `.chat`;
     - при `enableChatHistory === false` — `InMemoryChatHistory`;
   - `setChatHistory()` и `resetChatHistory()` управляют текущим объектом истории;
+  - триммер окна для LLM выбирается через настройки `config.jsonc`:
+    - `history.trimmer = "fluid"` (по умолчанию) — окно строится от хвоста истории по токенам (`FluidContextWindowTrimmer`);
+    - `history.trimmer = "ccl_compact"` — режим «CCL Code»: microcompact старых tool-result + LLM-summary головы (`CclCodeHistoryTrimmer`).
+
+#### Настройки `history.*` для триммера
+
+Ключи в `config.jsonc`:
+
+- `history.trimmer` (string): `"fluid"` | `"ccl_compact"`.
+- `history.ccl_compact.tail_ratio` (float, default `0.6`): доля контекстного окна, выделяемая под tail (хвост), который сохраняется без изменений.
+- `history.ccl_compact.keep_recent_tool_results` (int, default `10`): сколько последних `ToolResultMessage` оставлять «как есть» (старые tool-result очищаются маркером).
+
+Пример:
+
+```json
+{
+  "history": {
+    "trimmer": "ccl_compact",
+    "ccl_compact": {
+      "tail_ratio": 0.6,
+      "keep_recent_tool_results": 10
+    }
+  }
+}
+```
 - сессии todolist:
   - `getBlankRunStateDto()` / `getExistRunStateDto()` — работа с `RunStateDto` и чекпоинтами в `.store` через `RunStateCheckpointHelper`;
 - результаты:
