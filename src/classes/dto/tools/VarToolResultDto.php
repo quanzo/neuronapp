@@ -97,6 +97,25 @@ final class VarToolResultDto implements IArrayable
             'truncated'  => $this->truncated,
         ];
 
+        // Урезаем шумовые метаданные для LLM в зависимости от операции.
+        // DTO поля сохраняются, меняется только сериализация.
+        switch ($this->action) {
+            case 'get':
+            case 'set':
+            case 'pad':
+                unset($result['sessionKey'], $result['fileName'], $result['savedAt']);
+                break;
+            case 'unset':
+                unset($result['sessionKey']);
+                break;
+            case 'exist':
+                unset($result['sessionKey'], $result['fileName']);
+                break;
+            case 'list':
+                unset($result['sessionKey']);
+                break;
+        }
+
         return array_filter(
             $result,
             static fn(mixed $value): bool => $value !== null,
