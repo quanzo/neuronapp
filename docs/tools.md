@@ -5,7 +5,7 @@
 ### Общая модель
 
 - Базовый абстрактный класс для инструментов модуля — `app\modules\neuron\tools\ATool`.
-- Конкретные инструменты реализованы в `src/tools/*Tool.php` (например, `GlobTool`, `GrepTool`, `ViewTool`, `BashTool`, `BashCmdTool`, `GitSummaryTool`, `WikiSearchTool`, `RuWikiSearchTool`, `UniSearchTool`, `FileTreeTool`, `SearchReplaceTool`, `HttpFetchTool`, `OllamaSearchTool`).
+- Конкретные инструменты реализованы в `src/tools/*Tool.php` (например, `GlobTool`, `GrepTool`, `ViewTool`, `BashTool`, `BashCmdTool`, `GitSummaryTool`, `WikiSearchTool`, `RuWikiSearchTool`, `UniSearchTool`, `FileTreeTool`, `SearchReplaceTool`, `WebFetchTool`, `OllamaSearchTool`).
 - Инструменты передаются в `ConfigurationAgent::$tools` и используются агентом NeuronAI при вызове `getTools()`.
 - Навыки и todolist могут подключать встроенные инструменты через:
   - опцию `tools` (строка с именами инструментов);
@@ -33,17 +33,67 @@
 - **`ChunckGrepTool`** — поиск строки в файле с возвратом семантических чанков вокруг совпадений.
 - **`GitSummaryTool`** — получение краткой сводки по текущему git‑состоянию (например, изменения, ветка).
 - **`WikiSearchTool` / `RuWikiSearchTool` / `UniSearchTool`** — поиск по Wikipedia/универсальным источникам (в зависимости от реализации).
-- **`HttpFetchTool`** — выполнение HTTP‑запросов к внешним ресурсам (GET/HEAD, белый список хостов, лимиты); см. ниже.
+- **`WebFetchTool`** — единый инструмент для HTTP‑запросов (raw) и извлечения контента (extract/prompt); см. ниже.
 - **`OllamaSearchTool`** — взаимодействие с локальными моделями через Ollama (если настроено).
 
 Конкретное поведение каждого инструмента реализовано в соответствующем классе, опираясь на интерфейсы NeuronAI (`ToolInterface`, `ProviderToolInterface`, `ToolkitInterface`).
 
-### `HttpFetchTool` и исходящие заголовки
+### `web_fetch` / `http_fetch`: единый WebFetchTool с режимами
 
-- Класс: `app\modules\neuron\tools\HttpFetchTool`. Подключается явным добавлением экземпляра в `ConfigurationAgent::$tools` (в `ToolRegistry` по короткому имени не регистрируется).
-- По умолчанию запросы отправляются с идентичностью **Firefox**: набор задаётся `app\modules\neuron\classes\dto\tools\HttpFetchRequestHeadersDto::firefoxDefaults()` (User-Agent в формате Mozilla/Firefox/Gecko, плюс типичные `Accept` и `Accept-Language`).
-- Дополнительные заголовки передаются через DTO: аргумент конструктора `?HttpFetchRequestHeadersDto $requestHeaders` или метод `setDefaultRequestHeaders()`. Переданный набор **сливается** с дефолтами Firefox; совпадающие по имени (без учёта регистра) заголовки **перекрываются** вашими значениями.
-- Пример только добавления заголовка: `HttpFetchRequestHeadersDto::empty()->withHeader('Authorization', 'Bearer …')` в конструкторе `HttpFetchTool` или в `setDefaultRequestHeaders()`.
+В проекте используется **один** класс инструмента: `app\modules\neuron\tools\WebFetchTool` (`src/tools/WebFetchTool.php`).
+
+Доступные имена (алиасы в `ToolRegistry`):
+
+- `web_fetch` — основной алиас;
+- `http_fetch` — алиас для обратной совместимости со старой конфигурацией.
+
+#### Заголовки (User-Agent = Firefox)
+
+- По умолчанию исходящие запросы отправляются с идентичностью **Firefox**:
+  `app\modules\neuron\classes\dto\tools\HttpFetchRequestHeadersDto::firefoxDefaults()`.
+- Дополнительные заголовки передаются через DTO в конструктор `WebFetchTool` или методом `setDefaultRequestHeaders()`.
+  Переданный набор **сливается** с дефолтами Firefox; совпадающие по имени (без учёта регистра) заголовки **перекрываются** вашими значениями.
+
+#### Режимы (параметр `mode`)
+
+- `mode=raw` — “сырой” HTTP: возвращает **JSON** со статусом/заголовками/телом.
+  Доп. параметры: `method=GET|HEAD`, `follow_redirects`, `max_redirects`.
+- `mode=extract` — извлекает текст: HTML → markdown-like, возвращает **plain-text**.
+- `mode=prompt` — как `extract`, но затем применяет `prompt` через LLM и возвращает **plain-text**.
+
+### `WebFetchTool` (`web_fetch`)
+
+- Класс: `app\modules\neuron\tools\WebFetchTool` (`src/tools/WebFetchTool.php`).
+- Подключение: через `tools: web_fetch` (создаётся через `ToolRegistry::makeTool('web_fetch', ...)`).
+- Формат ответа зависит от `mode`:
+  - `raw` → JSON
+  - `extract|prompt` → plain-text
+
+Назначение:
+
+- получить читаемый текст со страницы (HTML конвертируется в markdown‑like текст);
+- при наличии `prompt` — применить его к контенту через LLM (используется текущая модель агента, но в «чистой» сессии без истории и без tools).
+
+Параметры:
+
+- `mode` (string, optional) — `raw|extract|prompt` (по умолчанию `extract`).
+- `url` (string, required) — абсолютный `http/https` URL. HTTP автоматически повышается до HTTPS.
+- `method` (string, optional) — только для `raw`: `GET|HEAD` (по умолчанию `GET`).
+- `prompt` (string, optional) — инструкция/вопрос к контенту. Если не задан — возвращается извлечённый текст.
+- `timeout_ms` (int, optional) — таймаут в мс.
+- `max_body_size` (int, optional) — максимальный размер тела ответа в байтах.
+- `cache_ttl_seconds` (int, optional) — TTL кэша (для `extract|prompt`); `0` отключает кэш.
+- `follow_redirects` (bool, optional) — только для `raw`: следовать редиректам автоматически (по умолчанию `true`).
+- `max_redirects` (int, optional) — только для `raw`: максимум редиректов (по умолчанию `5`).
+- Исходящие заголовки:
+  - по умолчанию инструмент использует **набор заголовков в стиле Firefox** (включая `User-Agent`);
+  - при создании инструмента можно передать/установить дополнительные заголовки, которые сольются с дефолтами Firefox с перекрытием по имени.
+
+Ограничения и безопасность:
+
+- **Редиректы на другой host** инструмент не следует автоматически. Вместо этого вернёт сообщение с `Redirect URL`, которое нужно передать в повторный вызов.
+- **Бинарный контент** (например, `application/pdf`) не поддерживается — вернётся `Error: ...`.
+- Аутентифицированные/private URL обычно недоступны; для них предпочтительнее специализированные MCP-инструменты с авторизацией.
 
 ### Инструменты просмотра истории (`chat_history.*`)
 

@@ -56,6 +56,48 @@ class LlmCycleHelper
     }
 
     /**
+     * Определяет «пустое» текстовое сообщение в истории.
+     *
+     * Пустым считается сообщение NeuronAI, которое не является tool-call и не содержит
+     * структурированный (array/object) контент, а текстовый контент после trim пуст
+     * (или контент отсутствует).
+     *
+     * Роль сообщения не имеет значения.
+     *
+     * Пример:
+     *
+     * <code>
+     * $isEmpty = LlmCycleHelper::isCycleEmptyMsg($message);
+     * </code>
+     *
+     * @param mixed $message Сообщение (обычно {@see NeuronMessage}) или иное значение.
+     */
+    public static function isCycleEmptyMsg(mixed $message): bool
+    {
+        if (!$message instanceof NeuronMessage) {
+            return false;
+        }
+
+        if ($message instanceof ToolCallMessage) {
+            return false;
+        }
+
+        /** @var mixed $content */
+        $content = $message->getContent();
+        if ($content === null) {
+            return true;
+        }
+
+        if (\is_array($content) || \is_object($content)) {
+            return false;
+        }
+
+        $text = trim((string) $content);
+
+        return $text === '';
+    }
+
+    /**
      * Проверяет, что сообщение является служебным вопросом цикла проверки статуса (waitCycle).
      *
      * Служебным считается user-сообщение с ровно одним из ожидаемых текстов проверки.
@@ -179,6 +221,7 @@ class LlmCycleHelper
         }
 
         $end = min($countAfter, $max);
+        /** @var array<int,true> $indexesToDelete */
         $indexesToDelete = [];
         $awaitingServiceResponse = false;
 
@@ -188,14 +231,22 @@ class LlmCycleHelper
                 continue;
             }
 
+            if (self::isCycleEmptyMsg($msg)) {
+                $indexesToDelete[$i] = true;
+                if ($awaitingServiceResponse && self::normalizeRole($msg) === 'assistant') {
+                    $awaitingServiceResponse = false;
+                }
+                continue;
+            }
+
             if (self::isCycleRequestMsg($msg)) {
-                $indexesToDelete[] = $i;
+                $indexesToDelete[$i] = true;
                 $awaitingServiceResponse = true;
                 continue;
             }
 
             if ($awaitingServiceResponse && self::isCycleResponseMsg($msg)) {
-                $indexesToDelete[] = $i;
+                $indexesToDelete[$i] = true;
                 $awaitingServiceResponse = false;
             }
         }
@@ -204,9 +255,10 @@ class LlmCycleHelper
             return;
         }
 
-        rsort($indexesToDelete);
+        $indexes = array_keys($indexesToDelete);
+        rsort($indexes);
 
-        foreach ($indexesToDelete as $index) {
+        foreach ($indexes as $index) {
             if ($history instanceof AbstractFullChatHistory) {
                 ChatHistoryEditHelper::deleteFullMessageAt($history, $index);
                 continue;

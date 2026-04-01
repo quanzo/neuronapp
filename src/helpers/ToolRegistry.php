@@ -12,13 +12,13 @@ use app\modules\neuron\tools\ChunckGrepTool;
 use app\modules\neuron\tools\GitSummaryTool;
 use app\modules\neuron\tools\GlobTool;
 use app\modules\neuron\tools\GrepTool;
-use app\modules\neuron\tools\HttpFetchTool;
 use app\modules\neuron\tools\VarExistTool;
 use app\modules\neuron\tools\VarGetTool;
 use app\modules\neuron\tools\VarListTool;
 use app\modules\neuron\tools\VarPadTool;
 use app\modules\neuron\tools\VarSetTool;
 use app\modules\neuron\tools\VarUnsetTool;
+use app\modules\neuron\tools\WebFetchTool;
 use app\modules\neuron\tools\WikiSearchTool;
 use app\modules\neuron\tools\RuWikiSearchTool;
 use app\modules\neuron\tools\TodoGotoTool;
@@ -68,7 +68,10 @@ class ToolRegistry
             'chunk_grep'     => new ChunckGrepTool(),
             'glob'           => new GlobTool(),
             'grep'           => new GrepTool(),
-            'http_fetch'     => new HttpFetchTool(),
+            // Единый инструмент. 'http_fetch' сохранён как алиас (для обратной совместимости),
+            // но реализован тем же классом WebFetchTool.
+            'http_fetch'     => new WebFetchTool(name: 'http_fetch'),
+            'web_fetch'      => new WebFetchTool(),
             default          => null,
         };
         if ($tool && $tool instanceof ATool) {

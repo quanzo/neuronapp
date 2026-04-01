@@ -1,37 +1,128 @@
 <?php
 
+declare(strict_types=1);
+
 namespace app\modules\neuron\classes\convert;
 
+use DOMDocument;
+use DOMNode;
+
+use function html_entity_decode;
+use function implode;
+use function is_string;
+use function libxml_clear_errors;
+use function libxml_use_internal_errors;
+use function mb_strlen;
+use function preg_match;
+use function preg_match_all;
+use function preg_replace;
+use function preg_replace_callback;
+use function strip_tags;
+use function str_replace;
+use function strlen;
+use function strpos;
+use function substr;
+use function substr_count;
+use function trim;
+
+use const ENT_HTML5;
+use const ENT_QUOTES;
+
 /**
- * HTML <--> MARKDOWN
+ * HTML ⇄ Markdown (и markdown-like текст).
+ *
+ * Это легковесный конвертер, ориентированный на **стабильный** «LLM-friendly» результат.
+ *
+ * Ключевые цели:
+ *
+ * - **Стабильность**: на реальном web‑HTML (с шумом, вложенностями и "кривой" разметкой) результат
+ *   должен быть предсказуемым и не разваливаться в пустоту.
+ * - **Чистота текста**: не допускать попадания JS/CSS в выходной текст (типичный баг конвертеров,
+ *   которые в конце делают `strip_tags()` — текст внутри `<script>` остаётся).
+ * - **Смысл важнее идеала**: это не полноценный "идеальный" HTML→Markdown движок; задача — выдать
+ *   удобочитаемый markdown-like текст для дальнейшей обработки LLM/поиском.
+ *
+ * Пайплайн `htmlToMarkdown()`:
+ *
+ * 1) **DOM‑санитизация**: удаляем шумные/опасные элементы (`script`, `style`, `noscript`, `iframe`, …),
+ *    а также HTML‑комментарии.
+ * 2) **Защита `pre/code`**: блоки `<pre>` заменяем плейсхолдерами, чтобы regex‑конвертация и `strip_tags()`
+ *    не разрушили форматирование. Потом восстанавливаем как fenced‑code.
+ * 3) **Блочные элементы**: отдельно обрабатываем `<hr>` и `<blockquote>` (до `strip_tags()`).
+ * 4) **Структурные элементы**: картинки, ссылки, таблицы, списки — отдельными обработчиками.
+ * 5) **Базовые теги**: заголовки/абзацы/выделения — простыми правилами замены.
+ * 6) **Финализация**: `strip_tags()`, восстановление плейсхолдеров, декод сущностей, нормализация пустых строк.
  *
  * @see https://github.com/shengkung/mdify
+ *
+ * Пример:
+ *
+ * <code>
+ * $markdown = Mdify::htmlToMarkdown('<h1>Hello</h1><p>World</p>');
+ * </code>
  */
 class Mdify
 {
     /**
-     * HTML → Markdown main conversion method
-     * Converts HTML content to Markdown format
+     * HTML → Markdown главный метод конвертации.
      *
-     * @param string $sHtmlContent HTML content
-     * @return string Markdown formatted text
+     * Важно: конвертация выполняется по принципу best‑effort, потому что реальный HTML часто содержит:
+     *
+     * - скрипты, стили, скрытые элементы, навигацию, мусорные контейнеры;
+     * - вложенные списки/таблицы со сложными атрибутами и нестандартной вложенностью;
+     * - незакрытые теги или HTML‑фрагменты вместо полноценного документа.
+     *
+     * Поэтому метод сначала делает DOM‑очистку и защиту pre‑блоков, затем применяет набор
+     * преобразований, ориентированных на практичный markdown‑like результат.
+     *
+     * @param string $sHtmlContent HTML контент (допускается фрагмент HTML)
+     *
+     * @return string Markdown/markdown-like текст
      */
-    public static function htmlToMarkdown($sHtmlContent)
+    public static function htmlToMarkdown(string $sHtmlContent): string
     {
-        // Remove paragraphs containing only whitespace, line breaks, or empty tags
-        $sPattern = '/<p>(\s|&nbsp;|<br\s*\/?>|<strong>(\s|&nbsp;)*<\/strong>|<span[^>]*>(\s|&nbsp;)*<\/span>)*<\/p>/i';
-        $sMarkdown = preg_replace($sPattern, '', $sHtmlContent);
+        $sHtmlContent = trim($sHtmlContent);
+        if ($sHtmlContent === '') {
+            return '';
+        }
 
-        // Process images first to ensure proper conversion
+        // 1) DOM‑очистка.
+        //
+        // Наивный подход "сначала заменим теги, потом strip_tags()" опасен тем, что JS/CSS
+        // из <script>/<style> будет сохранён как обычный текст.
+        // Поэтому сначала удаляем такие узлы из DOM и только потом делаем regex‑конвертацию.
+        $sHtmlContent = self::sanitizeHtml($sHtmlContent);
+
+        // 2) Защита preformatted блоков.
+        //
+        // Блоки <pre> обычно содержат код/логи/конфиги, для которых критичны переносы строк.
+        // Мы заменяем каждый <pre> плейсхолдером, а содержимое сохраняем как fenced‑code.
+        $protected = self::protectPreformattedBlocks($sHtmlContent);
+        $sHtmlContent = $protected['html'];
+        $protectedBlocks = $protected['blocks'];
+
+        // 3) Блочные элементы, которые проще и надёжнее обработать ДО strip_tags().
+        //
+        // Это помогает сохранить границы блоков (цитаты/разделители), не полагаясь на угадывание
+        // после удаления тегов.
+        $sHtmlContent = self::convertHtmlHorizontalRules($sHtmlContent);
+        $sHtmlContent = self::convertHtmlBlockquotes($sHtmlContent);
+        $sHtmlContent = self::convertInlineCodeTags($sHtmlContent);
+
+        // 4) Убираем "пустые" абзацы, которые дают лишние пустые строки в markdown.
+        $sPattern = '/<p>(\s|&nbsp;|<br\s*\/?>|<strong>(\s|&nbsp;)*<\/strong>|<span[^>]*>(\s|&nbsp;)*<\/span>)*<\/p>/i';
+        $sMarkdown = preg_replace($sPattern, '', $sHtmlContent) ?? $sHtmlContent;
+
+        // 5) Конвертируем элементы, которые не должны пропасть после strip_tags():
+        // - изображения и ссылки: иначе <img>/<a> исчезнут без следа
+        // - таблицы: переводим в pipe‑таблицы
+        // - списки: пытаемся сохранить маркеры и вложенность
         $sMarkdown = self::convertHtmlImages($sMarkdown);
-        // Process <a> links first to avoid matching failures due to paths or encoding
         $sMarkdown = self::convertHtmlLinks($sMarkdown);
-        // Process HTML tables first
         $sMarkdown = self::convertHtmlTables($sMarkdown);
-        // Process nested lists first
         $sMarkdown = self::nestedLists($sMarkdown);
 
-        // Define replacement rules, ignoring any attributes within tags
+        // 6) Базовые правила замены для простых тегов (заголовки/абзацы/выделения/переносы).
         $aReplacePatterns = [
             '/<h1[^>]*>(.*?)<\/h1>/is' => "# $1\n\n",
             '/<h2[^>]*>(.*?)<\/h2>/is' => "## $1\n\n",
@@ -48,34 +139,290 @@ class Mdify
             // '/<img[^>]*src=[\"\'](.*?)[\"\'][^>]*alt=[\"\'](.*?)[\"\'][^>]*>/is' => '![$2]($1)', // Handled by convertHtmlImages
         ];
 
-        // Apply replacements step by step
+        // Применяем правила по очереди.
         foreach ($aReplacePatterns as $k1 => $v1) {
-            $sMarkdown = preg_replace($k1, $v1, $sMarkdown);
+            $sMarkdown = preg_replace($k1, $v1, $sMarkdown) ?? $sMarkdown;
         }
 
-        // Remove remaining HTML tags
+        // 7) Удаляем оставшиеся HTML‑теги.
         $sMarkdown = strip_tags($sMarkdown);
 
-        // Remove excessive blank lines
-        $sMarkdown = preg_replace("/(\n\s*){3,}/", "\n\n", $sMarkdown);
+        // 8) Восстанавливаем защищённые <pre> блоки (fenced‑code) по плейсхолдерам.
+        if ($protectedBlocks !== []) {
+            foreach ($protectedBlocks as $placeholder => $blockMarkdown) {
+                $sMarkdown = str_replace($placeholder, $blockMarkdown, $sMarkdown);
+            }
+        }
 
-        // Return processed Markdown text
+        // 9) Декодируем HTML‑сущности (например, &amp;, &nbsp;) после strip_tags().
+        $sMarkdown = html_entity_decode($sMarkdown, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // 10) Нормализация пустых строк: оставляем максимум 2 подряд.
+        $sMarkdown = preg_replace("/(\n\s*){3,}/", "\n\n", $sMarkdown) ?? $sMarkdown;
+
+        // Финал: убираем пробелы/переводы строк по краям.
         return trim($sMarkdown);
     }
 
     /**
-     * HTML → Markdown specialized handler for <img> images
-     * Processes image tags first, converts to Markdown format, prevents removal by subsequent strip_tags
+     * DOM-based HTML sanitization for stable conversion.
+     *
+     * Удаляет элементы, которые чаще всего:
+     * - содержат исполняемый код/стили;
+     * - не несут полезного текста для LLM;
+     * - ломают regex-конвертацию.
+     *
+     * @param string $html Raw html
+     *
+     * @return string Sanitized html
+     */
+    private static function sanitizeHtml(string $html): string
+    {
+        $useErrors = libxml_use_internal_errors(true);
+
+        $dom = new DOMDocument('1.0', 'UTF-8');
+        // Оборачиваем в минимальный документ: так DOMDocument устойчивее к фрагментам HTML.
+        $loaded = $dom->loadHTML(
+            '<!doctype html><html><head><meta charset="utf-8"></head><body>' . $html . '</body></html>'
+        );
+
+        libxml_clear_errors();
+        libxml_use_internal_errors($useErrors);
+
+        if ($loaded !== true) {
+            // Fallback: если DOM не загрузился, хотя бы вырежем скрипты/стили регексом.
+            $html = preg_replace('/<script\b[^>]*>[\s\S]*?<\/script>/i', '', $html) ?? $html;
+            $html = preg_replace('/<style\b[^>]*>[\s\S]*?<\/style>/i', '', $html) ?? $html;
+            $html = preg_replace('/<!--[\s\S]*?-->/i', '', $html) ?? $html;
+            return $html;
+        }
+
+        $removeTags = [
+            'script',
+            'style',
+            'noscript',
+            'iframe',
+            'canvas',
+            'svg',
+            'form',
+            'button',
+            'input',
+            'select',
+            'textarea',
+            'link',
+            'meta',
+            'head',
+        ];
+
+        foreach ($removeTags as $tag) {
+            /** @var \DOMNodeList $nodes */
+            $nodes = $dom->getElementsByTagName($tag);
+            // NodeList "live", поэтому удаляем с конца.
+            for ($i = $nodes->length - 1; $i >= 0; $i--) {
+                $node = $nodes->item($i);
+                if ($node && $node->parentNode) {
+                    $node->parentNode->removeChild($node);
+                }
+            }
+        }
+
+        // Удаляем HTML-комментарии.
+        self::removeDomComments($dom);
+
+        $body = $dom->getElementsByTagName('body')->item(0);
+        if (!$body) {
+            return $html;
+        }
+
+        $out = '';
+        foreach ($body->childNodes as $child) {
+            $out .= $dom->saveHTML($child);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Рекурсивно удаляет comment‑узлы из DOM.
+     *
+     * Комментарии в HTML часто содержат мусор, служебные инструкции или куски шаблонов.
+     * Если их не удалять, они могут попадать в результат после `strip_tags()` и ухудшать качество текста.
+     *
+     * @param DOMNode $node Узел, от которого начинается рекурсивный обход
+     */
+    private static function removeDomComments(DOMNode $node): void
+    {
+        if (!$node->hasChildNodes()) {
+            return;
+        }
+
+        // Идём с конца, чтобы безопасно удалять узлы во время обхода.
+        for ($i = $node->childNodes->length - 1; $i >= 0; $i--) {
+            $child = $node->childNodes->item($i);
+            if (!$child) {
+                continue;
+            }
+
+            if ($child->nodeType === XML_COMMENT_NODE) {
+                $node->removeChild($child);
+                continue;
+            }
+
+            self::removeDomComments($child);
+        }
+    }
+
+    /**
+     * Защищает `<pre>` (и `<pre><code>`) блоки, заменяя их плейсхолдерами.
+     *
+     * Почему это нужно:
+     *
+     * - `<pre>` обычно содержит код/логи/вывод команд, где важны переносы строк.
+     * - Если пропустить `<pre>` через общие regex и `strip_tags()`, форматирование кода почти гарантированно сломается.
+     *
+     * Как работает:
+     *
+     * - каждый `<pre>...</pre>` заменяется на уникальный плейсхолдер `[[[MDIFY_PRE_BLOCK_N]]]`;
+     * - содержимое очищается от внешних тегов `<pre>` и `<code>`, затем:
+     *   - `strip_tags()` удаляет остаточные теги (например, подсветка кода);
+     *   - `html_entity_decode()` возвращает символы из `&lt;`, `&gt;`, `&amp;` и т.д.;
+     * - плейсхолдер сопоставляется с fenced code block формата:
+     *
+     * ```text
+     * ...
+     * ```
+     *
+     * Ограничение: язык code block фиксирован как `text`, потому что по HTML нельзя надёжно
+     * определить язык, а "угадывание" часто приводит к ошибкам подсветки.
+     *
+     * @return array{html:string,blocks:array<string,string>}
+     */
+    private static function protectPreformattedBlocks(string $html): array
+    {
+        $blocks = [];
+        $i = 0;
+
+        $html = preg_replace_callback('/<pre\b[^>]*>[\s\S]*?<\/pre>/i', static function (array $m) use (&$blocks, &$i): string {
+            $raw = $m[0];
+            $inner = preg_replace('/^<pre\b[^>]*>/i', '', $raw) ?? $raw;
+            $inner = preg_replace('/<\/pre>$/i', '', $inner) ?? $inner;
+
+            // Убираем оболочку <code> (если есть), оставляя содержимое.
+            $inner = preg_replace('/^<code\b[^>]*>/i', '', $inner) ?? $inner;
+            $inner = preg_replace('/<\/code>$/i', '', $inner) ?? $inner;
+
+            // Превращаем HTML внутри блока в "сырой" текст.
+            $text = html_entity_decode(strip_tags($inner), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $text = str_replace(["\r\n", "\r"], "\n", $text);
+            $text = trim($text);
+
+            $placeholder = "\n\n[[[MDIFY_PRE_BLOCK_" . $i . "]]]\n\n";
+            $blocks[$placeholder] = "\n```text\n" . $text . "\n```\n";
+            $i++;
+            return $placeholder;
+        }, $html) ?? $html;
+
+        return [
+            'html' => $html,
+            'blocks' => $blocks,
+        ];
+    }
+
+    /**
+     * Конвертирует `<hr>` в markdown‑разделитель `---`.
+     *
+     * Делается до `strip_tags()`, чтобы не потерять семантику разделителя.
+     *
+     * @param string $html HTML фрагмент
+     *
+     * @return string HTML с заменёнными `<hr>`
+     */
+    private static function convertHtmlHorizontalRules(string $html): string
+    {
+        return preg_replace('/<hr\b[^>]*\/?>/i', "\n\n---\n\n", $html) ?? $html;
+    }
+
+    /**
+     * Конвертирует `<blockquote>` в markdown‑цитаты (`> ...`).
+     *
+     * Делается до общего `strip_tags()`, чтобы не потерять границы цитаты.
+     *
+     * Реальный HTML внутри `<blockquote>` часто содержит `<p>` и `<br>`.
+     * Если просто сделать `strip_tags()`, абзацы могут "склеиться" в одну строку.
+     * Поэтому предварительно нормализуем разрывы:
+     *
+     * - `</p><p>` → `\n`
+     * - `<br>` → `\n`
+     *
+     * @param string $html HTML фрагмент
+     *
+     * @return string HTML с заменёнными `<blockquote>`
+     */
+    private static function convertHtmlBlockquotes(string $html): string
+    {
+        return preg_replace_callback('/<blockquote\b[^>]*>([\s\S]*?)<\/blockquote>/i', static function (array $m): string {
+            // Сохраняем разрывы между абзацами внутри цитаты до strip_tags().
+            $innerHtml = $m[1];
+            $innerHtml = preg_replace('/<\/p>\s*<p\b[^>]*>/i', "\n", $innerHtml) ?? $innerHtml;
+            $innerHtml = preg_replace('/<br\s*\/?>/i', "\n", $innerHtml) ?? $innerHtml;
+
+            $inner = trim(strip_tags($innerHtml));
+            $inner = str_replace(["\r\n", "\r"], "\n", $inner);
+            if ($inner === '') {
+                return '';
+            }
+            $lines = preg_split('/\n+/', $inner) ?: [];
+            $quoted = [];
+            foreach ($lines as $line) {
+                $line = trim((string) $line);
+                if ($line === '') {
+                    continue;
+                }
+                $quoted[] = '> ' . $line;
+            }
+            return "\n\n" . implode("\n", $quoted) . "\n\n";
+        }, $html) ?? $html;
+    }
+
+    /**
+     * Конвертирует inline `<code>...</code>` в backticks.
+     *
+     * Важно: `pre`‑блоки уже защищены в {@see self::protectPreformattedBlocks()},
+     * поэтому здесь обрабатываем только оставшиеся inline‑вставки кода.
+     *
+     * @param string $html HTML фрагмент
+     *
+     * @return string HTML с заменёнными inline `<code>`
+     */
+    private static function convertInlineCodeTags(string $html): string
+    {
+        return preg_replace_callback('/<code\b[^>]*>([\s\S]*?)<\/code>/i', static function (array $m): string {
+            $text = html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $text = trim($text);
+            if ($text === '') {
+                return '';
+            }
+            // Минимальная защита от конфликтов с backtick внутри кода.
+            $text = str_replace('`', '\\`', $text);
+            return '`' . $text . '`';
+        }, $html) ?? $html;
+    }
+
+    /**
+     * HTML → Markdown обработка изображений (`<img>` → `![alt](src)`).
+     *
+     * Делается до `strip_tags()`, потому что иначе `<img>` исчезнет и потеряется ссылка на изображение.
      *
      * @param string $sContent HTML content
+     *
      * @return string Converted content
      */
-    private static function convertHtmlImages($sContent)
+    private static function convertHtmlImages(string $sContent): string
     {
         return preg_replace_callback('/<img\b[^>]*>/i', function ($aMatches) {
             $sImgTag = $aMatches[0];
 
-            // Parse src attribute
+            // Достаём src.
             if (!preg_match('/src\s*=\s*("([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $sImgTag, $aSrcMatch)) {
                 return '';
             }
@@ -89,7 +436,7 @@ class Mdify
                 $sSrc = $aSrcMatch[4];
             }
 
-            // Parse alt attribute
+            // Достаём alt (опционально).
             $sAlt = '';
             if (preg_match('/alt\s*=\s*("([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $sImgTag, $aAltMatch)) {
                 if (isset($aAltMatch[2]) && $aAltMatch[2] !== '') {
@@ -101,11 +448,11 @@ class Mdify
                 }
             }
 
-            // Decode HTML entities
+            // Декодируем HTML‑сущности.
             $sSrc = html_entity_decode($sSrc, ENT_QUOTES | ENT_HTML5, 'UTF-8');
             $sAlt = html_entity_decode($sAlt, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-            // Avoid Markdown conflicts in alt text
+            // Экранируем квадратные скобки, чтобы не сломать markdown‑синтаксис.
             $sAlt = str_replace(['[', ']'], ['\\[', '\\]'], $sAlt);
 
             return '![' . $sAlt . '](' . $sSrc . ')';
@@ -113,21 +460,27 @@ class Mdify
     }
 
     /**
-     * HTML → Markdown specialized handler for <a> links
-     * Robustly parses href and content using callback to avoid failures due to paths, encoding, or attribute order
+     * HTML → Markdown обработка ссылок (`<a>` → `[text](href)`).
+     *
+     * Делается до `strip_tags()`, потому что иначе `<a>` исчезнет без следа.
+     *
+     * Подход best‑effort:
+     * - пытаемся сохранить базовое форматирование текста ссылки (bold/italic);
+     * - любые "сложные" вложенные элементы превращаем в обычный текст.
      *
      * @param string $sContent HTML content
+     *
      * @return string Converted content
      */
-    private static function convertHtmlLinks($sContent)
+    private static function convertHtmlLinks(string $sContent): string
     {
         return preg_replace_callback('/<a\b[^>]*>(.*?)<\/a>/is', function ($aMatches) {
             $sFullATag = $aMatches[0];
             $sInnerHtml = $aMatches[1];
 
-            // Parse href attribute (supports double quotes, single quotes, or no quotes)
+            // Достаём href (поддерживаем двойные/одинарные кавычки и без кавычек).
             if (!preg_match('/href\s*=\s*("([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $sFullATag, $aHrefMatch)) {
-                // No href, return plain text only (remove internal tags)
+                // Если href нет — возвращаем только текст (убираем внутренние теги).
                 return strip_tags($sInnerHtml);
             }
 
@@ -140,13 +493,13 @@ class Mdify
                 $sHref = $aHrefMatch[4];
             }
 
-            // Inner content: preserve basic formatting (bold, italic, line breaks), remove other tags and excess whitespace
+            // Внутренний текст ссылки: сохраняем базовое форматирование, потом чистим лишнее.
             $aInnerPatterns = [
                 '/<strong[^>]*>(.*?)<\/strong>/is' => '**$1**',
                 '/<b[^>]*>(.*?)<\/b>/is' => '**$1**',
                 '/<em[^>]*>(.*?)<\/em>/is' => '*$1*',
                 '/<i[^>]*>(.*?)<\/i>/is' => '*$1*',
-                '/<br\s*\/>/is' => ' ',
+                '/<br\s*\/?>/is' => ' ',
                 '/<p[^>]*>(.*?)<\/p>/is' => '$1 ',
             ];
 
@@ -158,10 +511,10 @@ class Mdify
             $sText = preg_replace('/\s+/', ' ', $sText);
             $sText = trim($sText);
 
-            // Avoid Markdown conflicts (exclude image syntax)
+            // Экранируем закрывающую `]`, если она не является частью `](...)`.
             $sText = preg_replace('/\](?!\()/', '\\]', $sText);
 
-            // Decode common HTML entities
+            // Декодируем сущности в href.
             $sHref = html_entity_decode($sHref, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
             return '[' . $sText . '](' . $sHref . ')';

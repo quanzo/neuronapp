@@ -7,7 +7,7 @@ namespace app\modules\neuron\classes\dto\tools;
 use InvalidArgumentException;
 
 /**
- * Набор исходящих HTTP-заголовков для {@see \app\modules\neuron\tools\HttpFetchTool}.
+ * Набор исходящих HTTP-заголовков для HTTP-инструментов (например, {@see \app\modules\neuron\tools\WebFetchTool}).
  *
  * Хранит пары имя/значение с нормализацией ключа по нижнему регистру для слияния.
  * Значения очищаются от символов `\r` и `\n`, чтобы исключить подмену заголовков.
@@ -38,7 +38,7 @@ final class HttpFetchRequestHeadersDto
     }
 
     /**
-     * Пустой набор заголовков (для последующего {@see self::withHeader()} и передачи в HttpFetchTool).
+     * Пустой набор заголовков (для последующего {@see self::withHeader()} и передачи в инструмент).
      *
      * @return self
      */
