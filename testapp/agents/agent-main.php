@@ -27,7 +27,7 @@ return [
     'enableChatHistory' => true,
     'contextWindow'     => $contextWindow,
     'toolMaxTries'      => 75,
-    'llmPayloadLogMode' => 'debug',
+    'llmPayloadLogMode' => 'summary',
 
     'provider' => [
         CallableWrapper::class,

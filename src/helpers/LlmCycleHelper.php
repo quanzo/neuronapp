@@ -116,7 +116,9 @@ class LlmCycleHelper
             return false;
         }
 
-        if (self::normalizeRole($message) !== 'user') {
+        $arPossibleRole = [MessageRole::DEVELOPER->value, MessageRole::USER->value, MessageRole::SYSTEM->value];
+
+        if (!in_array(self::normalizeRole($message), $arPossibleRole)) {
             return false;
         }
 
@@ -233,9 +235,6 @@ class LlmCycleHelper
 
             if (self::isCycleEmptyMsg($msg)) {
                 $indexesToDelete[$i] = true;
-                if ($awaitingServiceResponse && self::normalizeRole($msg) === 'assistant') {
-                    $awaitingServiceResponse = false;
-                }
                 continue;
             }
 
@@ -289,17 +288,14 @@ class LlmCycleHelper
         $clearProgressCount = 0;
         $totalRounds        = 0;
         $completed          = false;
+        
+        $history     = $agentCfg->getChatHistory();
+        $countBefore = ChatHistoryRollbackHelper::getSnapshotCount($history);
 
         while ($totalRounds < $maxTotalRounds) {
             ++$totalRounds;
 
-            $history     = $agentCfg->getChatHistory();
-            $countBefore = ChatHistoryRollbackHelper::getSnapshotCount($history);
-
             $msgAnswer = $agentCfg->sendMessage($msgTest);
-            $countAfter = ChatHistoryRollbackHelper::getSnapshotCount($history);
-            self::cleanupCycleServiceMessagesBySnapshotRange($history, $countBefore, $countAfter);
-
             $status = LlmCyclePollStatus::fromAgentAnswer($msgAnswer);
 
             if ($status === LlmCyclePollStatus::Completed) {
@@ -318,6 +314,9 @@ class LlmCycleHelper
 
             // Unclear: счётчик явных «в работе» не увеличиваем; totalRounds уже учтён.
         }
+
+        $countAfter = ChatHistoryRollbackHelper::getSnapshotCount($history);
+        self::cleanupCycleServiceMessagesBySnapshotRange($history, $countBefore, $countAfter);
 
         return [
             'ok'                 => $completed,
