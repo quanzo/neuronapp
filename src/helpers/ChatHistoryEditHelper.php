@@ -92,7 +92,8 @@ final class ChatHistoryEditHelper
      * @param ChatHistoryInterface $history
      * @return Message|false
      */
-    public static function getLastMessage(ChatHistoryInterface $history): Message|false {
+    public static function getLastMessage(ChatHistoryInterface $history): Message|false
+    {
         return $history->getLastMessage();
     }
 

@@ -9,8 +9,6 @@ use app\modules\neuron\classes\AbstractPromptWithParams;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
-use app\modules\neuron\classes\dto\cmd\AgentCmdDto;
-use app\modules\neuron\classes\dto\cmd\CmdDto;
 use app\modules\neuron\classes\dto\events\RunEventDto;
 use app\modules\neuron\classes\dto\events\TodoEventDto;
 use app\modules\neuron\classes\dto\params\SessionParamsDto;
@@ -19,7 +17,6 @@ use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
-use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\helpers\LlmCycleHelper;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\interfaces\ITodoList;
@@ -35,6 +32,12 @@ use NeuronAI\Chat\Messages\Message as NeuronMessage;
  * Использует общий парсер APromptComponent для разбора опций и тела,
  * а затем строит очередь заданий из текстового блока.
  * Задания хранятся в виде очереди и извлекаются по принципу FIFO.
+ *
+ * Пример (мягкое продолжение с индекса resume без повторной отправки тела этого пункта):
+ *
+ * <code>
+ * $list->execute(MessageRole::USER, [], null, $startFromTodoIndex, null, true)->await();
+ * </code>
  */
 class TodoList extends AbstractPromptWithParams implements ITodoList
 {
@@ -128,22 +131,30 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
      * @param array<string,mixed>|null $params             Параметры, передаваемые в {@see ITodo::getTodo()}.
      * @param int                      $startFromTodoIndex Индекс первого todo для выполнения (0 = с начала); предыдущие пропускаются (для resume).
      * @param SessionParamsDto|null    $sessionParams      Сессионные параметры (date, branch, user и др.) для подстановки.
-     * @param bool|null                $softContinue       Мы знаем, что сессия прервалась на пункте задачи. И не хотим отправлять задание снова, а просто хотим чтобы LLM продолжжила. Никаких гарантий продолжения тут нет. Но если пункт многоходовый...
+     * @param bool|null                $softContinue       Мягкое продолжение **только для первого пункта этого запуска**
+     *                                                      (индекс {@see $startFromTodoIndex} после нормализации `max(0, …)`):
+     *                                                      не вызывать {@see ConfigurationAgent::sendMessageWithAttachments()} с телом этого todo
+     *                                                      (предполагается, что формулировка уже есть в истории чата после обрыва).
+     *                                                      Далее по списку сообщения отправляются как обычно. Затем для пункта всё равно вызывается
+     *                                                      {@see LlmCycleHelper::waitCycle()} — гарантий корректного продолжения нет.
+     *                                                      `null` и `false` — обычная отправка тела каждого todo.
      *
      * @return Future<ChatHistoryInterface> Завершается копией истории сообщений агента после выполнения всех заданий.
      */
     public function execute(
-        MessageRole       $role               = MessageRole::USER,
-        array             $attachments        = [],
-        ?array            $params             = null,
-        int               $startFromTodoIndex = 0,
-        ?SessionParamsDto $sessionParams      = null,
-        ?bool             $softContinue       = null
+        MessageRole $role = MessageRole::USER,
+        array $attachments = [],
+        ?array $params = null,
+        int $startFromTodoIndex = 0,
+        ?SessionParamsDto $sessionParams = null,
+        ?bool $softContinue = null
     ): Future {
         $agentCfg = $this->getConfigurationAgent();
 
         return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $startFromTodoIndex, $sessionParams, $softContinue): ChatHistoryInterface {
             $runId       = $this->generateRunId();
+
+            $normalizedStartFromTodoIndex = max(0, $startFromTodoIndex);
 
             $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) : $agentCfg;
             EventBus::trigger(
@@ -168,7 +179,8 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             $todos            = $this->getTodos();
             $todoCount        = count($todos);
             $stepsExecuted    = 0;
-            $currentTodoIndex = max(0, $startFromTodoIndex);
+            $currentTodoIndex = $normalizedStartFromTodoIndex;
+            $skipTodoBodySend = $softContinue === true;
             $effectiveParams  = $this->buildEffectiveParams(
                 $params,
                 $sessionParams?->toArray()
@@ -219,22 +231,21 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                     $this->buildTodoEventDto($sessionCfg, $runId, $todoIndex, $todoTextRaw)->setTodoAgent($todoSessionCfg->getAgentName())
                 );
                 try {
-                    $message = new NeuronMessage($role, $todoTextToSend);
-                    $todoAttachments = $attachments;
-                    if ($configApp !== null) {
-                        /**
-                         * В тексте каждого элемента списка ищем указание на файл для его подключения в контекст исполнени именно этого todo
-                         */
-                        $contextFiles = AttachmentHelper::buildContextAttachments($todoTextToSend, $configApp);
-                        if ($contextFiles['attachments'] !== []) {
-                            $todoAttachments = array_merge($todoAttachments, $contextFiles['attachments']);
+                    if (!$skipTodoBodySend) {
+                        $message = new NeuronMessage($role, $todoTextToSend);
+                        $todoAttachments = $attachments;
+                        if ($configApp !== null) {
+                            /**
+                             * В тексте каждого элемента списка ищем указание на файл для его подключения в контекст исполнени именно этого todo
+                             */
+                            $contextFiles = AttachmentHelper::buildContextAttachments($todoTextToSend, $configApp);
+                            if ($contextFiles['attachments'] !== []) {
+                                $todoAttachments = array_merge($todoAttachments, $contextFiles['attachments']);
+                            }
                         }
-                    }
-                    if (!$softContinue) {
                         $todoSessionCfg->sendMessageWithAttachments($message, $todoAttachments);
-                    } else {
-                        // мягкое продолжение - считаем что у LLM уже есть задание этого пункта. И поэтому запустим цикл вопрос-ответ на проверку готовности
                     }
+                    $skipTodoBodySend = false;
 
                     // здесь проверим, что пункт LLM исполнила - спросим ее прямо
                     $arRes = LlmCycleHelper::waitCycle($todoSessionCfg, $todoSessionCfg->llmMaxCycleCount, $todoSessionCfg->llmMaxTotalRounds);

@@ -372,7 +372,6 @@ class ConfigurationAgent implements IDependConfigApp
                     );
                 }
             );
-
         } catch (\Throwable $e) {
             $duration = round(microtime(true) - $start, 2);
             EventBus::trigger(

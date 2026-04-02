@@ -90,9 +90,17 @@ public function execute(
     array $attachments = [],
     ?array $params = null,
     int $startFromTodoIndex = 0,
-    ?SessionParamsDto $sessionParams = null
+    ?SessionParamsDto $sessionParams = null,
+    ?bool $softContinue = null
 ): Future;
 ```
+
+#### Параметр `softContinue` (мягкое продолжение)
+
+- **Назначение:** при возобновлении сессии не дублировать **текст первого выполняемого в этом запуске** пункта списка в истории чата (он уже мог быть отправлен до обрыва).
+- **Когда срабатывает:** только если передано `true` **и** текущий индекс todo совпадает с нормализованным `startFromTodoIndex` (`max(0, startFromTodoIndex)`). Для всех следующих пунктов в том же `execute()` тело todo отправляется как обычно.
+- **`null` / `false`:** обычное поведение — у каждого пункта вызывается `sendMessageWithAttachments()` с текстом задания.
+- **После пропуска отправки** для этого пункта всё равно вызывается `LlmCycleHelper::waitCycle()` (служебный опрос готовности); корректность «продолжения без повтора задания» не гарантируется — зависит от состояния истории.
 
 Последовательность:
 
@@ -107,8 +115,8 @@ public function execute(
     - имя агента разрешается через `ConfigurationApp::getAgent($name)`;
     - если агент не найден или команда некорректна — выполнение продолжается текущим агентом (логируется предупреждение);
     - сигнатура `@@agent(...)` удаляется из текста перед отправкой в LLM;
-  - из текста извлекаются @‑ссылки на файлы (`AttachmentHelper::buildContextAttachments()`), учитывая настройки `context_files.*` из `config.jsonc`;
-  - сообщение отправляется в LLM через `ConfigurationAgent::sendMessageWithAttachments()`;
+  - из текста извлекаются @‑ссылки на файлы (`AttachmentHelper::buildContextAttachments()`), учитывая настройки `context_files.*` из `config.jsonc` (только если для пункта выполняется отправка тела, см. `softContinue` выше);
+  - сообщение с текстом пункта отправляется в LLM через `ConfigurationAgent::sendMessageWithAttachments()`, кроме одного случая мягкого продолжения;
   - по завершении задачи обновляется чекпоинт (`last_completed_todo_index`, `history_message_count`);
   - после каждого шага цикл проверяет `goto_requested_todo_index` в `RunStateDto`:
     - если индекс валиден (`0..count-1`) — выполнение продолжается с указанного пункта;
