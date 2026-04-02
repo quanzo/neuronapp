@@ -7,7 +7,7 @@ namespace app\modules\neuron\tools;
 use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\ChatHistoryGrepMatchDto;
 use app\modules\neuron\classes\dto\tools\ChatHistoryGrepResultDto;
-use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
+use app\modules\neuron\helpers\ChatHistoryEditHelper;
 use app\modules\neuron\helpers\ChatHistoryToolMessageHelper;
 use NeuronAI\Chat\Messages\Message;
 use NeuronAI\Chat\Messages\ToolCallMessage;
@@ -118,10 +118,8 @@ final class ChatHistoryGrepTool extends ATool
 
         /** @var Message[] $messages */
         $messages = [];
-        if ($history instanceof AbstractFullChatHistory) {
-            $messages = $history->getFullMessages();
-        } elseif ($history !== null) {
-            $messages = $history->getMessages();
+        if ($history !== null) {
+            $messages = ChatHistoryEditHelper::getMessages($history);
         }
 
         $limit = $maxMatches ?? $this->defaultMaxMatches;

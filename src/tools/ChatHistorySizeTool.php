@@ -6,7 +6,7 @@ namespace app\modules\neuron\tools;
 
 use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\ChatHistorySizeResultDto;
-use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
+use app\modules\neuron\helpers\ChatHistoryEditHelper;
 
 use function count;
 
@@ -35,11 +35,7 @@ final class ChatHistorySizeTool extends ATool
         $agentCfg = $this->getAgentCfg();
         $history = $agentCfg?->getChatHistory();
 
-        if ($history instanceof AbstractFullChatHistory) {
-            $count = count($history->getFullMessages());
-        } else {
-            $count = $history ? count($history->getMessages()) : 0;
-        }
+        $count = $history ? count(ChatHistoryEditHelper::getMessages($history)) : 0;
 
         $dto = new ChatHistorySizeResultDto($count);
 

@@ -213,9 +213,7 @@ class LlmCycleHelper
             return;
         }
 
-        $messages = $history instanceof AbstractFullChatHistory
-            ? $history->getFullMessages()
-            : $history->getMessages();
+        $messages = ChatHistoryEditHelper::getMessages($history);
 
         $max = count($messages);
         if ($countBefore >= $max) {
@@ -288,7 +286,7 @@ class LlmCycleHelper
         $clearProgressCount = 0;
         $totalRounds        = 0;
         $completed          = false;
-        
+
         $history     = $agentCfg->getChatHistory();
         $countBefore = ChatHistoryRollbackHelper::getSnapshotCount($history);
 

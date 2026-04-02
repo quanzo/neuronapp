@@ -54,6 +54,7 @@ final class VarIndexItemDto implements IArrayable
         return [
             'name'        => $this->name,
             'description' => $this->description,
+            'fileName'    => $this->fileName,
             'savedAt'     => $this->savedAt,
             'dataType'    => $this->dataType,
             'sizeBytes'   => $this->sizeBytes,

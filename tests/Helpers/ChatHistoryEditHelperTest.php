@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Helpers;
 
 use app\modules\neuron\classes\neuron\history\FileFullChatHistory;
+use NeuronAI\Chat\History\InMemoryChatHistory;
+use app\modules\neuron\classes\neuron\history\InMemoryFullChatHistory;
 use app\modules\neuron\helpers\ChatHistoryEditHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\Message;
@@ -41,6 +43,98 @@ final class ChatHistoryEditHelperTest extends TestCase
     {
         $history = new FileFullChatHistory($this->tmpDir, 's1', contextWindow: 50);
         $this->assertSame(0, ChatHistoryEditHelper::getFullMessageCount($history));
+    }
+
+    /**
+     * getMessages() для AbstractFullChatHistory возвращает полную историю (а не окно).
+     */
+    public function testGetMessagesPrefersFullHistory(): void
+    {
+        $history = new InMemoryFullChatHistory(contextWindow: 1);
+        $history->addMessage(new Message(MessageRole::USER, 'a'));
+        $history->addMessage(new Message(MessageRole::ASSISTANT, 'b'));
+
+        $messages = ChatHistoryEditHelper::getMessages($history);
+        $this->assertCount(2, $messages);
+        $this->assertSame('a', (string) $messages[0]->getContent());
+        $this->assertSame('b', (string) $messages[1]->getContent());
+    }
+
+    /**
+     * getMessages() для обычной истории возвращает окно (getMessages()).
+     */
+    public function testGetMessagesUsesWindowForRegularHistory(): void
+    {
+        $history = new InMemoryChatHistory();
+        $history->addMessage(new Message(MessageRole::USER, 'a'));
+        $history->addMessage(new Message(MessageRole::ASSISTANT, 'b'));
+
+        $messages = ChatHistoryEditHelper::getMessages($history);
+        $this->assertCount(2, $messages);
+        $this->assertSame('a', (string) $messages[0]->getContent());
+        $this->assertSame('b', (string) $messages[1]->getContent());
+    }
+
+    /**
+     * getLastMessages() при count <= 0 возвращает пустой массив.
+     */
+    public function testGetLastMessagesRejectsNonPositiveCount(): void
+    {
+        $history = new InMemoryChatHistory();
+        $history->addMessage(new Message(MessageRole::USER, 'a'));
+        $history->addMessage(new Message(MessageRole::ASSISTANT, 'b'));
+
+        $this->assertSame([], ChatHistoryEditHelper::getLastMessages($history, 0));
+        $this->assertSame([], ChatHistoryEditHelper::getLastMessages($history, -1));
+    }
+
+    /**
+     * getLastMessages() возвращает последний элемент при count=1.
+     */
+    public function testGetLastMessagesCountOne(): void
+    {
+        $history = new InMemoryChatHistory();
+        $history->addMessage(new Message(MessageRole::USER, 'a'));
+        $history->addMessage(new Message(MessageRole::ASSISTANT, 'b'));
+        $history->addMessage(new Message(MessageRole::USER, 'c'));
+
+        $messages = ChatHistoryEditHelper::getLastMessages($history, 1);
+        $this->assertCount(1, $messages);
+        $this->assertSame('c', (string) $messages[0]->getContent());
+    }
+
+    /**
+     * getLastMessages() при count больше размера возвращает всю историю.
+     */
+    public function testGetLastMessagesReturnsAllWhenCountExceedsSize(): void
+    {
+        $history = new InMemoryChatHistory();
+        $history->addMessage(new Message(MessageRole::USER, 'a'));
+        $history->addMessage(new Message(MessageRole::ASSISTANT, 'b'));
+        $history->addMessage(new Message(MessageRole::USER, 'c'));
+
+        $messages = ChatHistoryEditHelper::getLastMessages($history, 99);
+        $this->assertCount(3, $messages);
+        $this->assertSame('a', (string) $messages[0]->getContent());
+        $this->assertSame('b', (string) $messages[1]->getContent());
+        $this->assertSame('c', (string) $messages[2]->getContent());
+    }
+
+    /**
+     * getLastMessages() возвращает последние N сообщений в исходном порядке (старые → новые).
+     */
+    public function testGetLastMessagesKeepsChronologicalOrder(): void
+    {
+        $history = new InMemoryChatHistory();
+        $history->addMessage(new Message(MessageRole::USER, 'a'));
+        $history->addMessage(new Message(MessageRole::ASSISTANT, 'b'));
+        $history->addMessage(new Message(MessageRole::USER, 'c'));
+        $history->addMessage(new Message(MessageRole::ASSISTANT, 'd'));
+
+        $messages = ChatHistoryEditHelper::getLastMessages($history, 2);
+        $this->assertCount(2, $messages);
+        $this->assertSame('c', (string) $messages[0]->getContent());
+        $this->assertSame('d', (string) $messages[1]->getContent());
     }
 
     /**

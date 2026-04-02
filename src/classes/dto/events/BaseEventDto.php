@@ -103,7 +103,6 @@ class BaseEventDto implements IArrayable
     public function toArray(): array
     {
         return [
-            'sessionKey' => $this->sessionKey,
             'runId'      => $this->runId,
             'timestamp'  => $this->timestamp,
             'agentName'  => $this->agent?->getAgentName(),

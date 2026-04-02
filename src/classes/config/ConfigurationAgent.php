@@ -46,6 +46,7 @@ use app\modules\neuron\classes\WaitSuccess;
 use app\modules\neuron\exceptions\RunStateNotFoundException;
 use app\modules\neuron\helpers\ChatHistoryRollbackHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
+use app\modules\neuron\helpers\LlmCycleHelper;
 use app\modules\neuron\tools\ATool;
 use app\modules\neuron\traits\DependConfigAppTrait;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
@@ -327,6 +328,8 @@ class ConfigurationAgent implements IDependConfigApp
             $response              = null;
             $llmRetryDelayMicrosec = 100000;
             $maxLlmAttempts        = 5;
+            $isCycleRequest        = LlmCycleHelper::isCycleRequestMsg($message);
+
             WaitSuccess::waitSuccess(
                 function () use (&$response, $message, $agent) {
                     if ($this->reponseStructClass) {
@@ -342,15 +345,22 @@ class ConfigurationAgent implements IDependConfigApp
                 },
                 $llmRetryDelayMicrosec,
                 $maxLlmAttempts,
-                function (\Throwable $e, int $execCount) use ($history, $countBefore, $maxLlmAttempts): void {
-                    ChatHistoryRollbackHelper::rollbackToSnapshot($history, $countBefore);
+                function (\Throwable $e, int $execCount) use ($history, $countBefore, $maxLlmAttempts, $isCycleRequest): void {
+                    $advMsg = '';
+                    if (!$isCycleRequest) {
+                        // падает на запросе статуса - не будем откатывать
+                        ChatHistoryRollbackHelper::rollbackToSnapshot($history, $countBefore);
+                        $advMsg = ' история откатана';
+                    }
                     // execCount — индекс неудачной попытки (0 при первом сбое), как в WaitSuccess.
                     $failedAttempt = $execCount + 1;
                     $willRetry     = $failedAttempt < $maxLlmAttempts;
+
+                    $msg = 'Вызов LLM завершился ошибкой: ' . $e->getMessage() . ';' . $advMsg;
+                    $msg .= $willRetry ? '; запланирован повтор' : '; повторов больше не будет';
+
                     $this->getLogger()->warning(
-                        $willRetry
-                            ? 'Вызов LLM завершился ошибкой, история откатана, запланирован повтор'
-                            : 'Вызов LLM завершился ошибкой, история откатана, повторов больше не будет',
+                        $msg,
                         array_merge($this->getLogContext(), [
                             'llm_retry'     => true,
                             'failedAttempt' => $failedAttempt,
@@ -362,6 +372,7 @@ class ConfigurationAgent implements IDependConfigApp
                     );
                 }
             );
+
         } catch (\Throwable $e) {
             $duration = round(microtime(true) - $start, 2);
             EventBus::trigger(
@@ -651,13 +662,12 @@ class ConfigurationAgent implements IDependConfigApp
     /**
      * Возвращает контекст для логирования: имя агента и ключ сессии.
      *
-     * @return array{agent: string|null, session: string|null}
+     * @return array{agent: string|null}
      */
     public function getLogContext(): array
     {
         return [
             'agent'   => $this->getAgentName(),
-            'session' => $this->getSessionKey(),
         ];
     }
 

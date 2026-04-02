@@ -70,9 +70,9 @@
 Примеры:
 
 - `ConfigurationAgent::sendMessageWithAttachments()`:
-  - при исключении логирует `'Ошибка при отправке сообщения агенту'` с контекстом `{agent, session, exception}`.
+  - при исключении логирует `'Ошибка при отправке сообщения агенту'` с контекстом `{agent, exception}`.
 - `Skill::execute()`:
-  - `Skill started` и `Skill completed` с контекстом `{agent, session, skill}`.
+  - `Skill started` и `Skill completed` с контекстом `{agent, skill}`.
 - `TodoList::execute()`:
   - `TodoList started`, `Todo started`, `Todo completed`, `TodoList completed` с контекстом `{todolist, todo_index, ...}`.
 
@@ -85,7 +85,9 @@
 - событие `llm.inference.prepared`:
   - пишется в кастомном узле `LoggingChatNode` (`src/classes/neuron/nodes/LoggingChatNode.php`);
   - содержит `instructions_preview`, `instructions_length`, `tools_count`, `tools_names`, `tool_required_params`;
-  - использует контекст `agent`/`session` через `ContextualLogger`.
+  - в **текстовой части сообщения** дополнительно выводит превью последнего user-сообщения (одной строкой);
+  - в `context` дополнительно выводит `llm_user_message_preview` и `llm_user_message_length`;
+  - использует контекст `agent` через `ContextualLogger` (ключи `session`/`sessionKey` не пишутся в JSON-контекст).
 - событие `llm.request.payload`:
   - пишется в декораторе `LoggingAIProviderDecorator` (`src/classes/neuron/providers/LoggingAIProviderDecorator.php`);
   - содержит информацию о подготовленном payload перед отправкой к провайдеру:

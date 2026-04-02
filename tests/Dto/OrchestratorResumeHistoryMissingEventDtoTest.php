@@ -23,6 +23,7 @@ final class OrchestratorResumeHistoryMissingEventDtoTest extends TestCase
         array $expectedSubset
     ): void {
         $arr = $dto->toArray();
+        $this->assertArrayNotHasKey('sessionKey', $arr, $comment);
         foreach ($expectedSubset as $key => $value) {
             $this->assertArrayHasKey($key, $arr, $comment);
             $this->assertSame($value, $arr[$key], $comment);
@@ -77,7 +78,7 @@ final class OrchestratorResumeHistoryMissingEventDtoTest extends TestCase
         yield 'session_key_preserved' => [
             'sessionKey в базовой части',
             $mk()->setSessionKey('sess-x')->setTodolistName('d')->setLastCompletedTodoIndex(2)->setStartFromTodoIndex(3),
-            ['sessionKey' => 'sess-x'],
+            ['todolistName' => 'd', 'lastCompletedTodoIndex' => 2, 'startFromTodoIndex' => 3],
         ];
 
         yield 'run_id_preserved' => [

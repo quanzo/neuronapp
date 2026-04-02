@@ -7,7 +7,7 @@ namespace app\modules\neuron\tools;
 use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\ChatHistoryMessageMetaDto;
 use app\modules\neuron\helpers\ChatHistoryToolMessageHelper;
-use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
+use app\modules\neuron\helpers\ChatHistoryEditHelper;
 use NeuronAI\Chat\Messages\Message;
 use NeuronAI\Chat\Messages\ToolCallMessage;
 use NeuronAI\Chat\Messages\ToolResultMessage;
@@ -61,10 +61,8 @@ final class ChatHistoryMetaTool extends ATool
 
         /** @var Message[] $messages */
         $messages = [];
-        if ($history instanceof AbstractFullChatHistory) {
-            $messages = $history->getFullMessages();
-        } elseif ($history !== null) {
-            $messages = $history->getMessages();
+        if ($history !== null) {
+            $messages = ChatHistoryEditHelper::getMessages($history);
         }
 
         $count = count($messages);

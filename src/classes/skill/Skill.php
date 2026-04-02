@@ -20,6 +20,7 @@ use app\modules\neuron\helpers\PlaceholderHelper;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\AttachmentHelper;
+use app\modules\neuron\helpers\ChatHistoryEditHelper;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\helpers\LlmCycleHelper;
 use app\modules\neuron\interfaces\ISkill;
@@ -276,7 +277,16 @@ class Skill extends AbstractPromptWithParams implements ISkill
                     $this,
                     $runEventDto->setSteps(1)->setSuccess(true)
                 );
+
+                // берем историю работы скила и выбираем последнее сообщение - это будет результат
+                $lastMessage = ChatHistoryEditHelper::getLastMessage($sessionCfg->getChatHistory());
+                if (!$lastMessage->getContent()) {
+                    $xxx = 1;
+                }
+                return $lastMessage;
+                /* так не будем делать ибо работа skill после первого ответа может не закончится а закончится после прохождения цикла LlmCycleHelper
                 return $result;
+                */
             } catch (\Throwable $e) {
                 $eventDto = clone $baseSkillEvent;
                 EventBus::trigger(

@@ -35,6 +35,68 @@ use function count;
 final class ChatHistoryEditHelper
 {
     /**
+     * Возвращает сообщения истории: для {@see AbstractFullChatHistory} — полную историю,
+     * иначе окно сообщений {@see ChatHistoryInterface::getMessages()}.
+     *
+     * Назначение: централизовать выбор «проекции» истории (full vs window),
+     * чтобы не дублировать `instanceof AbstractFullChatHistory ? ... : ...` по коду.
+     *
+     * @param ChatHistoryInterface $history История агента.
+     *
+     * @return array<int, Message>
+     */
+    public static function getMessages(ChatHistoryInterface $history): array
+    {
+        if ($history instanceof AbstractFullChatHistory) {
+            return $history->getFullMessages();
+        }
+
+        return $history->getMessages();
+    }
+
+    /**
+     * Возвращает последние $count сообщений истории в хронологическом порядке (старые → новые).
+     *
+     * Для {@see AbstractFullChatHistory} выборка делается по полной истории, иначе — по окну.
+     *
+     * Граничные случаи:
+     * - $count <= 0: возвращается пустой массив
+     * - $count >= размера истории: возвращаются все сообщения
+     *
+     * @param ChatHistoryInterface $history История агента.
+     * @param int $count Сколько последних сообщений вернуть.
+     *
+     * @return array<int, Message>
+     */
+    public static function getLastMessages(ChatHistoryInterface $history, int $count): array
+    {
+        if ($count <= 0) {
+            return [];
+        }
+
+        $messages = self::getMessages($history);
+        $n = count($messages);
+        if ($n === 0) {
+            return [];
+        }
+        if ($count >= $n) {
+            return $messages;
+        }
+
+        return array_slice($messages, $n - $count);
+    }
+
+    /**
+     * Последнее сообщение в истории
+     *
+     * @param ChatHistoryInterface $history
+     * @return Message|false
+     */
+    public static function getLastMessage(ChatHistoryInterface $history): Message|false {
+        return $history->getLastMessage();
+    }
+
+    /**
      * Возвращает количество сообщений в полной истории.
      *
      * @param AbstractFullChatHistory $history История с полной проекцией.
@@ -135,9 +197,7 @@ final class ChatHistoryEditHelper
             return [];
         }
 
-        $messages = $history instanceof AbstractFullChatHistory
-            ? $history->getFullMessages()
-            : $history->getMessages();
+        $messages = self::getMessages($history);
 
         return array_slice($messages, $countBefore, $countAfter - $countBefore);
     }

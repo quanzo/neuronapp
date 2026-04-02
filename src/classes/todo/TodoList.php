@@ -128,19 +128,21 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
      * @param array<string,mixed>|null $params             Параметры, передаваемые в {@see ITodo::getTodo()}.
      * @param int                      $startFromTodoIndex Индекс первого todo для выполнения (0 = с начала); предыдущие пропускаются (для resume).
      * @param SessionParamsDto|null    $sessionParams      Сессионные параметры (date, branch, user и др.) для подстановки.
+     * @param bool|null                $softContinue       Мы знаем, что сессия прервалась на пункте задачи. И не хотим отправлять задание снова, а просто хотим чтобы LLM продолжжила. Никаких гарантий продолжения тут нет. Но если пункт многоходовый...
      *
      * @return Future<ChatHistoryInterface> Завершается копией истории сообщений агента после выполнения всех заданий.
      */
     public function execute(
-        MessageRole $role = MessageRole::USER,
-        array $attachments = [],
-        ?array $params = null,
-        int $startFromTodoIndex = 0,
-        ?SessionParamsDto $sessionParams = null
+        MessageRole       $role               = MessageRole::USER,
+        array             $attachments        = [],
+        ?array            $params             = null,
+        int               $startFromTodoIndex = 0,
+        ?SessionParamsDto $sessionParams      = null,
+        ?bool             $softContinue       = null
     ): Future {
         $agentCfg = $this->getConfigurationAgent();
 
-        return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $startFromTodoIndex, $sessionParams): ChatHistoryInterface {
+        return \Amp\async(function () use ($agentCfg, $role, $attachments, $params, $startFromTodoIndex, $sessionParams, $softContinue): ChatHistoryInterface {
             $runId       = $this->generateRunId();
 
             $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) : $agentCfg;
@@ -228,7 +230,11 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                             $todoAttachments = array_merge($todoAttachments, $contextFiles['attachments']);
                         }
                     }
-                    $todoSessionCfg->sendMessageWithAttachments($message, $todoAttachments);
+                    if (!$softContinue) {
+                        $todoSessionCfg->sendMessageWithAttachments($message, $todoAttachments);
+                    } else {
+                        // мягкое продолжение - считаем что у LLM уже есть задание этого пункта. И поэтому запустим цикл вопрос-ответ на проверку готовности
+                    }
 
                     // здесь проверим, что пункт LLM исполнила - спросим ее прямо
                     $arRes = LlmCycleHelper::waitCycle($todoSessionCfg, $todoSessionCfg->llmMaxCycleCount, $todoSessionCfg->llmMaxTotalRounds);

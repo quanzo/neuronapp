@@ -43,6 +43,7 @@ final class TodoGotoResultDto implements IArrayable
             'message' => $this->message,
             'fromPoint' => $this->fromPoint,
             'toPoint' => $this->toPoint,
+            'reason' => $this->reason,
         ];
     }
 }
