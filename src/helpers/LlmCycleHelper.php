@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace app\modules\neuron\helpers;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\neuron\Agent;
 use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
+use app\modules\neuron\classes\neuron\RAG;
+use app\modules\neuron\classes\WaitSuccess;
 use app\modules\neuron\enums\LlmCyclePollStatus;
+use NeuronAI\Agent\AgentInterface;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
 use NeuronAI\Chat\Messages\ToolCallMessage;
+use NeuronAI\Chat\Messages\ToolResultMessage;
 
 /**
  * Циклы ожидания завершения задачи LLM и повтор итогового сообщения.
@@ -74,11 +79,10 @@ class LlmCycleHelper
      */
     public static function isCycleEmptyMsg(mixed $message): bool
     {
-        if (!$message instanceof NeuronMessage) {
+        if ($message instanceof ToolCallMessage || $message instanceof ToolResultMessage) {
             return false;
         }
-
-        if ($message instanceof ToolCallMessage) {
+        if (!$message instanceof NeuronMessage) {
             return false;
         }
 
@@ -112,6 +116,9 @@ class LlmCycleHelper
      */
     public static function isCycleRequestMsg(mixed $message): bool
     {
+        if ($message instanceof ToolCallMessage || $message instanceof ToolResultMessage) {
+            return false;
+        }
         if (!$message instanceof NeuronMessage) {
             return false;
         }
@@ -151,11 +158,10 @@ class LlmCycleHelper
      */
     public static function isCycleResponseMsg(mixed $message): bool
     {
-        if (!$message instanceof NeuronMessage) {
+        if ($message instanceof ToolCallMessage || $message instanceof ToolResultMessage) {
             return false;
         }
-
-        if ($message instanceof ToolCallMessage) {
+        if (!$message instanceof NeuronMessage) {
             return false;
         }
 
@@ -255,13 +261,16 @@ class LlmCycleHelper
         $indexes = array_keys($indexesToDelete);
         rsort($indexes);
 
+        $messages2 = ChatHistoryEditHelper::getMessages($history);
         foreach ($indexes as $index) {
-            if ($history instanceof AbstractFullChatHistory) {
-                ChatHistoryEditHelper::deleteFullMessageAt($history, $index);
-                continue;
+            $msg = $messages2[$index] ?? null;
+            if (self::isCycleEmptyMsg($msg) || self::isCycleRequestMsg($msg) || self::isCycleResponseMsg($msg)) {
+                if ($history instanceof AbstractFullChatHistory) {
+                    ChatHistoryEditHelper::deleteFullMessageAt($history, $index);
+                    continue;
+                }
+                ChatHistoryTruncateHelper::deleteMessageAtIndex($history, $index);
             }
-
-            ChatHistoryTruncateHelper::deleteMessageAtIndex($history, $index);
         }
     }
 
@@ -275,9 +284,27 @@ class LlmCycleHelper
      * @param int                $maxCycleCount   Максимум явных ответов «ещё в работе» (NO).
      * @param int|null           $maxTotalRounds  Верхняя граница числа вызовов sendMessage в этом waitCycle; null — max(30, maxCycleCount * 6).
      *
-     * @return array{ok: bool, cycles: int, clearProgressCount: int, totalRounds: int}
+     * @return array
      */
     public static function waitCycle(ConfigurationAgent $agentCfg, int $maxCycleCount = 10, ?int $maxTotalRounds = null): array
+    {
+        $agent = $agentCfg->getAgent();
+        return static::waitCycleAgent($agent, $maxCycleCount, $maxTotalRounds); /** @phpstan-ignore-line */
+    }
+
+    /**
+     * Цикл опроса LLM до подтверждения завершения задачи; служебные реплики проверки при необходимости убираются из истории.
+     *
+     * Явные ответы NO увеличивают счётчик «ясных» незавершений (не более $maxCycleCount).\n
+     * Невнятные ответы не увеличивают этот счётчик, но увеличивают число раундов sendMessage; при превышении $maxTotalRounds цикл прерывается (защита от зацикливания).
+     *
+     * @param Agent|RAG          $agent           Конфигурация агента с историей сессии.
+     * @param int                $maxCycleCount   Максимум явных ответов «ещё в работе» (NO).
+     * @param int|null           $maxTotalRounds  Верхняя граница числа вызовов sendMessage в этом waitCycle; null — max(30, maxCycleCount * 6).
+     *
+     * @return array
+     */
+    public static function waitCycleAgent(Agent|RAG $agent, int $maxCycleCount = 10, ?int $maxTotalRounds = null): array
     {
         $maxTotalRounds ??= max(30, $maxCycleCount * 6);
 
@@ -287,27 +314,48 @@ class LlmCycleHelper
         $totalRounds        = 0;
         $completed          = false;
 
-        $history     = $agentCfg->getChatHistory();
+        $history     = $agent->config->getChatHistory();
         $countBefore = ChatHistoryRollbackHelper::getSnapshotCount($history);
 
+        $isError = false;
+        $lastErr = null;
         while ($totalRounds < $maxTotalRounds) {
+            $isError = false;
             ++$totalRounds;
 
-            $msgAnswer = $agentCfg->sendMessage($msgTest);
-            $status = LlmCyclePollStatus::fromAgentAnswer($msgAnswer);
+            $msgAnswer = null;
+            WaitSuccess::waitSuccess(
+                function () use ($msgTest, $agent, &$msgAnswer) {
+                    $handler = $agent->chat($msgTest);
+                    $msgAnswer = $handler->getMessage();
+                },
+                
+                100000,
+                5,
+                
+                function ($err, $execCount) use (&$lastErr) {
+                    $lastErr = $err;
+                }
+            );
 
-            if ($status === LlmCyclePollStatus::Completed) {
-                $completed = true;
-                break;
-            }
+            if ($msgAnswer) {
+                $status = LlmCyclePollStatus::fromAgentAnswer($msgAnswer);
 
-            if ($status === LlmCyclePollStatus::InProgress) {
-                ++$clearProgressCount;
-                if ($clearProgressCount >= $maxCycleCount) {
+                if ($status === LlmCyclePollStatus::Completed) {
+                    $completed = true;
                     break;
                 }
 
-                continue;
+                if ($status === LlmCyclePollStatus::InProgress) {
+                    ++$clearProgressCount;
+                    if ($clearProgressCount >= $maxCycleCount) {
+                        break;
+                    }
+
+                    continue;
+                }
+            } else {
+                $isError = true;
             }
 
             // Unclear: счётчик явных «в работе» не увеличиваем; totalRounds уже учтён.
@@ -321,6 +369,8 @@ class LlmCycleHelper
             'cycles'             => $totalRounds,
             'clearProgressCount' => $clearProgressCount,
             'totalRounds'        => $totalRounds,
+            'error'              => $isError,
+            'errorMsg'           => $isError && $lastErr ? $lastErr->getMessage() : '',
         ];
     }
 

@@ -248,13 +248,13 @@ final class VarStorage
         $dataType = $this->detectDataType($data);
 
         $payload = [
-            'schema' => self::SCHEMA_VAR_V1,
-            'sessionKey' => $sessionKey,
-            'name' => $name,
+            'schema'      => self::SCHEMA_VAR_V1,
+            'sessionKey'  => $sessionKey,
+            'name'        => $name,
             'description' => $descriptionNorm,
-            'savedAt' => $savedAt,
-            'dataType' => $dataType,
-            'data' => $data,
+            'savedAt'     => $savedAt,
+            'dataType'    => $dataType,
+            'data'        => $data,
         ];
 
         $path = $this->resultFilePath($sessionKey, $name);

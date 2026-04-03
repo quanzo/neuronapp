@@ -157,7 +157,7 @@ class TodoListOrchestrator
                     $iterations = $i;
 
                     // Читаем completed, который должен выставляться шагами.
-                    $completedRaw = $this->readCompletedRaw();
+                    $completedRaw = $this->getCompleted();
                     $completedNormalized = $this->normalizeCompleted($completedRaw);
 
                     // Публикуем состояние после каждой итерации шага.
@@ -283,20 +283,6 @@ class TodoListOrchestrator
     }
 
     /**
-     * Считывает сырое значение completed из intermediate storage.
-     *
-     * @return mixed Исходное значение ключа `completed` либо `null`,
-     * если ключ отсутствует.
-     */
-    protected function readCompletedRaw(): mixed
-    {
-        $storage = $this->configApp->getVarStorage();
-        $payload = $storage->load($this->configApp->getSessionKey(), 'completed');
-
-        return $payload['data'] ?? null;
-    }
-
-    /**
      * Нормализует completed к значениям:
      * - 1: выполнено
      * - 0: не выполнено
@@ -338,9 +324,21 @@ class TodoListOrchestrator
      */
     protected function setCompleted(int $value, string $description): void
     {
-        $this->configApp
-            ->getVarStorage()
-            ->save($this->configApp->getSessionKey(), 'completed', $value, $description);
+        $this->configApp->getVarStorage()->save($this->configApp->getSessionKey(), 'completed', $value, $description);
+    }
+
+    /**
+     * Считывает сырое значение completed из intermediate storage.
+     *
+     * @return mixed Исходное значение ключа `completed` либо `null`,
+     * если ключ отсутствует.
+     */
+    protected function getCompleted(): mixed
+    {
+        $storage = $this->configApp->getVarStorage();
+        $payload = $storage->load($this->configApp->getSessionKey(), 'completed');
+
+        return $payload['data'] ?? 0;
     }
 
     /**

@@ -330,28 +330,63 @@ class ConfigurationAgent implements IDependConfigApp
             $maxLlmAttempts        = 5;
             $isCycleRequest        = LlmCycleHelper::isCycleRequestMsg($message);
 
+
+            try {
+                $msg = $message;
+                if ($this->reponseStructClass) {
+                    $response = $agent->structured(
+                        $msg,
+                        $this->reponseStructClass,
+                        2
+                    );
+                } else {
+                    $handler = $agent->chat($msg);
+                    $response = $handler->getMessage();
+                }
+            } catch (\Throwable $e) {
+                // попробуем оживить
+                $arCycles = LlmCycleHelper::waitCycleAgent($agent, 5, 7);
+                if (!empty($arCycles['error'])) {
+                    throw new RuntimeException(
+                        !empty($arCycles['errorMsg']) ? $arCycles['errorMsg'] : 'Ошибка при отправке сообщения в чат'
+                    );
+                }
+            }
+
+            // Флаг о том что была ошибка запроса
+/*            $isReqErrFound = false;
+
             WaitSuccess::waitSuccess(
-                function () use (&$response, $message, $agent) {
+                // ---
+                function () use (&$response, $message, $agent, &$isReqErrFound) {
+                    $msg = $message;
                     if ($this->reponseStructClass) {
                         $response = $agent->structured(
-                            $message,
+                            $msg,
                             $this->reponseStructClass,
                             2
                         );
                     } else {
-                        $handler = $agent->chat($message);
+                        $handler = $agent->chat($msg);
                         $response = $handler->getMessage();
                     }
+                    $isReqErrFound = false;
                 },
+
                 $llmRetryDelayMicrosec,
                 $maxLlmAttempts,
-                function (\Throwable $e, int $execCount) use ($history, $countBefore, $maxLlmAttempts, $isCycleRequest): void {
+
+                function (\Throwable $e, int $execCount) use ($history, $countBefore, $maxLlmAttempts, &$isReqErrFound, $message): void {
+                    $isReqErrFound = true;
+
                     $advMsg = '';
-                    if (!$isCycleRequest) {
-                        // падает на запросе статуса - не будем откатывать
-                        ChatHistoryRollbackHelper::rollbackToSnapshot($history, $countBefore);
-                        $advMsg = ' история откатана';
-                    }
+                    /*
+                    ChatHistoryRollbackHelper::rollbackToSnapshot($history, $countBefore);
+                    $advMsg = ' история откатана';
+
+                    Допустим, не будем чистить историю ибо там контент из инструментов и это все повторится
+                    /
+
                     // execCount — индекс неудачной попытки (0 при первом сбое), как в WaitSuccess.
                     $failedAttempt = $execCount + 1;
                     $willRetry     = $failedAttempt < $maxLlmAttempts;
@@ -370,8 +405,13 @@ class ConfigurationAgent implements IDependConfigApp
                             'errorMessage'  => $e->getMessage(),
                         ])
                     );
+
+                    // попробуем оживить
+                    //$arCycles = LlmCycleHelper::waitCycle($this, 2, 4);
+
                 }
-            );
+                // ---
+            );*/
         } catch (\Throwable $e) {
             $duration = round(microtime(true) - $start, 2);
             EventBus::trigger(

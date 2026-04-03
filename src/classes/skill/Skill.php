@@ -18,6 +18,7 @@ use app\modules\neuron\helpers\FileContextHelper;
 use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\PlaceholderHelper;
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\neuron\history\AbstractFullChatHistory;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\ChatHistoryEditHelper;
@@ -29,6 +30,8 @@ use app\modules\neuron\traits\AttachesSkillToolsTrait;
 use JsonSerializable;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
+use NeuronAI\Chat\Messages\ToolCallMessage;
+use NeuronAI\Chat\Messages\ToolResultMessage;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\Tool;
 use NeuronAI\Tools\ToolProperty;
@@ -279,7 +282,25 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 );
 
                 // берем историю работы скила и выбираем последнее сообщение - это будет результат
-                $lastMessage = ChatHistoryEditHelper::getLastMessage($sessionCfg->getChatHistory());
+                $lastMessage = null;
+                $history     = $sessionCfg->getChatHistory();
+                $messages    = $history instanceof AbstractFullChatHistory ? $history->getFullMessages() : $history->getMessages();
+                // последнее сообщение ассистента...
+                for ($i = sizeof($messages) - 1; $i >= 0; $i--) {
+                    if (
+                        $messages[$i]->getRole() == MessageRole::ASSISTANT->value
+                        && !(
+                            $messages[$i] instanceof ToolCallMessage
+                            || $messages[$i] instanceof ToolResultMessage
+                        )
+                        && $messages[$i]->getContent()
+                    ) {
+                        $lastMessage = $messages[$i];
+                    }
+                }
+                if (empty($lastMessage)) {
+                    $lastMessage = ChatHistoryEditHelper::getLastMessage($sessionCfg->getChatHistory());
+                }
                 if (!$lastMessage->getContent()) {
                     $xxx = 1;
                 }

@@ -94,6 +94,9 @@ final class ChatHistoryEditHelper
      */
     public static function getLastMessage(ChatHistoryInterface $history): Message|false
     {
+        if ($history instanceof AbstractFullChatHistory) {
+            return $history->getFullLastMessage();
+        }
         return $history->getLastMessage();
     }
 

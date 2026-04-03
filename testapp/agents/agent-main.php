@@ -38,7 +38,7 @@ return [
             CallableWrapper::class,
             'createObject',
             'class'          => GuzzleHttpClient::class,
-            'timeout'        => 120.0,
+            'timeout'        => 75.0,
             'connectTimeout' => 10.0,
         ],
         'parameters' => [
@@ -50,8 +50,8 @@ return [
                 'think'          => false,
             ],
         ],
-        'model' => 'qwen3.5:9b',
-        //'model' => 'qwen3.5:cloud',
+        //'model' => 'qwen3.5:9b',
+        //'model' => 'gemma4:e4b',
     ],
 
     'instructions' => [
