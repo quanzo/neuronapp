@@ -8,6 +8,7 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\attachments\TextAttachmentDto;
 use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
 use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\classes\neuron\Agent;
 use app\modules\neuron\enums\EventNameEnum;
 use NeuronAI\Agent\AgentHandler;
 use NeuronAI\Agent\AgentInterface;
@@ -175,7 +176,12 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
 
     public function testSendMessageWithAttachmentsEmitsFailedEventOnException(): void
     {
-        $agent = $this->createMock(AgentInterface::class);
+        /** @var AgentInterface $agent */
+        $agent = $this
+            ->getMockBuilder(Agent::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['chat'])
+            ->getMock();
         $agent->method('chat')->willThrowException(new \RuntimeException('boom'));
 
         $cfg = new class ($agent) extends ConfigurationAgent {
@@ -190,6 +196,7 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
         };
         $cfg->setSessionKey('s1');
         $cfg->setChatHistory(new InMemoryChatHistory());
+        $agent->config = $cfg;
 
         $failedPayload = null;
         EventBus::on(EventNameEnum::AGENT_MESSAGE_FAILED->value, static function (mixed $payload) use (&$failedPayload): void {

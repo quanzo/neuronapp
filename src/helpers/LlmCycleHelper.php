@@ -289,7 +289,7 @@ class LlmCycleHelper
     public static function waitCycle(ConfigurationAgent $agentCfg, int $maxCycleCount = 10, ?int $maxTotalRounds = null): array
     {
         $agent = $agentCfg->getAgent();
-        return static::waitCycleAgent($agent, $maxCycleCount, $maxTotalRounds); /** @phpstan-ignore-line */
+        return static::waitCycleAgent($agent, $maxCycleCount, $maxTotalRounds);
     }
 
     /**
@@ -329,10 +329,8 @@ class LlmCycleHelper
                     $handler = $agent->chat($msgTest);
                     $msgAnswer = $handler->getMessage();
                 },
-                
                 100000,
                 5,
-                
                 function ($err, $execCount) use (&$lastErr) {
                     $lastErr = $err;
                 }
