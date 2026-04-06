@@ -7,8 +7,6 @@ use app\modules\neuron\classes\command\InteractiveCommand;
 use app\modules\neuron\classes\command\RuwikiCommand;
 use app\modules\neuron\classes\command\SimpleMessageCommand;
 use app\modules\neuron\classes\command\TodolistCommand;
-use app\modules\neuron\classes\command\ConvertToMarkdownChunksCommand;
-use app\modules\neuron\classes\command\ConvertToMarkdownCommand;
 use app\modules\neuron\classes\command\ClearAllSessionsCommand;
 use app\modules\neuron\classes\command\ClearSessionCommand;
 use app\modules\neuron\classes\command\OrchestrateCommand;
@@ -22,7 +20,7 @@ use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\classes\producers\TodoListProducer;
 define('APP_ID', 'neuronapp');
 
-$app = new TimedConsoleApplication('neuronapp', '0.0.1');
+$app = new TimedConsoleApplication(APP_ID, '0.0.1');
 $arDirs = [];
 
 /**
@@ -102,8 +100,6 @@ $app->add(new SimpleMessageCommand());
 $app->add(new TodolistCommand());
 $app->add(new WikiCommand());
 $app->add(new RuwikiCommand());
-$app->add(new ConvertToMarkdownCommand());
-$app->add(new ConvertToMarkdownChunksCommand());
 $app->add(new OrchestrateCommand());
 $app->add(new ClearSessionCommand());
 $app->add(new ClearAllSessionsCommand());
