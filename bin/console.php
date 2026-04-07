@@ -28,10 +28,9 @@ $arDirs = [];
  * 
  * Если в папке старта приложения есть папка `.neauronapp` то считаем эту папку приоритетной
  */
-$startDir = !defined('APP_START_DIR') ? getcwd() . DIRECTORY_SEPARATOR . '.' . APP_ID : APP_START_DIR;
-if (is_dir($startDir)) {
-    $arDirs['APP_START_DIR'] = $startDir;
-}
+$arDirs['APP_START_DIR'] = !defined('APP_START_DIR') ? getcwd() : APP_START_DIR;
+$arDirs['APP_CFG_DIR'] = $arDirs['APP_START_DIR'] . DIRECTORY_SEPARATOR . '.' . APP_ID;
+$arDirs = array_filter($arDirs, fn($val) => is_dir($val));
 
 /**
  * Директория приложения в домашней папке пользователя

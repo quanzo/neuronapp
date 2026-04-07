@@ -5,10 +5,12 @@
  */
 
 use app\modules\neuron\helpers\CallableWrapper;
+use app\modules\neuron\tools\GlobTool;
 use app\modules\neuron\tools\VarGetTool;
 use app\modules\neuron\tools\VarListTool;
 use app\modules\neuron\tools\VarPadTool;
 use app\modules\neuron\tools\VarSetTool;
+use app\modules\neuron\tools\ViewTool;
 use NeuronAI\Providers\Ollama\Ollama;
 use NeuronAI\Agent\SystemPrompt;
 use NeuronAI\HttpClient\GuzzleHttpClient;
@@ -50,7 +52,7 @@ return [
                 'think'          => false,
             ],
         ],
-        //'model' => 'qwen3.5:9b',
+        'model' => 'qwen3.5:9b',
         //'model' => 'gemma4:e4b',
     ],
 
@@ -96,5 +98,7 @@ TEXT
         [VarSetTool::class, 'make'],
         [VarListTool::class, 'make'],
         [VarPadTool::class, 'make'],
+        //[GlobTool::class, 'make'],
+        //[ViewTool::class, 'make'],
     ],
 ];
