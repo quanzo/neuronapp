@@ -10,6 +10,37 @@
 - Навыки и todolist могут подключать встроенные инструменты через:
   - опцию `tools` (строка с именами инструментов);
   - `ToolRegistry::makeTool()` — фабрика, создающая экземпляры по имени (`wiki_search`, `ru_wiki_search`, `uni_search`, `git_summary`, `todo_goto`).
+  - `ToolRegistry::register()` / `ToolRegistry::registerAlias()` — расширение реестра инструментов на этапе bootstrap приложения (например, для модулей/плагинов).
+
+#### Регистрация собственного tool
+
+Фабрика инструмента должна иметь сигнатуру:
+
+- `fn(string $name, ConfigurationAgent $cfg): ToolInterface`
+
+где:
+
+- `$name` — короткое имя, под которым tool запрошен (`makeTool($name, ...)`). Его удобно использовать, если один и тот же класс инструмента должен “светиться” под разными именами (алиасы) или если вы хотите прокинуть имя в метрики/логи.
+- `$cfg` — конфигурация текущей сессии агента.
+
+Пример регистрации (в bootstrap приложения/модуля):
+
+```php
+use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\helpers\ToolRegistry;
+use NeuronAI\Tools\ToolInterface;
+
+ToolRegistry::register(
+    'my_tool',
+    static fn(string $name, ConfigurationAgent $cfg): ToolInterface => new MyTool()
+);
+```
+
+Пример алиаса:
+
+```php
+ToolRegistry::registerAlias('my_tool_v2', 'my_tool');
+```
 
 При выполнении:
 
@@ -45,7 +76,7 @@
 Доступные имена (алиасы в `ToolRegistry`):
 
 - `web_fetch` — основной алиас;
-- `http_fetch` — алиас для обратной совместимости со старой конфигурацией.
+- `http_fetch` — алиас для обратной совместимости со старой конфигурацией (зарегистрирован отдельной фабрикой, чтобы сохранить публичное имя инструмента).
 
 #### Заголовки (User-Agent = Firefox)
 
