@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\traits;
 
-use app\modules\neuron\classes\AbstractPromptWithParams;
-
 /**
  * Трейт для компонент с опцией "skills".
  *
@@ -15,8 +13,8 @@ use app\modules\neuron\classes\AbstractPromptWithParams;
  * пробелы вокруг имен обрезаются. При этом имя самого компонента
  * исключается из результата, чтобы избежать самоссылок и рекурсии.
  *
- * Трейт ожидает, что класс-носитель наследуется от {@see AbstractPromptWithParams}
- * и, соответственно, предоставляет защищенный метод {@see AbstractPromptWithParams::parseSkills()}.
+ * Ожидания к классу-носителю:
+ * - предоставляет защищенный метод `parseSkills(bool $excludeSelf): array`.
  */
 trait HasNeedSkillsTrait
 {
@@ -31,7 +29,6 @@ trait HasNeedSkillsTrait
      */
     public function getNeedSkills(): array
     {
-        /** @var AbstractPromptWithParams $this */
         return $this->parseSkills(true);
     }
 }

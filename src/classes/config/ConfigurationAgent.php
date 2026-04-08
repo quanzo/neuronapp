@@ -12,8 +12,11 @@ use app\modules\neuron\events\Event;
 use app\modules\neuron\helpers\CallableWrapper;
 use app\modules\neuron\helpers\ChatHistoryCopyHelper;
 use app\modules\neuron\helpers\CommentsHelper;
+use app\modules\neuron\helpers\ArrayHelper;
 use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\models\Message;
+use app\modules\neuron\traits\AttachesSkillToolsTrait;
+use app\modules\neuron\traits\HasNeedSkillsTrait;
 use NeuronAI\Agent\AgentInterface;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\ChatHistoryInterface;
@@ -69,6 +72,8 @@ class ConfigurationAgent implements IDependConfigApp
     use LoggerAwareTrait;
     use LoggerAwareContextualTrait;
     use DependConfigAppTrait;
+    use HasNeedSkillsTrait;
+    use AttachesSkillToolsTrait;
 
     /**
      * Имя агента, для которого используется данная конфигурация.
@@ -170,6 +175,15 @@ class ConfigurationAgent implements IDependConfigApp
      * @var array<ToolInterface|ToolkitInterface|ProviderToolInterface>|array<callable>|callable - поддержка CallableWrapper
      */
     public $tools = [];
+
+    /**
+     * Список skills, которые должны быть подключены как tools для этого агента.
+     *
+     * Каждый элемент — имя навыка, резолвится через {@see ConfigurationApp::getSkill()}.
+     *
+     * @var list<string>
+     */
+    public array $skills = [];
 
     /**
      * Сколько раз можно вызвать инструмент
@@ -670,6 +684,15 @@ class ConfigurationAgent implements IDependConfigApp
             }
         }
 
+        /**
+         * Skills как tools из конфигурации агента.
+         * Важно: используем сборщик из трейта, который не вызывает getTools(), чтобы избежать рекурсии.
+         */
+        $skillAndExtraTools = $this->buildAttachedTools($this, MessageRole::USER);
+        if ($skillAndExtraTools !== []) {
+            array_push($tools, ...$skillAndExtraTools);
+        }
+
         foreach ($tools as $tool) {
             if ($tool instanceof ATool) {
                 /**
@@ -995,6 +1018,7 @@ class ConfigurationAgent implements IDependConfigApp
      *  - embeddingProvider (EmbeddingsProviderInterface|callable|null)
      *  - embeddingChunkSize (int)
      *  - vectorStore (VectorStoreInterface|callable|null)
+     *  - skills (string[])
      *
      * @param array<string, mixed> $cfg        Ассоциативный массив с настройками агента.
      * @param ConfigurationApp     $configApp конфигурация приложения
@@ -1046,6 +1070,11 @@ class ConfigurationAgent implements IDependConfigApp
             $config->tools = $cfg['tools'];
         }
 
+        if (array_key_exists('skills', $cfg)) {
+            $rawSkills = $cfg['skills'];
+            $config->skills = is_array($rawSkills) ? ArrayHelper::getUniqStrList($rawSkills) : [];
+        }
+
         if (array_key_exists('toolMaxTries', $cfg)) {
             $config->toolMaxTries = (int) $cfg['toolMaxTries'];
         }
@@ -1079,6 +1108,22 @@ class ConfigurationAgent implements IDependConfigApp
         $config->setSessionKey($configApp->getSessionKey());
 
         return $config;
+    }
+
+    /**
+     * Разбирает список skills в массив имён.
+     *
+     * Нужен для {@see HasNeedSkillsTrait::getNeedSkills()}.
+     * Для конфигурации агента источником является {@see ConfigurationAgent::$skills}.
+     *
+     * @param bool $excludeSelf Для совместимости сигнатуры, для агента не применяется.
+     *
+     * @return list<string>
+     */
+    protected function parseSkills(bool $excludeSelf = true): array
+    {
+        unset($excludeSelf);
+        return ArrayHelper::getUniqStrList($this->skills);
     }
 
     /**

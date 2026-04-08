@@ -112,12 +112,7 @@ final class SessionCleanupHelper
         }
 
         // Дедуп (на всякий случай)
-        $uniq = [];
-        foreach ($result as $p) {
-            $uniq[$p] = true;
-        }
-
-        return array_keys($uniq);
+        return ArrayHelper::getUniqStrList($result);
     }
 
     /**

@@ -51,6 +51,7 @@
   - `provider` — конфигурация провайдера (`AIProviderInterface` или `callable`);
   - `instructions` — системный промпт (строка, `Stringable` или `callable`);
   - `tools` — базовый набор инструментов (`ToolInterface`/`ToolkitInterface` и пр.);
+  - `skills` — список skills, которые будут подключены как tools для этого агента;
   - `toolMaxTries` — лимит попыток использования инструмента;
   - `enableLlmPayloadLogging` — включение диагностического логирования payload к LLM;
   - `llmPayloadLogMode` — режим payload-логов: `summary` (без payload сообщений) или `debug` (с payload сообщений);
@@ -122,6 +123,30 @@
 - делегирует создание объекта в `makeFromArray(array $cfg, ConfigurationApp $configApp)`, который:
   - заполняет поля конфигурации по известным ключам;
   - устанавливает `logger`, `configurationApp`, `sessionKey` (через `configApp->getSessionKey()`).
+
+#### `skills` в конфигурации агента
+
+`skills` — это **массив строк** с именами skills, которые будут подключены к агенту как LLM tools (через `Skill::getTool()`).
+
+Пример (PHP):
+
+```php
+return [
+    // ...
+    'skills' => [
+        'review/summary',
+        'review/checklist',
+    ],
+];
+```
+
+Пример (JSONC):
+
+```json
+{
+  "skills": ["review/summary", "review/checklist"]
+}
+```
 
 Файлы примеров конфигураций агентов находятся в `testapp/agents`.
 

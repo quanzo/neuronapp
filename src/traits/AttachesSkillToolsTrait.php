@@ -28,26 +28,31 @@ use NeuronAI\Chat\Enums\MessageRole;
 trait AttachesSkillToolsTrait
 {
     /**
-     * Подключает зависимые навыки к сессионной конфигурации агента.
+     * Собирает tools, которые нужно подключить к конфигурации агента.
      *
-     * @param ConfigurationAgent $sessionCfg Конфигурация агента для текущей сессии (будет модифицирована).
-     * @param MessageRole        $role       Роль сообщения, с которой будут вызываться инструменты навыков.
+     * Важно: этот метод не должен вызывать {@see ConfigurationAgent::getTools()},
+     * чтобы его можно было безопасно использовать внутри {@see ConfigurationAgent::getTools()}
+     * без рекурсии.
+     *
+     * @param ConfigurationAgent $sessionCfg Конфигурация агента, в контексте которой будут создаваться tools.
+     * @param MessageRole        $role       Роль сообщений для вызовов skill-tools.
+     *
+     * @return array<int, mixed> Список tool-объектов (NeuronAI tools/toolkits/ATool и т.п.).
      */
-    protected function attachSkillToolsToSession(
+    protected function buildAttachedTools(
         ConfigurationAgent $sessionCfg,
         MessageRole $role
-    ): void {
+    ): array {
         /** @var ConfigurationApp|null $configApp */
         $configApp = $this->getConfigurationApp();
         if ($configApp === null) {
-            return;
+            return [];
         }
 
-        $sessionTools = $sessionCfg->getTools();
+        $attached = [];
 
         $needSkills = $this->getNeedSkills();
         if ($needSkills !== []) {
-            $skillTools = [];
             foreach ($needSkills as $skillName) {
                 $skill = $configApp->getSkill($skillName);
                 if (!$skill instanceof Skill) {
@@ -56,11 +61,7 @@ trait AttachesSkillToolsTrait
 
                 // если в блоке настроек skill не указан используемый агент, то берется $sessionCfg
                 $skill->setDefaultConfigurationAgent($sessionCfg);
-                $skillTools[] = $skill->getTool($role);
-            }
-
-            if ($skillTools !== []) {
-                $sessionTools = array_merge($sessionTools, $skillTools);
+                $attached[] = $skill->getTool($role);
             }
         }
 
@@ -73,17 +74,30 @@ trait AttachesSkillToolsTrait
                     continue;
                 }
                 if ($tool instanceof ATool) {
-                    /**
-                     * В инструмент пробрасываем конфиг агента и его логгер
-                     */
-                    /*
-                    $a = $skill->getConfigurationAgent();
-                    $tool->setAgentCfg($a);
-                    */
                     $tool->setAgentCfg($sessionCfg);
                 }
-                $sessionTools[] = $tool;
+                $attached[] = $tool;
             }
+        }
+
+        return $attached;
+    }
+
+    /**
+     * Подключает зависимые навыки к сессионной конфигурации агента.
+     *
+     * @param ConfigurationAgent $sessionCfg Конфигурация агента для текущей сессии (будет модифицирована).
+     * @param MessageRole        $role       Роль сообщения, с которой будут вызываться инструменты навыков.
+     */
+    protected function attachSkillToolsToSession(
+        ConfigurationAgent $sessionCfg,
+        MessageRole $role
+    ): void {
+        $sessionTools = $sessionCfg->getTools();
+
+        $attached = $this->buildAttachedTools($sessionCfg, $role);
+        if ($attached !== []) {
+            $sessionTools = array_merge($sessionTools, $attached);
         }
 
         $sessionCfg->tools = $sessionTools;
