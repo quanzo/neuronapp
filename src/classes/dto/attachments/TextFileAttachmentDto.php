@@ -78,11 +78,17 @@ final class TextFileAttachmentDto extends AttachmentDto implements IAttachmentFi
                 throw new \RuntimeException("Unable to read attachment file: {$path}");
             }
 
-            $base64 = base64_encode($raw);
-            $filename = basename($path);
-            $mime = $this->detectMimeType($path) ?? ($meta['media_type'] ?? null);
+            $mime       = $this->detectMimeType($path) ?? ($meta['media_type'] ?? null);
+            $filename   = basename($path);
+            $base64     = base64_encode($raw);
+            $sourceType = SourceType::BASE64;
 
-            $block = new FileContent($base64, SourceType::BASE64, is_string($mime) ? $mime : null, $filename);
+            /*
+            $base64 = $raw;
+            $sourceType = SourceType::ID;
+            */
+
+            $block = new FileContent($base64, $sourceType, is_string($mime) ? $mime : null, $filename);
             $block->setMetadata($meta);
             return $block;
         }
