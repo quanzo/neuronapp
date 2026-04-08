@@ -51,15 +51,43 @@ final class FileContextHelper
 
         $paths = [];
 
-        if (preg_match_all('/(^|[ \t])@(?P<path>\S+)/m', $body, $matches) === 1 || !empty($matches['path'])) {
+        if (preg_match_all('/(^|[ \t(\[{])@(?P<path>\S+)/m', $body, $matches) === 1 || !empty($matches['path'])) {
             foreach ($matches['path'] as $rawPath) {
-                $trimmed = trim($rawPath);
-                if ($trimmed !== '') {
-                    $paths[] = $trimmed;
+                $normalized = self::normalizeExtractedPath($rawPath);
+                if ($normalized !== '') {
+                    $paths[] = $normalized;
                 }
             }
         }
         return array_values(array_unique($paths));
+    }
+
+    /**
+     * Нормализует путь, извлечённый из @-ссылки в тексте.
+     *
+     * В обычной речи пользователь часто ставит знак пунктуации сразу после пути:
+     * "Что в @docs/file.md?" — здесь '?' не должен считаться частью имени файла.
+     *
+     * Метод:
+     *  - убирает пробелы по краям;
+     *  - удаляет типичные "хвосты" пунктуации, которые используются как окончания фраз;
+     *  - сохраняет внутренние точки/слеши/дефисы и другие символы пути.
+     *
+     * @param string $rawPath Сырой фрагмент из регулярного выражения (без '@').
+     *
+     * @return string Нормализованный путь или пустая строка.
+     */
+    private static function normalizeExtractedPath(string $rawPath): string
+    {
+        $trimmed = trim($rawPath);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        // Удаляем только конечные символы, характерные для пунктуации в тексте.
+        // Важно: точка внутри пути допустима (например, "file.md"), поэтому удаляем
+        // только финальные точки/скобки/кавычки и знаки завершения предложения.
+        return rtrim($trimmed, "?!,;:.\"'`)]}");
     }
 
     /**

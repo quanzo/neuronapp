@@ -44,6 +44,26 @@ class FileContextHelperTest extends TestCase
     }
 
     /**
+     * Пунктуация в конце фразы не должна попадать в имя файла.
+     */
+    public function testExtractFilePathsFromBodyTrimsTrailingPunctuation(): void
+    {
+        $body = <<<'TXT'
+Что в @docs/project-notes.md?
+А это @docs/readme.md!
+Смотри @docs/plan.md, там есть детали.
+И ещё (@docs/inside-parens.md).
+TXT;
+
+        $paths = FileContextHelper::extractFilePathsFromBody($body);
+
+        $this->assertSame(
+            ['docs/project-notes.md', 'docs/readme.md', 'docs/plan.md', 'docs/inside-parens.md'],
+            $paths
+        );
+    }
+
+    /**
      * Включённый режим context_files и существующий файл приводят к созданию вложения.
      */
     public function testBuildContextAttachmentsCreatesAttachmentWhenEnabled(): void
