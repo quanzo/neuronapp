@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\dto\tools\VarToolResultDto;
+use app\modules\neuron\helpers\TodoCompletedStatusHelper;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
-use function in_array;
-use function strtolower;
 use function trim;
 
 /**
@@ -42,7 +41,7 @@ final class TodoCompletedTool extends AVarTool
             ToolProperty::make(
                 name       : 'status',
                 type       : PropertyType::STRING,
-                description: 'Статус: done/not_done, 1/0, true/false, исполнено/не исполнено.',
+                description: 'Статус: ' . TodoCompletedStatusHelper::describeAllowedValues() . '.',
                 required   : true,
             ),
             ToolProperty::make(
@@ -62,13 +61,13 @@ final class TodoCompletedTool extends AVarTool
     public function __invoke(string $status, ?string $reason = null): string
     {
         $sessionKey = $this->getSessionKey();
-        $normalized = $this->normalizeStatus($status);
+        $normalized = TodoCompletedStatusHelper::normalize($status);
 
         if ($normalized === null) {
             return $this->resultJson(new VarToolResultDto(
                 action    : 'todo_completed',
                 success   : false,
-                message   : 'Некорректный status. Используйте done/not_done, 1/0, true/false, исполнено/не исполнено.',
+                message   : 'Некорректный status. Используйте ' . TodoCompletedStatusHelper::describeAllowedValues() . '.',
                 sessionKey: $sessionKey,
                 name      : 'completed',
             ));
@@ -104,21 +103,5 @@ final class TodoCompletedTool extends AVarTool
             data       : $normalized,
             exists     : true,
         ));
-    }
-
-    /**
-     * Нормализует входной статус в `1|0` или null (невалидный ввод).
-     */
-    private function normalizeStatus(string $status): ?int
-    {
-        $v = strtolower(trim($status));
-        if (in_array($v, ['done', '1', 'true', 'исполнено'], true)) {
-            return 1;
-        }
-        if (in_array($v, ['not_done', '0', 'false', 'не исполнено', 'неисполнено'], true)) {
-            return 0;
-        }
-
-        return null;
     }
 }

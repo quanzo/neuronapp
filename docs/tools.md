@@ -175,8 +175,13 @@ ToolRegistry::registerAlias('my_tool_v2', 'my_tool');
 - **Хранилище**: директория `.store` (через `ConfigurationApp::getStoreDir()`).
 - **Формат ответов**: инструменты возвращают LLM-friendly JSON через `VarToolResultDto`; поля со значением `null` **не включаются** в результат.
 - **Имена файлов**:
-  - результат: `.store/var_{sessionKey}_{label}.json` (небезопасные символы в частях имени заменяются на `_`);
-  - индекс: `.store/var_index_{sessionKey}.json` (для ускорения `list`).
+  - результат: `.store/var_{sessionKey}_{label}.json`;
+  - индекс: `.store/var_index_{sessionKey}.json`.
+
+Source of truth для имён файлов:
+
+- `src/helpers/StorageFileHelper.php`
+- `src/classes/storage/VarStorage.php`
 
 Формат хранения (LLM-friendly JSON envelope) остаётся прежним:
 
@@ -277,11 +282,23 @@ ToolRegistry::registerAlias('my_tool_v2', 'my_tool');
   - не завершено: `not_done`, `0`, `false`, `не исполнено`.
 - `reason` (string, optional) — краткая причина изменения статуса.
 
+Source of truth:
+
+- `src/helpers/TodoCompletedStatusHelper.php`
+- `src/tools/TodoCompletedTool.php`
+- `src/classes/orchestrators/TodoListOrchestrator.php`
+
 Поведение:
 
-- инструмент нормализует `status` к `1|0`;
+- инструмент нормализует `status` к `1|0` через `TodoCompletedStatusHelper::normalize()`;
 - записывает значение в `VarStorage` под меткой `completed`;
 - возвращает LLM-friendly JSON через `VarToolResultDto` (`action=todo_completed`).
+
+Инварианты:
+
+- `TodoCompletedTool` и `TodoListOrchestrator` обязаны трактовать `completed` одинаково;
+- если набор допустимых строк меняется, он меняется только в `TodoCompletedStatusHelper`;
+- docs и тексты ошибок не должны перечислять значения вручную вне этого helper.
 
 Пример псевдо-вызова:
 

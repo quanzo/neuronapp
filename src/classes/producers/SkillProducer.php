@@ -18,12 +18,19 @@ use app\modules\neuron\classes\dir\DirPriority;
  */
 class SkillProducer extends AProducer
 {
+    public const STORAGE_DIR_NAME = 'skills';
+
+    /**
+     * @var list<string>
+     */
+    public const EXTENSIONS = ['txt', 'md'];
+
     /**
      * @inheritDoc
      */
     public static function getStorageDirName(): string
     {
-        return 'skills';
+        return self::STORAGE_DIR_NAME;
     }
 
     /**
@@ -33,7 +40,7 @@ class SkillProducer extends AProducer
      */
     protected function getExtensions(): array
     {
-        return ['txt', 'md'];
+        return self::EXTENSIONS;
     }
 
     /**

@@ -47,6 +47,12 @@
 - для skills — в `Skill::execute()` при формировании запроса к агенту;
 - для todolist — отдельно для каждого todo в `TodoList::execute()`, чтобы каждый шаг мог иметь свой контекст.
 
+Source of truth:
+
+- `src/helpers/AttachmentHelper.php`
+- `src/helpers/FileContextHelper.php`
+- `src/classes/todo/TodoList.php`
+
 ### Настройки `context_files` в `config.jsonc`
 
 В разделе `context_files` файла `config.jsonc` задаются правила подключения файлов по @‑ссылкам:
@@ -91,3 +97,25 @@
 - явно контролировать объём и источник контекста для LLM;
 - избегать случайной утечки лишних данных;
 - повторно использовать справочные `.md`‑файлы из `docs/` как часть запроса.
+
+### Связанные файловые артефакты сессии
+
+Этот документ про контекстные файлы, но при отладке важно не путать их со служебными файлами исполнения.
+
+Source of truth:
+
+- `src/helpers/StorageFileHelper.php`
+- `src/classes/storage/VarStorage.php`
+- `src/helpers/RunStateCheckpointHelper.php`
+
+Служебные файлы:
+
+- история сессии: `.sessions/neuron_<sessionKey>.chat`
+- checkpoint run-state: `.store/run_state_<sessionKey>_<agentName>.json`
+- промежуточные значения: `.store/var_<sessionKey>_<name>.json`
+- индекс промежуточных значений: `.store/var_index_<sessionKey>.json`
+
+Edge cases:
+
+- имя файла не обязано совпадать с исходным значением `sessionKey` или `name` посимвольно, потому что части имени проходят безопасную нормализацию;
+- для пользовательского контекста через `@...` эти шаблоны не используются.

@@ -7,6 +7,7 @@ namespace app\modules\neuron\classes\storage;
 use app\modules\neuron\classes\dto\tools\VarIndexDto;
 use app\modules\neuron\classes\dto\tools\VarIndexItemDto;
 use app\modules\neuron\helpers\JsonHelper;
+use app\modules\neuron\helpers\StorageFileHelper;
 
 use function dirname;
 use function file_exists;
@@ -16,7 +17,6 @@ use function filesize;
 use function is_array;
 use function is_int;
 use function is_string;
-use function preg_replace;
 use function rename;
 use function scandir;
 use function str_ends_with;
@@ -92,9 +92,7 @@ final class VarStorage
     public const SCHEMA_VAR_V1 = 'neuronapp.var.v1';
     public const SCHEMA_INDEX_V1 = 'neuronapp.var_index.v1';
 
-    private const RESULT_PREFIX = 'var_';
-    private const INDEX_PREFIX = 'var_index_';
-    private const TMP_PREFIX = 'var_';
+    private const TMP_PREFIX = StorageFileHelper::VAR_RESULT_PREFIX;
 
     /**
      * Создаёт экземпляр хранилища для указанной директории `.store`.
@@ -119,9 +117,7 @@ final class VarStorage
      */
     public function resultFileName(string $sessionKey, string $name): string
     {
-        $safeKey = $this->sanitizeKeyPart($sessionKey);
-        $safename = $this->sanitizeKeyPart($name);
-        return self::RESULT_PREFIX . $safeKey . '_' . $safename . '.json';
+        return StorageFileHelper::varResultFileName($sessionKey, $name);
     }
 
     /**
@@ -145,8 +141,7 @@ final class VarStorage
      */
     private function indexFileName(string $sessionKey): string
     {
-        $safeKey = $this->sanitizeKeyPart($sessionKey);
-        return self::INDEX_PREFIX . $safeKey . '.json';
+        return StorageFileHelper::varIndexFileName($sessionKey);
     }
 
     /**
@@ -418,8 +413,8 @@ final class VarStorage
             return [];
         }
 
-        $safeKey = $this->sanitizeKeyPart($sessionKey);
-        $prefix = self::RESULT_PREFIX . $safeKey . '_';
+        $safeKey = StorageFileHelper::sanitizeFileKeyPart($sessionKey);
+        $prefix = StorageFileHelper::VAR_RESULT_PREFIX . $safeKey . '_';
         $items = [];
 
         foreach ($entries as $entry) {
@@ -495,20 +490,6 @@ final class VarStorage
             @unlink($tmp);
             throw new \RuntimeException('Не удалось переименовать временный файл результата в: ' . $targetPath);
         }
-    }
-
-    /**
-     * Нормализует часть ключа для безопасного использования в имени файла.
-     *
-     * Разрешены только символы `[a-zA-Z0-9_-]`, остальные заменяются на `_`.
-     *
-     * @param string $value Исходная строка.
-     * @return string Безопасная строка.
-     */
-    private function sanitizeKeyPart(string $value): string
-    {
-        $safe = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $value);
-        return is_string($safe) ? $safe : '';
     }
 
     /**

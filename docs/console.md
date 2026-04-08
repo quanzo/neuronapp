@@ -7,7 +7,24 @@
 - Точка входа: `bin/console.php` использует `TimedConsoleApplication` — после выполнения команды в stderr выводится строка вида `Время выполнения: X.XXX с` (в режиме `--quiet` / `-q` не показывается).
 - Все команды используют `ConfigurationApp` и producers для поиска агентов и todolist.
 - История чата и `sessionKey` позволяют продолжать диалог между запусками.
-- Формат `session_id` валидируется через `ConfigurationApp::isValidSessionKey()` и должен соответствовать `YYYYMMDD-HHMMSS-μs`.
+- Формат `session_id` валидируется через `ConfigurationApp::isValidSessionKey()` и должен соответствовать `Ymd-His-u-userId`.
+
+#### Формат `session_id`
+
+Source of truth:
+
+- `src/helpers/SessionKeyHelper.php`
+- `ConfigurationApp::describeSessionKeyFormat()`
+
+Канонический формат:
+
+- `Ymd-His-u-userId`
+- пример: `20250301-143022-123456-0`
+
+Ошибки и edge cases:
+
+- значение без `userId` считается невалидным для CLI;
+- при неверном формате команды `simplemessage` и `todolist` должны показывать сообщение, построенное из `ConfigurationApp::describeSessionKeyFormat()`, а не из вручную захардкоженной строки.
 
 ### Команды очистки сессий
 
@@ -98,10 +115,11 @@
   - ищется `RunStateDto` через `ConfigurationAgent::getExistRunStateDto()`;
   - если он есть, удаляется файл чекпоинта и команда завершается успешно;
 - при `--resume`:
-  - читается `RunStateDto`;
-  - проверяется совпадение имени списка;
-  - при наличии `history_message_count` история чата обрезается до указанного количества сообщений (через `ChatHistoryTruncateHelper`);
-  - вычисляется индекс `startFromTodoIndex` для продолжения;
+  - строится единый `TodoListResumePlanDto` через `TodoListResumeHelper::buildPlan()`;
+  - проверяется совпадение имени списка и `sessionKey`;
+  - при наличии `history_message_count` helper применяет rollback истории;
+  - если `history_message_count` отсутствует, команда продолжает выполнение с `last_completed_todo_index + 1`, но пишет warning в лог;
+  - вычисленный `startFromTodoIndex` берётся из `TodoListResumePlanDto`, а не считается локально в команде;
 - при обычном запуске с `--session_id` и незавершённым run:
   - команда просит явно указать `--resume` или `--abort` и завершается с ошибкой.
 
@@ -145,7 +163,8 @@
 - команда загружает три `TodoList` из `todos/`;
 - передает сценарии в `TodoListOrchestrator`;
 - оркестратор принудительно устанавливает `completed=0`, затем крутит `step` до `completed=1` или лимита итераций;
-- перед каждым запуском списка (`init`, каждая итерация `step`, `finish`) при наличии чекпоинта `RunStateDto` для той же сессии и того же имени списка выполняется автоматический resume (как у `todolist --resume`);
+- перед каждым запуском списка (`init`, каждая итерация `step`, `finish`) при наличии checkpoint строится такой же `TodoListResumePlanDto`, как у `todolist --resume`;
+- если rollback истории невозможен из-за отсутствия `history_message_count`, оркестратор публикует событие `orchestrator.resume_history_missing`, но продолжает выполнение с рассчитанного индекса;
 - в обоих финальных сценариях (успех/лимит) выполняется `finish`;
 - жизненный цикл оркестратора публикуется в `EventBus` событиями `orchestrator.*`;
 - результат печатается в JSON (`success`, `reason`, `iterations`, `restartCount`, `sessionKey`).

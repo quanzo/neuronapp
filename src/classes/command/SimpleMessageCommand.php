@@ -132,7 +132,10 @@ class SimpleMessageCommand extends AbstractAgentCommand
         // Если передан session_id — проверяем формат и существование сессии, затем подставляем ключ
         if ($sessionId !== null && $sessionId !== '') {
             if (!ConfigurationApp::isValidSessionKey($sessionId)) {
-                $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u-userId (например, 20250301-143022-123456-0).</error>');
+                $output->writeln(sprintf(
+                    '<error>Неверный формат session_id. Ожидается формат %s.</error>',
+                    ConfigurationApp::describeSessionKeyFormat()
+                ));
                 return Command::FAILURE;
             }
 

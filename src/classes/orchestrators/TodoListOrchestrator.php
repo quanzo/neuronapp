@@ -12,8 +12,8 @@ use app\modules\neuron\classes\dto\params\SessionParamsDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\classes\todo\TodoList;
-use app\modules\neuron\helpers\ChatHistoryRollbackHelper;
-use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
+use app\modules\neuron\helpers\TodoCompletedStatusHelper;
+use app\modules\neuron\helpers\TodoListResumeHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 use Revolt\EventLoop;
 
@@ -297,23 +297,7 @@ class TodoListOrchestrator
      */
     protected function normalizeCompleted(mixed $raw): ?int
     {
-        if (is_int($raw)) {
-            return $raw > 0 ? 1 : 0;
-        }
-        if (is_bool($raw)) {
-            return $raw ? 1 : 0;
-        }
-        if (is_string($raw)) {
-            $v = strtolower(trim($raw));
-            if (in_array($v, ['1', 'true', 'done', 'исполнено'], true)) {
-                return 1;
-            }
-            if (in_array($v, ['0', 'false', 'not_done', 'не исполнено', 'неисполнено'], true)) {
-                return 0;
-            }
-        }
-
-        return null;
+        return TodoCompletedStatusHelper::normalize($raw);
     }
 
     /**
@@ -404,31 +388,14 @@ class TodoListOrchestrator
      */
     protected function resolveStartFromTodoIndexForTodoList(TodoList $todoList): int
     {
-        $agentCfg    = $todoList->getConfigurationAgent();
-        $runStateDto = $agentCfg->getExistRunStateDto();
-        if ($runStateDto === null) {
-            return 0;
-        }
-        if ($runStateDto->isFinished()) {
-            return 0;
-        }
-        if ($runStateDto->getTodolistName() !== $todoList->getName()) {
-            return 0;
-        }
-        $checkpointSessionKey = $runStateDto->getSessionKey();
-        $appSessionKey      = $this->configApp->getSessionKey();
-        if ($checkpointSessionKey !== '' && $checkpointSessionKey !== $appSessionKey) {
+        $agentCfg = $todoList->getConfigurationAgent();
+        $plan = TodoListResumeHelper::buildPlan($agentCfg, $todoList->getName(), $this->configApp->getSessionKey());
+
+        if (!$plan->isResumeAvailable()) {
             return 0;
         }
 
-        $startFromTodoIndex = max(0, $runStateDto->getLastCompletedTodoIndex() + 1);
-
-        $historyMessageCount = $runStateDto->getHistoryMessageCount();
-        if ($historyMessageCount !== null) {
-            $agentCfg->resetChatHistory();
-            $history = $agentCfg->getChatHistory();
-            ChatHistoryTruncateHelper::truncateToMessageCount($history, $historyMessageCount);
-        } else {
+        if (!TodoListResumeHelper::applyHistoryRollback($agentCfg, $plan)) {
             EventBus::trigger(
                 EventNameEnum::ORCHESTRATOR_RESUME_HISTORY_MISSING->value,
                 $this,
@@ -438,12 +405,12 @@ class TodoListOrchestrator
                     ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
                     ->setAgent($agentCfg)
                     ->setTodolistName($todoList->getName())
-                    ->setLastCompletedTodoIndex($runStateDto->getLastCompletedTodoIndex())
-                    ->setStartFromTodoIndex($startFromTodoIndex)
+                    ->setLastCompletedTodoIndex($plan->getLastCompletedTodoIndex())
+                    ->setStartFromTodoIndex($plan->getStartFromTodoIndex())
             );
         }
 
-        return $startFromTodoIndex;
+        return $plan->getStartFromTodoIndex();
     }
 
     /**

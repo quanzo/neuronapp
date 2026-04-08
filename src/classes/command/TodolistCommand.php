@@ -7,19 +7,16 @@ namespace app\modules\neuron\classes\command;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\params\SessionParamsDto;
 use app\modules\neuron\helpers\AttachmentHelper;
-use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\helpers\ConsoleHelper;
-use app\modules\neuron\helpers\RunStateCheckpointHelper;
+use app\modules\neuron\helpers\TodoListResumeHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\Messages\Message;
 use Revolt\EventLoop;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Question\ChoiceQuestion;
 
 /**
  * Консольная команда выполнения списка заданий TodoList через указанного агента.
@@ -114,7 +111,10 @@ class TodolistCommand extends AbstractAgentCommand
         // Если передан session_id — проверяем формат и существование сессии, затем подставляем ключ
         if ($sessionId !== null && $sessionId !== '') {
             if (!ConfigurationApp::isValidSessionKey($sessionId)) {
-                $output->writeln('<error>Неверный формат session_id. Ожидается формат Ymd-His-u-userId (например, 20250301-143022-123456-0).</error>');
+                $output->writeln(sprintf(
+                    '<error>Неверный формат session_id. Ожидается формат %s.</error>',
+                    ConfigurationApp::describeSessionKeyFormat()
+                ));
                 return Command::FAILURE;
             }
 
@@ -192,36 +192,35 @@ class TodolistCommand extends AbstractAgentCommand
         }
 
         if ($resume) {
-            $runStateDto = $agentCfg->getExistRunStateDto();
-            if ($runStateDto) {
-                if ($runStateDto->isFinished()) {
+            $plan = TodoListResumeHelper::buildPlan($agentCfg, $todolistName, $configApp->getSessionKey());
+
+            if (!$plan->isResumeAvailable()) {
+                if ($plan->getReason() === 'finished') {
                     $output->writeln('<error>Выполнение списка уже завершено; продолжение недоступно.</error>');
                     return Command::FAILURE;
-                } elseif ($runStateDto->getTodolistName() !== $todolistName) {
+                }
+
+                if ($plan->getReason() === 'todolist_mismatch') {
                     $output->writeln(sprintf(
                         '<error>Продолжить можно только тот же список: в чекпоинте "%s", указан "%s".</error>',
-                        $runStateDto->getTodolistName(),
+                        $plan->getRunStateDto()?->getTodolistName() ?? '',
                         $todolistName
                     ));
                     return Command::FAILURE;
-                } else {
-                    $historyMessageCount = $runStateDto->getHistoryMessageCount();
-                    if ($historyMessageCount !== null) {
-                        $agentCfg->resetChatHistory();
-                        $history = $agentCfg->getChatHistory();
-                        ChatHistoryTruncateHelper::truncateToMessageCount($history, $historyMessageCount);
-                    } else {
-                        $logger = $agentCfg->getLogger();
-                        if ($logger !== null) {
-                            $logger->warning('Откат истории невозможен: в чекпоинте нет history_message_count (возможен дубликат сообщения при сбое).');
-                        }
-                    }
-                    $startFromTodoIndex = $runStateDto->getLastCompletedTodoIndex() + 1;
                 }
-            } else {
+
                 $output->writeln('<error>Нет сохранённого состояния для продолжения (чекпоинт не найден).</error>');
                 return Command::FAILURE;
             }
+
+            if (!TodoListResumeHelper::applyHistoryRollback($agentCfg, $plan)) {
+                $logger = $agentCfg->getLogger();
+                if ($logger !== null) {
+                    $logger->warning('Откат истории невозможен: в чекпоинте нет history_message_count (возможен дубликат сообщения при сбое).');
+                }
+            }
+
+            $startFromTodoIndex = $plan->getStartFromTodoIndex();
         }
 
         if ($todoList !== null) {

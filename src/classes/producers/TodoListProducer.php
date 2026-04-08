@@ -18,12 +18,19 @@ use app\modules\neuron\classes\dir\DirPriority;
  */
 class TodoListProducer extends AProducer
 {
+    public const STORAGE_DIR_NAME = 'todos';
+
+    /**
+     * @var list<string>
+     */
+    public const EXTENSIONS = ['txt', 'md'];
+
     /**
      * @inheritDoc
      */
     public static function getStorageDirName(): string
     {
-        return 'todos';
+        return self::STORAGE_DIR_NAME;
     }
 
     /**
@@ -33,7 +40,7 @@ class TodoListProducer extends AProducer
      */
     protected function getExtensions(): array
     {
-        return ['txt', 'md'];
+        return self::EXTENSIONS;
     }
 
     /**

@@ -21,7 +21,8 @@ use const DIRECTORY_SEPARATOR;
 /**
  * Хелпер чтения и записи чекпоинтов состояния выполнения run (TodoList) в рамках сессии.
  *
- * Сохраняет состояние в файлы .store/run_state_{sessionKey}_{agentName}.json.
+ * Сохраняет состояние в файлы `.store`, используя канонический нейминг из
+ * {@see StorageFileHelper::runStateFileName()}.
  * Запись выполняется атомарно (временный файл + rename) во избежание битых файлов при сбое.
  */
 final class RunStateCheckpointHelper
@@ -37,9 +38,7 @@ final class RunStateCheckpointHelper
      */
     public static function fileName(string $sessionKey, string $agentName): string
     {
-        $safeKey = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $sessionKey);
-        $safeAgent = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $agentName ?: 'unknown');
-        return 'run_state_' . $safeKey . '_' . $safeAgent . '.json';
+        return StorageFileHelper::runStateFileName($sessionKey, $agentName);
     }
 
     /**
@@ -92,7 +91,7 @@ final class RunStateCheckpointHelper
     {
         $path = self::filePath($state->getSessionKey(), $state->getAgentName());
         $dir = dirname($path);
-        $tmp = $dir . DIRECTORY_SEPARATOR . 'run_state_' . uniqid('', true) . '.tmp';
+        $tmp = $dir . DIRECTORY_SEPARATOR . StorageFileHelper::RUN_STATE_PREFIX . uniqid('', true) . '.tmp';
         $json = JsonHelper::encodeThrow($state->toArray());
         if (file_put_contents($tmp, $json) === false) {
             if (file_exists($tmp)) {

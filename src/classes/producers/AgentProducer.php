@@ -23,6 +23,13 @@ class AgentProducer extends AProducer
 {
     use LoggerAwareTrait;
 
+    public const STORAGE_DIR_NAME = 'agents';
+
+    /**
+     * @var list<string>
+     */
+    public const EXTENSIONS = ['php', 'jsonc'];
+
     /**
      * Имя агента по умолчанию.
      */
@@ -41,7 +48,7 @@ class AgentProducer extends AProducer
      */
     public static function getStorageDirName(): string
     {
-        return 'agents';
+        return self::STORAGE_DIR_NAME;
     }
 
     /**
@@ -51,7 +58,7 @@ class AgentProducer extends AProducer
      */
     protected function getExtensions(): array
     {
-        return ['php', 'jsonc'];
+        return self::EXTENSIONS;
     }
 
     /**

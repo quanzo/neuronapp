@@ -52,9 +52,15 @@ new DirPriority([APP_START_DIR, APP_WORK_DIR]);
 
 Producers сами отвечают за расширения файлов:
 
-- `AgentProducer` — `agents/<name>.php` или `agents/<name>.jsonc` (с приоритетом PHP);
-- `TodoListProducer` — `todos/<name>.txt` или `todos/<name>.md`;
-- `SkillProducer` — `skills/<name>.txt` или `skills/<name>.md`.
+- `AgentProducer::EXTENSIONS` — `agents/<name>.php` или `agents/<name>.jsonc` (с приоритетом PHP);
+- `TodoListProducer::EXTENSIONS` — `todos/<name>.txt` или `todos/<name>.md`;
+- `SkillProducer::EXTENSIONS` — `skills/<name>.txt` или `skills/<name>.md`.
+
+Source of truth для этих расширений:
+
+- `src/classes/producers/AgentProducer.php`
+- `src/classes/producers/TodoListProducer.php`
+- `src/classes/producers/SkillProducer.php`
 
 ### Альтернативные окружения (`testapp` и др.)
 
@@ -81,6 +87,25 @@ Producers сами отвечают за расширения файлов:
 - использовать общий набор агентов/skills/todos из более приоритетной директории;
 - переопределять их в окружении, создавая файлы с теми же именами в `APP_WORK_DIR`;
 - хранить изолированные логи, сессии и checkpoint-файлы в подкаталогах окружения.
+
+#### Имена служебных файлов в директориях
+
+Source of truth:
+
+- `src/helpers/StorageFileHelper.php`
+
+Канонические имена:
+
+- `.sessions/neuron_<sessionKey>.chat`
+- `.store/run_state_<sessionKey>_<agentName>.json`
+- `.store/var_<sessionKey>_<name>.json`
+- `.store/var_index_<sessionKey>.json`
+- `.logs/<sessionKey>.log`
+
+Инварианты:
+
+- директории `.sessions`, `.logs`, `.store` создаются bootstrap-логикой в `bin/console.php`;
+- шаблоны имён файлов не должны повторно собираться вручную в командах, сервисах или документации.
 
 ### Контекст‑файлы (`context_files` и `@docs/...`)
 

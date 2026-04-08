@@ -17,10 +17,11 @@
   - `getTodoList(string $name): ?TodoList`;
   - `getSkill(string $name): ?Skill`;
 - управление ключом сессии:
-  - `buildSessionKey()` генерирует базовый ключ вида `YYYYMMDD-HHMMSS-μs`;
-  - `getSessionKey()` — ленивое получение/создание ключа (опционально с `userId`);
+  - `buildSessionKey()` генерирует **базовую** часть ключа вида `YYYYMMDD-HHMMSS-μs`;
+  - `getSessionKey()` — ленивое получение/создание **полного** ключа с `userId`;
   - `setSessionKey(string $sessionKey)` — установка ключа (например, из CLI) без проверки наличия истории;
   - `isValidSessionKey(string $sessionKey): bool` — валидация формата;
+  - `describeSessionKeyFormat(): string` — человекочитаемое описание формата для CLI и docs;
   - `sessionExists(string $sessionKey, ?string $agentName = null): bool` — проверка файла истории (`neuron_<key>.chat`) через `DirPriority`;
 - путь к служебным директориям:
   - `getSessionDirName()` / `getSessionDir()` → `.sessions`;
@@ -39,6 +40,33 @@
   - общие настройки (например, `userId`);
   - `context_files` — управление подключением файлов по @‑ссылкам (см. `docs/directories.md`, `docs/files.md`);
   - любые дополнительные опции, которые читаются через `ConfigurationApp::get()`.
+
+#### Формат `session_id` / `sessionKey`
+
+Source of truth:
+
+- `src/helpers/SessionKeyHelper.php`
+- `ConfigurationApp::SESSION_KEY_PATTERN`
+- `ConfigurationApp::describeSessionKeyFormat()`
+
+Канонические правила:
+
+- **базовая часть** ключа: `YYYYMMDD-HHMMSS-uuuuuu`;
+- **полный** ключ сессии: `YYYYMMDD-HHMMSS-uuuuuu-userId`;
+- пример полного значения: `20250301-143022-123456-0`;
+- CLI и документация не должны дублировать regex вручную, а должны ссылаться на `SessionKeyHelper`.
+
+Инварианты:
+
+- `ConfigurationApp::buildSessionKey()` возвращает только базовую часть без `userId`;
+- `ConfigurationApp::getSessionKey()` возвращает полный ключ, добавляя `userId` или `0`;
+- `ConfigurationApp::isValidSessionKey()` принимает только полный ключ, пригодный для CLI и файловых артефактов.
+
+Edge cases:
+
+- строка без `userId` не считается валидным `session_id` для CLI;
+- пустой `userId` нормализуется в `0`;
+- буквенный `userId` не допускается.
 
 ### Конфигурация агента (`ConfigurationAgent`)
 
@@ -90,6 +118,7 @@
 ```
 - сессии todolist:
   - `getBlankRunStateDto()` / `getExistRunStateDto()` — работа с `RunStateDto` и чекпоинтами в `.store` через `RunStateCheckpointHelper`;
+  - `resumeRunState()` — применяет rollback истории через `TodoListResumeHelper`, если checkpoint содержит `history_message_count`;
 - результаты:
   - `getVarStorage()` — доступ к хранилищу результатов (`VarStorage`), которое используют инструменты семейства `Var*Tool`;
 - клоны для отдельных запусков:
@@ -110,7 +139,7 @@
 Файлы агентов хранятся в директории `agents/` (через `DirPriority`). За поиск и создание конфигураций отвечает `AgentProducer`:
 
 - `getStorageDirName()` → `'agents'`;
-- расширения: `['php', 'jsonc']` (PHP имеет приоритет при совпадении имён файлов);
+- расширения: `AgentProducer::EXTENSIONS = ['php', 'jsonc']` (PHP имеет приоритет при совпадении имён файлов);
 - `createFromFile(string $path, string $name): ?ConfigurationAgent`:
   - вызывает `ConfigurationAgent::makeFromFile()` для чтения конфигурации;
   - выставляет `agentName` в имя файла;
@@ -160,6 +189,29 @@ return [
   - логгер для команд настраивается через `AbstractAgentCommand::resolveFileLogger()`, который использует `ConfigurationApp::getLogDir()`.
 
 Подробнее о командах см. `docs/console.md`, о skills и todolist — в `docs/skills.md` и `docs/todolist.md`.
+
+### Имена файлов сессий, чекпоинтов и логов
+
+Source of truth:
+
+- `src/helpers/StorageFileHelper.php`
+- `src/helpers/RunStateCheckpointHelper.php`
+- `src/classes/storage/VarStorage.php`
+
+Канонические шаблоны:
+
+- история сессии: `.sessions/neuron_<sessionKey>.chat`
+- история с именем агента: `.sessions/neuron_<sessionKey>-<agentName>.chat`
+- checkpoint run-state: `.store/run_state_<sessionKey>_<agentName>.json`
+- результат VarStorage: `.store/var_<sessionKey>_<name>.json`
+- индекс VarStorage: `.store/var_index_<sessionKey>.json`
+- лог команды: `.logs/<sessionKey>.log`
+
+Инварианты:
+
+- все части имени файла проходят через `StorageFileHelper::sanitizeFileKeyPart()`;
+- ручное построение имён файлов в бизнес-логике считается расхождением и должно заменяться вызовом helper;
+- `RunStateCheckpointHelper` и `VarStorage` обязаны использовать те же шаблоны, что документированы здесь.
 
 ### Управление сессиями (SessionConfigAppService)
 

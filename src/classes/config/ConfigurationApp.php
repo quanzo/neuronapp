@@ -14,6 +14,8 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\logger\ContextualLogger;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\helpers\JsonHelper;
+use app\modules\neuron\helpers\SessionKeyHelper;
+use app\modules\neuron\helpers\StorageFileHelper;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
 use app\modules\neuron\classes\storage\VarStorage;
@@ -33,12 +35,12 @@ class ConfigurationApp
     use LoggerAwareContextualTrait;
 
     /**
-     * Регулярное выражение для проверки формата sessionKey.
+     * Регулярное выражение для проверки формата полного session key.
      *
-     * Формат совпадает с {@see ConfigurationApp::buildSessionKey()}: Ymd-His-u
-     * (дата 8 цифр, дефис, время 6 цифр, дефис, микросекунды, дефис, id пользователя или 0).
+     * Источник истины — {@see SessionKeyHelper::PATTERN}. Константа оставлена как
+     * совместимый публичный алиас для существующего кода и тестов.
      */
-    const SESSION_KEY_PATTERN = '/^\d{8}-\d{6}-\d+-\d+$/';
+    public const SESSION_KEY_PATTERN = SessionKeyHelper::PATTERN;
 
     /**
      * Единственный экземпляр конфигурации.
@@ -99,7 +101,7 @@ class ConfigurationApp
      * @param DirPriority $dirPriority    Приоритетный список директорий для поиска файла конфигурации.
      * @param string      $configFileName Имя файла конфигурации (например, config.jsonc).
      */
-    private function __construct(DirPriority $dirPriority, string $configFileName, int $userId = 0)
+    private function __construct(DirPriority $dirPriority, string $configFileName, int|string $userId = 0)
     {
         $this->dirPriority = $dirPriority;
         $this->configFileName = $configFileName;
@@ -320,8 +322,9 @@ class ConfigurationApp
      */
     public function sessionExists(string $sessionKey, ?string $agentName = null): bool
     {
-        $key = $sessionKey . (is_null($agentName) ? '' : '-' . ($agentName ?: 'unknown'));
-        $path = $this->dirPriority->resolveFile($this->getSessionDirName() . DIRECTORY_SEPARATOR . 'neuron_' . $key . '.chat');
+        $path = $this->dirPriority->resolveFile(
+            $this->getSessionDirName() . DIRECTORY_SEPARATOR . StorageFileHelper::sessionHistoryFileName($sessionKey, $agentName)
+        );
         if ($path) {
             return true;
         }
@@ -336,14 +339,7 @@ class ConfigurationApp
      */
     public static function buildSessionKey(): string
     {
-        $microtime = microtime(true);
-        $dt = \DateTime::createFromFormat('U.u', sprintf('%.6f', $microtime));
-
-        if ($dt === false) {
-            $dt = new \DateTime();
-        }
-
-        return $dt->format('Ymd-His-u');
+        return SessionKeyHelper::buildBaseKey();
     }
 
     /**
@@ -354,8 +350,7 @@ class ConfigurationApp
     public function getSessionKey(): string
     {
         if ($this->sessionKey === null) {
-            $uid = $this->getUserId();
-            $this->sessionKey = $this::buildSessionKey() . ($uid ? '-' . $uid : '0');
+            $this->sessionKey = SessionKeyHelper::buildSessionKey($this->getUserId());
         }
 
         return $this->sessionKey;
@@ -377,10 +372,17 @@ class ConfigurationApp
      */
     public static function isValidSessionKey(string $sessionKey): bool
     {
-        if (preg_match(self::SESSION_KEY_PATTERN, $sessionKey) !== 1) {
-            return false;
-        }
-        return true;
+        return SessionKeyHelper::isValid($sessionKey);
+    }
+
+    /**
+     * Возвращает описание канонического формата session key для CLI и docs.
+     *
+     * @return string Строка с форматом и примером.
+     */
+    public static function describeSessionKeyFormat(): string
+    {
+        return SessionKeyHelper::describeFormat();
     }
 
     /**

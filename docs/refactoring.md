@@ -13,6 +13,9 @@
   - выносить повторяющуюся логику в абстрактные классы и хелперы (например, `AProducer`, `AttachmentHelper`, `FileContextHelper`, `ShellToolFactory`, `ToolRegistry`);
   - избегать избыточной сложности в методах, делить большие операции на небольшие, понятные шаги;
   - следить за единичной ответственностью классов (отдельно конфигурация, отдельно producers, отдельно хелперы).
+- **Single source of truth**:
+  - форматы `sessionKey`, имена служебных файлов, статусы `completed`, расширения доменных файлов и публичные соглашения должны определяться в одном месте кода;
+  - CLI, тесты и `docs/` должны ссылаться на эти определения, а не повторять их вручную.
 - **Стиль PSR‑12 и статический анализ**:
   - код должен проходить `phpcs` с конфигурацией проекта (PSR‑12, каталоги `src` и `tests`);
   - код должен быть совместим с `phpstan` на максимальном уровне проекта.
@@ -34,8 +37,9 @@
 При рефакторинге повторяющиеся и технические детали выносятся:
 
 - в DTO (`ParamDto`, `ParamListDto`, `SessionParamsDto`, `RunStateDto`, `AttachmentDto` и др.);
+- в DTO для расчётных решений и переходных состояний (например, `TodoListResumePlanDto`);
 - в traits (`LoggerAwareTrait`, `LoggerAwareContextualTrait`, `DependConfigAppTrait`, `HasNeedSkillsTrait`, `AttachesSkillToolsTrait`);
-- в хелперы (`AttachmentHelper`, `FileContextHelper`, `PlaceholderHelper`, `MarkdownHelper`, `OptionsHelper`, `ChatHistoryTruncateHelper`, `ChatHistoryRollbackHelper`, `ShellToolFactory`, `ToolRegistry`).
+- в хелперы (`AttachmentHelper`, `FileContextHelper`, `PlaceholderHelper`, `MarkdownHelper`, `OptionsHelper`, `ChatHistoryTruncateHelper`, `ChatHistoryRollbackHelper`, `ShellToolFactory`, `ToolRegistry`, `SessionKeyHelper`, `StorageFileHelper`, `TodoCompletedStatusHelper`, `TodoListResumeHelper`).
 
 Это упрощает сопровождение и уменьшает связность между доменными классами.
 
@@ -54,6 +58,7 @@
   - строгие типы;
   - соответствие PSR‑12;
   - проработанные phpdoc‑комментарии;
+  - единые точки истины для форматов и соглашений;
 - после изменений обязательно запускать:
   - `./vendor/bin/phpcs`;
   - `./vendor/bin/phpstan`;

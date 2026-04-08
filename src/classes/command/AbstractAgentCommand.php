@@ -11,6 +11,7 @@ use app\modules\neuron\classes\events\subscribers\SkillLoggingSubscriber;
 use app\modules\neuron\classes\events\subscribers\TodoListLoggingSubscriber;
 use app\modules\neuron\classes\events\subscribers\ToolLoggingSubscriber;
 use app\modules\neuron\classes\logger\FileLogger;
+use app\modules\neuron\helpers\StorageFileHelper;
 use Symfony\Component\Console\Command\Command;
 
 class AbstractAgentCommand extends Command
@@ -25,7 +26,7 @@ class AbstractAgentCommand extends Command
     {
         $appCfg = ConfigurationApp::getInstance();
         $logDir = $appCfg->getLogDir();
-        $fn     = $appCfg->getSessionKey() . '.log';
+        $fn     = StorageFileHelper::sessionLogFileName($appCfg->getSessionKey());
         $logger = new FileLogger($logDir . DIRECTORY_SEPARATOR . $fn);
         $appCfg->setLogger($logger);
         RunLoggingSubscriber::register($logger);

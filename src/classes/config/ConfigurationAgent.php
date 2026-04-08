@@ -47,9 +47,8 @@ use app\modules\neuron\interfaces\IDependConfigApp;
 use app\modules\neuron\classes\storage\VarStorage;
 use app\modules\neuron\classes\WaitSuccess;
 use app\modules\neuron\exceptions\RunStateNotFoundException;
-use app\modules\neuron\helpers\ChatHistoryRollbackHelper;
-use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\helpers\LlmCycleHelper;
+use app\modules\neuron\helpers\TodoListResumeHelper;
 use app\modules\neuron\tools\ATool;
 use app\modules\neuron\traits\DependConfigAppTrait;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
@@ -308,135 +307,21 @@ class ConfigurationAgent implements IDependConfigApp
         $attachments      = AttachmentHelper::deduplicateAttachments($attachments);
         $agent            = $this->getAgent();
         $attachmentsCount = count($attachments);
-        $isStructured     = $this->reponseStructClass !== null && $this->reponseStructClass !== '';
+        $isStructured     = $this->hasStructuredResponseClass();
 
         /**
          * @var Agent|RAG $agent
          */
 
         $start = microtime(true);
-        EventBus::trigger(
-            EventNameEnum::AGENT_MESSAGE_STARTED->value,
-            $this,
-            $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
-                ->setSuccess(true)
-                ->setDurationSeconds(0.0)
-        );
+        $this->triggerAgentMessageStarted($attachmentsCount, $isStructured);
 
         try {
-            // В NeuronAI вложения прикрепляются к сообщению через content blocks.
-            foreach ($attachments as $attachment) {
-                if ($attachment instanceof AttachmentDto) {
-                    $message->addContent($attachment->getContentBlock());
-                    continue;
-                }
-
-                if ($attachment instanceof ContentBlockInterface) {
-                    $message->addContent($attachment);
-                    continue;
-                }
-            }
-
-            $history               = $this->getChatHistory();
-            $countBefore           = ChatHistoryRollbackHelper::getSnapshotCount($history);
-            $response              = null;
-            $llmRetryDelayMicrosec = 100000;
-            $maxLlmAttempts        = 5;
-            $isCycleRequest        = LlmCycleHelper::isCycleRequestMsg($message);
-
-
-            try {
-                $msg = $message;
-                if ($this->reponseStructClass) {
-                    $response = $agent->structured(
-                        $msg,
-                        $this->reponseStructClass,
-                        2
-                    );
-                } else {
-                    $handler = $agent->chat($msg);
-                    $response = $handler->getMessage();
-                }
-            } catch (\Throwable $e) {
-                // попробуем оживить
-                $arCycles = LlmCycleHelper::waitCycleAgent($agent, 5, 7);
-                if (!empty($arCycles['error'])) {
-                    throw new RuntimeException(
-                        !empty($arCycles['errorMsg']) ? $arCycles['errorMsg'] : 'Ошибка при отправке сообщения в чат'
-                    );
-                }
-            }
-
-            // Флаг о том что была ошибка запроса
-/*            $isReqErrFound = false;
-
-            WaitSuccess::waitSuccess(
-                // ---
-                function () use (&$response, $message, $agent, &$isReqErrFound) {
-                    $msg = $message;
-                    if ($this->reponseStructClass) {
-                        $response = $agent->structured(
-                            $msg,
-                            $this->reponseStructClass,
-                            2
-                        );
-                    } else {
-                        $handler = $agent->chat($msg);
-                        $response = $handler->getMessage();
-                    }
-                    $isReqErrFound = false;
-                },
-
-                $llmRetryDelayMicrosec,
-                $maxLlmAttempts,
-
-                function (\Throwable $e, int $execCount) use ($history, $countBefore, $maxLlmAttempts, &$isReqErrFound, $message): void {
-                    $isReqErrFound = true;
-
-                    $advMsg = '';
-                    /*
-                    ChatHistoryRollbackHelper::rollbackToSnapshot($history, $countBefore);
-                    $advMsg = ' история откатана';
-
-                    Допустим, не будем чистить историю ибо там контент из инструментов и это все повторится
-                    /
-
-                    // execCount — индекс неудачной попытки (0 при первом сбое), как в WaitSuccess.
-                    $failedAttempt = $execCount + 1;
-                    $willRetry     = $failedAttempt < $maxLlmAttempts;
-
-                    $msg = 'Вызов LLM завершился ошибкой: ' . $e->getMessage() . ';' . $advMsg;
-                    $msg .= $willRetry ? '; запланирован повтор' : '; повторов больше не будет';
-
-                    $this->getLogger()->warning(
-                        $msg,
-                        array_merge($this->getLogContext(), [
-                            'llm_retry'     => true,
-                            'failedAttempt' => $failedAttempt,
-                            'maxAttempts'   => $maxLlmAttempts,
-                            'willRetry'     => $willRetry,
-                            'errorClass'    => $e::class,
-                            'errorMessage'  => $e->getMessage(),
-                        ])
-                    );
-
-                    // попробуем оживить
-                    //$arCycles = LlmCycleHelper::waitCycle($this, 2, 4);
-
-                }
-                // ---
-            );*/
+            $this->appendAttachmentsToMessage($message, $attachments);
+            $response = $this->dispatchMessageToAgent($agent, $message);
         } catch (\Throwable $e) {
-            $duration = round(microtime(true) - $start, 2);
-            EventBus::trigger(
-                EventNameEnum::AGENT_MESSAGE_FAILED->value,
-                $this,
-                $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
-                    ->setSuccess(false)
-                    ->setDurationSeconds($duration)
-                    ->setErrorClass($e::class)
-                    ->setErrorMessage($e->getMessage())
-            );
+            $duration = $this->calculateDurationSeconds($start);
+            $this->triggerAgentMessageFailed($attachmentsCount, $isStructured, $duration, $e);
             $this->getLogger()->error('Ошибка при отправке сообщения агенту', array_merge(
                 $this->getLogContext(),
                 ['exception' => $e]
@@ -444,14 +329,8 @@ class ConfigurationAgent implements IDependConfigApp
             throw $e;
         }
 
-        $duration = round(microtime(true) - $start, 2);
-        EventBus::trigger(
-            EventNameEnum::AGENT_MESSAGE_COMPLETED->value,
-            $this,
-            $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
-                ->setSuccess(true)
-                ->setDurationSeconds($duration)
-        );
+        $duration = $this->calculateDurationSeconds($start);
+        $this->triggerAgentMessageCompleted($attachmentsCount, $isStructured, $duration);
 
         /**
          * @var Agent|RAG $agent
@@ -467,6 +346,139 @@ class ConfigurationAgent implements IDependConfigApp
             unset($chatHistory);
         }
         return $response;
+    }
+
+    /**
+     * Возвращает true, если агент ожидает структурированный ответ.
+     */
+    private function hasStructuredResponseClass(): bool
+    {
+        return $this->reponseStructClass !== null && $this->reponseStructClass !== '';
+    }
+
+    /**
+     * Добавляет вложения к сообщению в формате content blocks.
+     *
+     * @param NeuronMessage $message     Исходное сообщение.
+     * @param array<int,AttachmentDto|ContentBlockInterface> $attachments Вложения.
+     *
+     * @return void
+     */
+    private function appendAttachmentsToMessage(NeuronMessage $message, array $attachments): void
+    {
+        foreach ($attachments as $attachment) {
+            if ($attachment instanceof AttachmentDto) {
+                $message->addContent($attachment->getContentBlock());
+                continue;
+            }
+
+            if ($attachment instanceof ContentBlockInterface) {
+                $message->addContent($attachment);
+            }
+        }
+    }
+
+    /**
+     * Отправляет сообщение агенту и при сбое пытается восстановить рабочий цикл.
+     *
+     * @param AgentInterface $agent   Экземпляр агента.
+     * @param NeuronMessage $message Сообщение с уже прикреплёнными вложениями.
+     *
+     * @return mixed Ответ агента или null, если после восстановления исходный ответ недоступен.
+     *
+     * @throws RuntimeException При неуспешном восстановлении рабочего цикла агента.
+     */
+    private function dispatchMessageToAgent(AgentInterface $agent, NeuronMessage $message): mixed
+    {
+        try {
+            return $this->performAgentRequest($agent, $message);
+        } catch (\Throwable) {
+            $cycles = LlmCycleHelper::waitCycleAgent($agent, 5, 7);
+            if (!empty($cycles['error'])) {
+                throw new RuntimeException(
+                    !empty($cycles['errorMsg']) ? $cycles['errorMsg'] : 'Ошибка при отправке сообщения в чат'
+                );
+            }
+
+            return null;
+        }
+    }
+
+    /**
+     * Выполняет непосредственный вызов chat/structured без вспомогательной логики.
+     *
+     * @param AgentInterface $agent   Экземпляр агента.
+     * @param NeuronMessage $message Подготовленное сообщение.
+     *
+     * @return mixed Ответ агента.
+     */
+    private function performAgentRequest(AgentInterface $agent, NeuronMessage $message): mixed
+    {
+        if ($this->hasStructuredResponseClass()) {
+            return $agent->structured($message, $this->reponseStructClass, 2);
+        }
+
+        $handler = $agent->chat($message);
+
+        return $handler->getMessage();
+    }
+
+    /**
+     * Возвращает длительность операции в секундах с округлением до сотых.
+     */
+    private function calculateDurationSeconds(float $start): float
+    {
+        return round(microtime(true) - $start, 2);
+    }
+
+    /**
+     * Публикует событие начала отправки сообщения агенту.
+     */
+    private function triggerAgentMessageStarted(int $attachmentsCount, bool $isStructured): void
+    {
+        EventBus::trigger(
+            EventNameEnum::AGENT_MESSAGE_STARTED->value,
+            $this,
+            $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
+                ->setSuccess(true)
+                ->setDurationSeconds(0.0)
+        );
+    }
+
+    /**
+     * Публикует событие успешного завершения отправки сообщения.
+     */
+    private function triggerAgentMessageCompleted(int $attachmentsCount, bool $isStructured, float $duration): void
+    {
+        EventBus::trigger(
+            EventNameEnum::AGENT_MESSAGE_COMPLETED->value,
+            $this,
+            $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
+                ->setSuccess(true)
+                ->setDurationSeconds($duration)
+        );
+    }
+
+    /**
+     * Публикует событие ошибки при отправке сообщения агенту.
+     *
+     * @param \Throwable $error Перехваченное исключение.
+     */
+    private function triggerAgentMessageFailed(
+        int $attachmentsCount,
+        bool $isStructured,
+        float $duration,
+        \Throwable $error
+    ): void {
+        EventBus::trigger(
+            EventNameEnum::AGENT_MESSAGE_FAILED->value,
+            $this,
+            $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
+                ->setSuccess(false)
+                ->setDurationSeconds($duration)
+                ->setErrorClass($error::class)
+                ->setErrorMessage($error->getMessage())
+        );
     }
 
     /**
@@ -941,18 +953,17 @@ class ConfigurationAgent implements IDependConfigApp
     public function resumeRunState(): bool
     {
         $runStateDto = $this->getExistRunStateDto();
-        if ($runStateDto) {
-            $historyMessageCount = $runStateDto->getHistoryMessageCount();
-            if ($historyMessageCount !== null) {
-                $this->resetChatHistory();
-                $history = $this->getChatHistory();
-                ChatHistoryTruncateHelper::truncateToMessageCount($history, $historyMessageCount);
-                return true;
-            }
-        } else {
+        if (!$runStateDto) {
             throw new RunStateNotFoundException();
         }
-        return false;
+
+        $plan = TodoListResumeHelper::buildPlan(
+            $this,
+            $runStateDto->getTodolistName(),
+            $runStateDto->getSessionKey() !== '' ? $runStateDto->getSessionKey() : null
+        );
+
+        return TodoListResumeHelper::applyHistoryRollback($this, $plan);
     }
 
     /**
