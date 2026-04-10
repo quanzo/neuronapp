@@ -6,6 +6,7 @@ namespace app\modules\neuron\classes\command\state;
 
 use app\modules\neuron\classes\dto\tui\KeyEventDto;
 use app\modules\neuron\classes\dto\tui\LayoutDto;
+use app\modules\neuron\classes\dto\tui\ReducerResultDto;
 use app\modules\neuron\classes\dto\tui\TuiStateDto;
 
 /**
@@ -35,9 +36,24 @@ final class TuiReducer
      */
     public function applyKeyEvent(TuiStateDto $state, KeyEventDto $event, LayoutDto $layout): TuiStateDto
     {
-        return match ($event->getType()) {
+        return $this->applyKeyEventWithResult($state, $event, $layout)->getState();
+    }
+
+    /**
+     * Применяет одно событие к состоянию и возвращает расширенный результат.
+     *
+     * @param TuiStateDto $state
+     * @param KeyEventDto $event
+     * @param LayoutDto   $layout
+     * @return ReducerResultDto
+     */
+    public function applyKeyEventWithResult(TuiStateDto $state, KeyEventDto $event, LayoutDto $layout): ReducerResultDto
+    {
+        $submittedInput = null;
+
+        $state = match ($event->getType()) {
             KeyEventDto::TYPE_TAB => $this->applyTab($state),
-            KeyEventDto::TYPE_ENTER => $this->applyEnter($state),
+            KeyEventDto::TYPE_ENTER => $this->applyEnter($state, $submittedInput),
             KeyEventDto::TYPE_BACKSPACE => $this->applyBackspace($state),
             KeyEventDto::TYPE_CTRL_C => $this->applyCtrlC($state),
             KeyEventDto::TYPE_TEXT => $this->applyText($state, (string) $event->getText()),
@@ -49,6 +65,8 @@ final class TuiReducer
             KeyEventDto::TYPE_PAGE_DOWN => $this->applyPageDown($state, $layout),
             default => $state,
         };
+
+        return new ReducerResultDto($state, $submittedInput);
     }
 
     private function applyTab(TuiStateDto $state): TuiStateDto
@@ -59,14 +77,18 @@ final class TuiReducer
         return $state;
     }
 
-    private function applyEnter(TuiStateDto $state): TuiStateDto
+    /**
+     * @param TuiStateDto    $state
+     * @param string|null &$submittedInput Исходный введённый текст, если применим.
+     * @return TuiStateDto
+     */
+    private function applyEnter(TuiStateDto $state, ?string &$submittedInput): TuiStateDto
     {
         if ($state->getFocus() !== TuiStateDto::FOCUS_INPUT) {
             return $state;
         }
 
-        $message = implode("\n", $state->getInputLines());
-        $state->addHistoryMessage($message);
+        $submittedInput = implode("\n", $state->getInputLines());
         $state->setInputLines(['', '', ''])->setCursorRow(0)->setCursorCol(0);
         $state->setFullRedraw(true);
         return $state;

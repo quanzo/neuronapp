@@ -10,9 +10,13 @@ use app\modules\neuron\classes\command\state\TuiReducer;
 use app\modules\neuron\classes\command\render\TuiRenderer;
 use app\modules\neuron\classes\dto\tui\KeyEventDto;
 use app\modules\neuron\classes\dto\tui\LayoutDto;
+use app\modules\neuron\classes\dto\tui\PostOutputContextDto;
+use app\modules\neuron\classes\dto\tui\PreOutputDecisionDto;
 use app\modules\neuron\classes\dto\tui\TerminalSizeDto;
 use app\modules\neuron\classes\dto\tui\TuiStateDto;
 use app\modules\neuron\helpers\TuiTextHelper;
+use app\modules\neuron\interfaces\tui\TuiPostOutputHookInterface;
+use app\modules\neuron\interfaces\tui\TuiPreOutputHookInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -90,6 +94,11 @@ class InteractiveCommand extends Command
     /** Минимальная высота терминала, необходимая для работы (9 строк) */
     private const MIN_HEIGHT = 9;
 
+    private TuiPreOutputHookInterface $preHook;
+    private TuiPostOutputHookInterface $postHook;
+
+    private ?PostOutputContextDto $pendingPostHookContext = null;
+
     protected function configure(): void
     {
         $this->setDescription('Запускает интерактивный TUI-интерфейс (адаптивный)');
@@ -107,6 +116,8 @@ class InteractiveCommand extends Command
         $this->statusBar = new StatusBar();
         $this->prevWidth = $this->terminal->getWidth();
         $this->prevHeight = $this->terminal->getHeight();
+
+        $this->initHooks();
 
         // Проверяем, достаточно ли высоты для отображения всех элементов
         if (!$this->checkMinSize()) {
@@ -160,6 +171,9 @@ class InteractiveCommand extends Command
             } else {
                 $this->renderPartial($renderer);
             }
+
+            // Post-hook должен вызываться после фактического рендера кадра.
+            $this->runPendingPostHookIfAny();
 
             // Ожидаем ввод с таймаутом 200 мс (позволяет реагировать на изменение размера)
             $r = $read;
@@ -226,23 +240,80 @@ class InteractiveCommand extends Command
      */
     private function applyKeyEvent(KeyEventDto $event, TuiReducer $reducer): void
     {
-        $oldHistoryCount = count($this->history);
-
         $state = $this->buildStateDto();
         $layout = $this->buildLayoutDto();
-        $state = $reducer->applyKeyEvent($state, $event, $layout);
-        $this->applyStateDto($state);
+        $result = $reducer->applyKeyEventWithResult($state, $event, $layout);
+        $this->applyStateDto($result->getState());
 
-        // Если добавили сообщение, прокручиваем вывод вниз (как раньше).
-        if (count($this->history) !== $oldHistoryCount) {
-            $this->terminal = new Terminal();
-            $this->outputScroll = $this->getMaxOutputScroll();
-            $this->fullRedraw = true;
+        $submittedInput = $result->getSubmittedInput();
+        if ($submittedInput !== null) {
+            $decision = $this->preHook->decide($submittedInput);
+            $this->applyPreHookDecision($decision);
         }
 
         // Clamp прокрутку после любых изменений.
         $this->terminal = new Terminal();
         $this->outputScroll = min($this->outputScroll, $this->getMaxOutputScroll());
+    }
+
+    /**
+     * Инициализирует pre/post hooks.
+     *
+     * @return void
+     */
+    private function initHooks(): void
+    {
+        $this->preHook = new \app\modules\neuron\classes\command\hooks\DefaultTuiPreOutputHook();
+        $this->postHook = new \app\modules\neuron\classes\command\hooks\DefaultTuiPostOutputHook();
+    }
+
+    /**
+     * Применяет решение pre-hook: добавляет текст в историю (или не добавляет).
+     *
+     * @param PreOutputDecisionDto $decision
+     * @return void
+     */
+    private function applyPreHookDecision(PreOutputDecisionDto $decision): void
+    {
+        $outputText = $decision->getOutputText();
+        if ($outputText === null) {
+            return;
+        }
+
+        $this->history[] = $outputText;
+        $this->terminal = new Terminal();
+        $this->outputScroll = $this->getMaxOutputScroll();
+        $this->fullRedraw = true;
+
+        $this->pendingPostHookContext = new PostOutputContextDto(
+            originalInput: $decision->getOriginalInput(),
+            renderedOutput: $outputText,
+        );
+    }
+
+    /**
+     * Выполняет post-hook, если он запланирован после предыдущего вывода.
+     *
+     * @return void
+     */
+    private function runPendingPostHookIfAny(): void
+    {
+        if ($this->pendingPostHookContext === null) {
+            return;
+        }
+
+        $ctx = $this->pendingPostHookContext;
+        $this->pendingPostHookContext = null;
+
+        $extra = $this->postHook->afterRender($ctx);
+        if ($extra === null || $extra === '') {
+            return;
+        }
+
+        $this->history[] = $extra;
+        $this->terminal = new Terminal();
+        $this->outputScroll = $this->getMaxOutputScroll();
+        $this->fullRedraw = true;
     }
 
     /**

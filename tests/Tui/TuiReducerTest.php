@@ -44,8 +44,10 @@ class TuiReducerTest extends TestCase
             ->setFocus(TuiStateDto::FOCUS_INPUT)
             ->setInputLines(['a', 'b', 'c']);
 
-        $state = $reducer->applyKeyEvent($state, KeyEventDto::enter(), $layout);
-        $this->assertSame(["a\nb\nc"], $state->getHistory());
+        $result = $reducer->applyKeyEventWithResult($state, KeyEventDto::enter(), $layout);
+        $state = $result->getState();
+        $this->assertSame("a\nb\nc", $result->getSubmittedInput());
+        $this->assertSame([], $state->getHistory());
         $this->assertSame(['', '', ''], $state->getInputLines());
         $this->assertSame(0, $state->getCursorRow());
         $this->assertSame(0, $state->getCursorCol());
