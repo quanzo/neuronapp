@@ -30,6 +30,7 @@ use NeuronAI\RAG\Embeddings\EmbeddingsProviderInterface;
 use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
+use app\modules\neuron\classes\dto\events\AgentMessageErrorEventDto;
 use app\modules\neuron\classes\dto\run\RunStateDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\logger\ContextualLogger;
@@ -447,7 +448,6 @@ class ConfigurationAgent implements IDependConfigApp
             EventNameEnum::AGENT_MESSAGE_STARTED->value,
             $this,
             $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
-                ->setSuccess(true)
                 ->setDurationSeconds(0.0)
         );
     }
@@ -461,7 +461,6 @@ class ConfigurationAgent implements IDependConfigApp
             EventNameEnum::AGENT_MESSAGE_COMPLETED->value,
             $this,
             $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
-                ->setSuccess(true)
                 ->setDurationSeconds($duration)
         );
     }
@@ -477,14 +476,14 @@ class ConfigurationAgent implements IDependConfigApp
         float $duration,
         \Throwable $error
     ): void {
+        $dto = $this->buildAgentMessageErrorEventDto($attachmentsCount, $isStructured);
+        $dto->setDurationSeconds($duration);
+        $dto->setErrorClass($error::class);
+        $dto->setErrorMessage($error->getMessage());
         EventBus::trigger(
             EventNameEnum::AGENT_MESSAGE_FAILED->value,
             $this,
-            $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
-                ->setSuccess(false)
-                ->setDurationSeconds($duration)
-                ->setErrorClass($error::class)
-                ->setErrorMessage($error->getMessage())
+            $dto
         );
     }
 
@@ -500,6 +499,21 @@ class ConfigurationAgent implements IDependConfigApp
             ->setAgent($this)
             ->setAttachmentsCount($attachmentsCount)
             ->setStructured($isStructured);
+    }
+
+    /**
+     * Создаёт DTO ошибки события отправки сообщения агентом.
+     */
+    private function buildAgentMessageErrorEventDto(int $attachmentsCount, bool $isStructured): AgentMessageErrorEventDto
+    {
+        $dto = new AgentMessageErrorEventDto();
+        $dto->setSessionKey($this->getSessionKey() ?? '');
+        $dto->setRunId('');
+        $dto->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM));
+        $dto->setAgent($this);
+        $dto->setAttachmentsCount($attachmentsCount);
+        $dto->setStructured($isStructured);
+        return $dto;
     }
 
     protected function makeListObjects($arCfg)

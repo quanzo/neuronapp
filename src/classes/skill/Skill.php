@@ -11,7 +11,9 @@ use app\modules\neuron\classes\dto\params\ParamListDto;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\cmd\CmdDto;
 use app\modules\neuron\classes\dto\events\RunEventDto;
+use app\modules\neuron\classes\dto\events\RunErrorEventDto;
 use app\modules\neuron\classes\dto\events\SkillEventDto;
+use app\modules\neuron\classes\dto\events\SkillErrorEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\helpers\FileContextHelper;
@@ -168,14 +170,14 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 }
                 return $result;
             } catch (\Throwable $e) {
+                $errorDto = $this->buildSkillErrorEventDto($this->getConfigurationAgent(), '');
+                $errorDto->setParams(['args' => $args]);
+                $errorDto->setErrorClass($e::class);
+                $errorDto->setErrorMessage($e->getMessage());
                 EventBus::trigger(
                     EventNameEnum::SKILL_FAILED->value,
                     $this,
-                    $this->buildSkillEventDto($this->getConfigurationAgent(), '')
-                        ->setParams(['args' => $args])
-                        ->setSuccess(false)
-                        ->setErrorClass($e::class)
-                        ->setErrorMessage($e->getMessage())
+                    $errorDto
                 );
                 throw $e;
             }
@@ -215,14 +217,14 @@ class Skill extends AbstractPromptWithParams implements ISkill
         EventBus::trigger(
             EventNameEnum::RUN_STARTED->value,
             $this,
-            $runEventDto->setSteps(0)->setSuccess(true)
+            $runEventDto->setSteps(0)
         );
 
         $eventDto = clone $baseSkillEvent;
         EventBus::trigger(
             EventNameEnum::SKILL_STARTED->value,
             $this,
-            $eventDto->setSuccess(true)
+            $eventDto
         );
 
         $text = PlaceholderHelper::renderWithParams($this->getBody(), $effectiveParams);
@@ -240,7 +242,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
             }
         }
 
-        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments, $baseSkillEvent, $baseRunEvent): mixed {
+        return \Amp\async(function () use ($agentCfg, $text, $role, $attachments, $baseSkillEvent, $baseRunEvent, $runId, $effectiveParams): mixed {
 
             $sessionCfg_0 = $this->isPureContext()
                 ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) // здесь агент без истории сообщений
@@ -271,14 +273,14 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 EventBus::trigger(
                     EventNameEnum::SKILL_COMPLETED->value,
                     $this,
-                    $eventDto->setSuccess(true)
+                    $eventDto
                 );
 
                 $runEventDto = clone $baseRunEvent;
                 EventBus::trigger(
                     EventNameEnum::RUN_FINISHED->value,
                     $this,
-                    $runEventDto->setSteps(1)->setSuccess(true)
+                    $runEventDto->setSteps(1)
                 );
 
                 // берем историю работы скила и выбираем последнее сообщение - это будет результат
@@ -309,18 +311,26 @@ class Skill extends AbstractPromptWithParams implements ISkill
                 return $result;
                 */
             } catch (\Throwable $e) {
-                $eventDto = clone $baseSkillEvent;
+                $skillErrDto = $this->buildSkillErrorEventDto($agentCfg, $runId);
+                $skillErrDto->setParams($effectiveParams);
+                $skillErrDto->setErrorClass($e::class);
+                $skillErrDto->setErrorMessage($e->getMessage());
                 EventBus::trigger(
                     EventNameEnum::SKILL_FAILED->value,
                     $this,
-                    $eventDto->setSuccess(false)->setErrorClass($e::class)->setErrorMessage($e->getMessage())
+                    $skillErrDto
                 );
 
-                $runEventDto = clone $baseRunEvent;
+                $runErrDto = $this->buildRunErrorEventDto($agentCfg, $runId);
+                $runErrDto->setType('skill');
+                $runErrDto->setName($this->getName());
+                $runErrDto->setSteps(0);
+                $runErrDto->setErrorClass($e::class);
+                $runErrDto->setErrorMessage($e->getMessage());
                 EventBus::trigger(
                     EventNameEnum::RUN_FAILED->value,
                     $this,
-                    $runEventDto->setSteps(0)->setSuccess(false)->setErrorClass($e::class)->setErrorMessage($e->getMessage())
+                    $runErrDto
                 );
                 throw $e;
             }
@@ -350,6 +360,33 @@ class Skill extends AbstractPromptWithParams implements ISkill
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
             ->setAgent($agentCfg)
             ->setSkill($this);
+    }
+
+    /**
+     * Создает DTO ошибки skill-события.
+     */
+    private function buildSkillErrorEventDto(ConfigurationAgent $agentCfg, string $runId): SkillErrorEventDto
+    {
+        $dto = new SkillErrorEventDto();
+        $dto->setSessionKey($agentCfg->getSessionKey() ?? '');
+        $dto->setRunId($runId);
+        $dto->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM));
+        $dto->setAgent($agentCfg);
+        $dto->setSkill($this);
+        return $dto;
+    }
+
+    /**
+     * Создает DTO ошибки run-события.
+     */
+    private function buildRunErrorEventDto(ConfigurationAgent $agentCfg, string $runId): RunErrorEventDto
+    {
+        $dto = new RunErrorEventDto();
+        $dto->setSessionKey($agentCfg->getSessionKey() ?? '');
+        $dto->setRunId($runId);
+        $dto->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM));
+        $dto->setAgent($agentCfg);
+        return $dto;
     }
 
     /**

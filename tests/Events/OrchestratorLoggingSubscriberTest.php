@@ -6,6 +6,7 @@ namespace Tests\Events;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\events\OrchestratorEventDto;
+use app\modules\neuron\classes\dto\events\OrchestratorErrorEventDto;
 use app\modules\neuron\classes\dto\events\OrchestratorResumeHistoryMissingEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\events\subscribers\OrchestratorLoggingSubscriber;
@@ -78,7 +79,7 @@ final class OrchestratorLoggingSubscriberTest extends TestCase
         $this->assertCount(0, $fallback->records);
         $this->assertCount(1, $agentLogger->records);
         $this->assertSame('warning', $agentLogger->records[0]['level']);
-        $this->assertSame('Orchestrator event: resume_history_missing', $agentLogger->records[0]['message']);
+        $this->assertStringStartsWith('Orchestrator event: resume_history_missing |', $agentLogger->records[0]['message']);
         $this->assertSame('step-list', $agentLogger->records[0]['context']['todolistName']);
         $this->assertSame(1, $agentLogger->records[0]['context']['startFromTodoIndex']);
         $this->assertSame('history_message_count_absent', $agentLogger->records[0]['context']['reason']);
@@ -137,39 +138,59 @@ final class OrchestratorLoggingSubscriberTest extends TestCase
             ->setRestartCount(0)
             ->setIterations(1);
 
+        // cycle_started
         EventBus::trigger(EventNameEnum::ORCHESTRATOR_CYCLE_STARTED->value, '*', clone $base);
+        // step_completed
         EventBus::trigger(
             EventNameEnum::ORCHESTRATOR_STEP_COMPLETED->value,
             '*',
             (clone $base)->setCompletedNormalized(0)->setCompletedRaw('not_done')
         );
+        // completed
         EventBus::trigger(
             EventNameEnum::ORCHESTRATOR_COMPLETED->value,
             '*',
-            (clone $base)->setReason('completed')->setSuccess(true)
-        );
-        EventBus::trigger(
-            EventNameEnum::ORCHESTRATOR_FAILED->value,
-            '*',
-            (clone $base)->setReason('error')->setSuccess(false)->setErrorClass(\RuntimeException::class)->setErrorMessage('x')
-        );
-        EventBus::trigger(
-            EventNameEnum::ORCHESTRATOR_RESTARTED->value,
-            '*',
-            (clone $base)->setReason('restart_after_error')->setSuccess(false)
+            (clone $base)->setReason('completed')
         );
 
+        // failed — используем OrchestratorErrorEventDto
+        $failedDto = new OrchestratorErrorEventDto();
+        $failedDto->setSessionKey('sess-orch');
+        $failedDto->setRunId('run-orch');
+        $failedDto->setTimestamp('2026-03-24T12:00:00+00:00');
+        $failedDto->setRestartCount(0);
+        $failedDto->setIterations(1);
+        $failedDto->setReason('error');
+        $failedDto->setErrorClass(\RuntimeException::class);
+        $failedDto->setErrorMessage('x');
+        EventBus::trigger(EventNameEnum::ORCHESTRATOR_FAILED->value, '*', $failedDto);
+
+        // restarted — используем OrchestratorErrorEventDto (с информацией об ошибке, вызвавшей рестарт)
+        $restartDto = new OrchestratorErrorEventDto();
+        $restartDto->setSessionKey('sess-orch');
+        $restartDto->setRunId('run-orch');
+        $restartDto->setTimestamp('2026-03-24T12:00:00+00:00');
+        $restartDto->setRestartCount(1);
+        $restartDto->setReason('restart_after_error');
+        EventBus::trigger(EventNameEnum::ORCHESTRATOR_RESTARTED->value, '*', $restartDto);
+
         $this->assertCount(5, $fallback->records);
+
         $this->assertSame('info', $fallback->records[0]['level']);
-        $this->assertSame('Orchestrator event: cycle_started', $fallback->records[0]['message']);
+        $this->assertStringStartsWith('Orchestrator event: cycle_started |', $fallback->records[0]['message']);
+
         $this->assertSame('info', $fallback->records[1]['level']);
-        $this->assertSame('Orchestrator event: step_completed', $fallback->records[1]['message']);
+        $this->assertStringStartsWith('Orchestrator event: step_completed |', $fallback->records[1]['message']);
+
         $this->assertSame('info', $fallback->records[2]['level']);
-        $this->assertSame('Orchestrator event: completed', $fallback->records[2]['message']);
+        $this->assertStringStartsWith('Orchestrator event: completed |', $fallback->records[2]['message']);
+
         $this->assertSame('error', $fallback->records[3]['level']);
-        $this->assertSame('Orchestrator event: failed', $fallback->records[3]['message']);
+        $this->assertStringStartsWith('Orchestrator event: failed |', $fallback->records[3]['message']);
+        $this->assertStringContainsString('[OrchestratorErrorEvent]', $fallback->records[3]['message']);
+
         $this->assertSame('warning', $fallback->records[4]['level']);
-        $this->assertSame('Orchestrator event: restarted', $fallback->records[4]['message']);
+        $this->assertStringStartsWith('Orchestrator event: restarted |', $fallback->records[4]['message']);
     }
 
     /**
@@ -183,5 +204,32 @@ final class OrchestratorLoggingSubscriberTest extends TestCase
         EventBus::trigger(EventNameEnum::ORCHESTRATOR_CYCLE_STARTED->value, '*', []);
 
         $this->assertCount(0, $fallback->records);
+    }
+
+    /**
+     * OrchestratorErrorEventDto и OrchestratorResumeHistoryMissingEventDto наследуют OrchestratorEventDto.
+     */
+    public function testErrorDtosAreInstanceOfOrchestratorEventDto(): void
+    {
+        $this->assertInstanceOf(OrchestratorEventDto::class, new OrchestratorErrorEventDto());
+        $this->assertInstanceOf(OrchestratorEventDto::class, new OrchestratorResumeHistoryMissingEventDto());
+    }
+
+    /**
+     * Stringable OrchestratorErrorEventDto содержит информацию об ошибке.
+     */
+    public function testOrchestratorErrorEventDtoToStringContainsError(): void
+    {
+        $dto = new OrchestratorErrorEventDto();
+        $dto->setIterations(3);
+        $dto->setRestartCount(1);
+        $dto->setReason('error');
+        $dto->setErrorClass(\RuntimeException::class);
+        $dto->setErrorMessage('max iterations');
+
+        $str = (string) $dto;
+        $this->assertStringContainsString('[OrchestratorErrorEvent]', $str);
+        $this->assertStringContainsString('iterations=3', $str);
+        $this->assertStringContainsString('RuntimeException', $str);
     }
 }

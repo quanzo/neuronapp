@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\events\subscribers;
 
+use app\modules\neuron\classes\dto\events\BaseEventDto;
 use app\modules\neuron\classes\dto\events\RunEventDto;
+use app\modules\neuron\classes\dto\events\RunErrorEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use Psr\Log\LoggerInterface;
@@ -12,8 +14,12 @@ use Psr\Log\LoggerInterface;
 /**
  * Подписчик логирования run-событий.
  *
- * Преобразует события run.started/run.finished/run.failed
- * в PSR-3 сообщения, чтобы убрать дублирование в доменном коде.
+ * Преобразует события run.started / run.finished / run.failed
+ * в PSR-3 сообщения. Для сообщения используется строковое представление
+ * DTO ({@see BaseEventDto::__toString()}), контекст — массив {@see BaseEventDto::toArray()}.
+ *
+ * - `run.started` и `run.finished` ожидают payload {@see RunEventDto};
+ * - `run.failed` ожидает payload {@see RunErrorEventDto}.
  *
  * Пример использования:
  * ```php
@@ -41,7 +47,7 @@ final class RunLoggingSubscriber
                 }
 
                 $effectiveLogger = self::resolveLogger($payload, $logger);
-                $effectiveLogger->info('Run event: started', $payload->toArray());
+                $effectiveLogger->info('Run event: started | ' . (string) $payload, $payload->toArray());
             },
             '*'
         );
@@ -54,7 +60,7 @@ final class RunLoggingSubscriber
                 }
 
                 $effectiveLogger = self::resolveLogger($payload, $logger);
-                $effectiveLogger->info('Run event: finished', $payload->toArray());
+                $effectiveLogger->info('Run event: finished | ' . (string) $payload, $payload->toArray());
             },
             '*'
         );
@@ -67,7 +73,7 @@ final class RunLoggingSubscriber
                 }
 
                 $effectiveLogger = self::resolveLogger($payload, $logger);
-                $effectiveLogger->error('Run event: failed', $payload->toArray());
+                $effectiveLogger->error('Run event: failed | ' . (string) $payload, $payload->toArray());
             },
             '*'
         );

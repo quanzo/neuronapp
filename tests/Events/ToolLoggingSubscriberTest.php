@@ -6,6 +6,7 @@ namespace Tests\Events;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\events\ToolEventDto;
+use app\modules\neuron\classes\dto\events\ToolErrorEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\events\subscribers\ToolLoggingSubscriber;
 use app\modules\neuron\enums\EventNameEnum;
@@ -57,9 +58,9 @@ final class ToolLoggingSubscriberTest extends TestCase
     }
 
     /**
-     * Подписчик логирует started/completed/failed tool-события.
+     * Подписчик логирует started/completed tool-события.
      */
-    public function testSubscriberLogsToolLifecycleEvents(): void
+    public function testSubscriberLogsToolStartedAndCompletedEvents(): void
     {
         $logger = $this->createMemoryLogger();
         $agentLogger = $this->createMemoryLogger();
@@ -75,26 +76,50 @@ final class ToolLoggingSubscriberTest extends TestCase
             ->setRunId('r1')
             ->setTimestamp('2026-03-24T12:00:00+00:00')
             ->setAgent($agentCfg)
-            ->setToolName('bash')
-            ->setSuccess(true);
+            ->setToolName('bash');
 
         EventBus::trigger(EventNameEnum::TOOL_STARTED->value, '*', $event);
         EventBus::trigger(EventNameEnum::TOOL_COMPLETED->value, '*', $event);
-        EventBus::trigger(
-            EventNameEnum::TOOL_FAILED->value,
-            '*',
-            $event->setSuccess(false)->setErrorClass(\RuntimeException::class)->setErrorMessage('boom')
-        );
 
         $this->assertCount(0, $logger->records);
-        $this->assertCount(3, $agentLogger->records);
+        $this->assertCount(2, $agentLogger->records);
         $this->assertSame('info', $agentLogger->records[0]['level']);
-        $this->assertSame('Tool event: started', $agentLogger->records[0]['message']);
+        $this->assertStringStartsWith('Tool event: started |', $agentLogger->records[0]['message']);
         $this->assertSame('info', $agentLogger->records[1]['level']);
-        $this->assertSame('Tool event: completed', $agentLogger->records[1]['message']);
-        $this->assertSame('error', $agentLogger->records[2]['level']);
-        $this->assertSame('Tool event: failed', $agentLogger->records[2]['message']);
+        $this->assertStringStartsWith('Tool event: completed |', $agentLogger->records[1]['message']);
         $this->assertSame('assistant', $agentLogger->records[0]['context']['agentName'] ?? null);
+    }
+
+    /**
+     * Подписчик логирует failed tool-событие с ToolErrorEventDto.
+     */
+    public function testSubscriberLogsToolFailedEvent(): void
+    {
+        $agentLogger = $this->createMemoryLogger();
+
+        ToolLoggingSubscriber::register($this->createMemoryLogger());
+        $agentCfg = new ConfigurationAgent();
+        $agentCfg->agentName = 'assistant';
+        $agentCfg->setSessionKey('s1');
+        $agentCfg->setLogger($agentLogger);
+
+        $errorEvent = new ToolErrorEventDto();
+        $errorEvent->setSessionKey('s1');
+        $errorEvent->setRunId('r1');
+        $errorEvent->setTimestamp('2026-03-24T12:00:00+00:00');
+        $errorEvent->setAgent($agentCfg);
+        $errorEvent->setToolName('bash');
+        $errorEvent->setErrorClass(\RuntimeException::class);
+        $errorEvent->setErrorMessage('boom');
+
+        EventBus::trigger(EventNameEnum::TOOL_FAILED->value, '*', $errorEvent);
+
+        $this->assertCount(1, $agentLogger->records);
+        $this->assertSame('error', $agentLogger->records[0]['level']);
+        $this->assertStringStartsWith('Tool event: failed |', $agentLogger->records[0]['message']);
+        $this->assertStringContainsString('[ToolErrorEvent]', $agentLogger->records[0]['message']);
+        $this->assertSame(\RuntimeException::class, $agentLogger->records[0]['context']['errorClass']);
+        $this->assertSame('boom', $agentLogger->records[0]['context']['errorMessage']);
     }
 
     /**
@@ -117,14 +142,13 @@ final class ToolLoggingSubscriberTest extends TestCase
             ->setRunId('r1')
             ->setTimestamp('2026-03-24T12:00:00+00:00')
             ->setAgent($agentCfg)
-            ->setToolName('bash')
-            ->setSuccess(true);
+            ->setToolName('bash');
 
         EventBus::trigger(EventNameEnum::TOOL_STARTED->value, '*', $event);
 
         $this->assertCount(0, $fallbackLogger->records);
         $this->assertCount(1, $agentLogger->records);
-        $this->assertSame('Tool event: started', $agentLogger->records[0]['message']);
+        $this->assertStringStartsWith('Tool event: started |', $agentLogger->records[0]['message']);
         $this->assertSame('assistant', $agentLogger->records[0]['context']['agentName'] ?? null);
     }
 
@@ -141,12 +165,37 @@ final class ToolLoggingSubscriberTest extends TestCase
             ->setRunId('r1')
             ->setTimestamp('2026-03-24T12:00:00+00:00')
             ->setAgent(null)
-            ->setToolName('bash')
-            ->setSuccess(true);
+            ->setToolName('bash');
 
         EventBus::trigger(EventNameEnum::TOOL_STARTED->value, '*', $event);
 
         $this->assertCount(1, $fallbackLogger->records);
-        $this->assertSame('Tool event: started', $fallbackLogger->records[0]['message']);
+        $this->assertStringStartsWith('Tool event: started |', $fallbackLogger->records[0]['message']);
+    }
+
+    /**
+     * ToolErrorEventDto является instanceof ToolEventDto.
+     */
+    public function testToolErrorEventDtoIsInstanceOfToolEventDto(): void
+    {
+        $dto = new ToolErrorEventDto();
+        $this->assertInstanceOf(ToolEventDto::class, $dto);
+    }
+
+    /**
+     * Stringable ToolErrorEventDto содержит информацию об ошибке.
+     */
+    public function testToolErrorEventDtoToStringContainsError(): void
+    {
+        $dto = new ToolErrorEventDto();
+        $dto->setToolName('bash');
+        $dto->setErrorClass(\RuntimeException::class);
+        $dto->setErrorMessage('command failed');
+
+        $str = (string) $dto;
+        $this->assertStringContainsString('[ToolErrorEvent]', $str);
+        $this->assertStringContainsString('tool=bash', $str);
+        $this->assertStringContainsString('RuntimeException', $str);
+        $this->assertStringContainsString('command failed', $str);
     }
 }

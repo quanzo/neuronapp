@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\events;
 
-use app\modules\neuron\interfaces\IArrayable;
-
 /**
- * DTO события: при resume оркестратором в чекпоинте нет `history_message_count`.
+ * DTO события: при resume оркестратором в чекпоинте отсутствует `history_message_count`.
  *
+ * Семантически принадлежит домену оркестратора и наследуется от {@see OrchestratorEventDto}.
  * Служит для логирования и наблюдаемости: без усечения истории возможны дубликаты
  * сообщений при продолжении списка.
+ *
+ * Событие публикуется как warning-уровень (не ошибка — выполнение продолжается).
  *
  * Пример использования:
  * ```php
@@ -21,9 +22,12 @@ use app\modules\neuron\interfaces\IArrayable;
  *     ->setTodolistName('job-step')
  *     ->setLastCompletedTodoIndex(0)
  *     ->setStartFromTodoIndex(1);
+ *
+ * echo (string) $dto;
+ * // [OrchestratorResumeHistoryMissingEvent] todolist=job-step | lastCompleted=0 | startFrom=1 | ...
  * ```
  */
-final class OrchestratorResumeHistoryMissingEventDto extends BaseEventDto implements IArrayable
+final class OrchestratorResumeHistoryMissingEventDto extends OrchestratorEventDto
 {
     private string $todolistName = '';
 
@@ -96,11 +100,23 @@ final class OrchestratorResumeHistoryMissingEventDto extends BaseEventDto implem
      */
     public function toArray(): array
     {
-        return parent::toArray() + [
+        return array_merge(parent::toArray(), [
             'todolistName'            => $this->todolistName,
             'lastCompletedTodoIndex'  => $this->lastCompletedTodoIndex,
             'startFromTodoIndex'      => $this->startFromTodoIndex,
             'reason'                  => 'history_message_count_absent',
-        ];
+        ]);
+    }
+
+    /**
+     * @return array<string, string|int|float|null>
+     */
+    protected function buildStringParts(): array
+    {
+        return [
+            'todolist'      => $this->todolistName,
+            'lastCompleted' => $this->lastCompletedTodoIndex,
+            'startFrom'     => $this->startFromTodoIndex,
+        ] + parent::buildStringParts();
     }
 }

@@ -4,26 +4,24 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\events;
 
-use app\modules\neuron\interfaces\IArrayable;
-
 /**
- * DTO события инструмента.
+ * DTO события инструмента (tool).
  *
- * Содержит имя инструмента, признак успеха и диагностику ошибки.
+ * Содержит имя инструмента. Используется для событий `tool.started` и `tool.completed`.
+ * Для события `tool.failed` используется наследник {@see ToolErrorEventDto}.
  *
  * Пример использования:
  * ```php
  * $event = (new ToolEventDto())
- *     ->setToolName('bash')
- *     ->setSuccess(true);
+ *     ->setToolName('chunk_view');
+ *
+ * echo (string) $event;
+ * // [ToolEvent] tool=chunk_view | runId=... | agent=...
  * ```
  */
-class ToolEventDto extends BaseEventDto implements IArrayable
+class ToolEventDto extends BaseEventDto
 {
     private string $toolName = '';
-    private bool $success = true;
-    private ?string $errorClass = null;
-    private ?string $errorMessage = null;
 
     /**
      * Возвращает имя инструмента.
@@ -35,61 +33,12 @@ class ToolEventDto extends BaseEventDto implements IArrayable
 
     /**
      * Устанавливает имя инструмента.
+     *
+     * @param string $toolName Имя инструмента (напр. `chunk_view`, `bash`).
      */
     public function setToolName(string $toolName): self
     {
         $this->toolName = $toolName;
-        return $this;
-    }
-
-    /**
-     * Возвращает признак успешного выполнения.
-     */
-    public function isSuccess(): bool
-    {
-        return $this->success;
-    }
-
-    /**
-     * Устанавливает признак успешного выполнения.
-     */
-    public function setSuccess(bool $success): self
-    {
-        $this->success = $success;
-        return $this;
-    }
-
-    /**
-     * Возвращает класс ошибки.
-     */
-    public function getErrorClass(): ?string
-    {
-        return $this->errorClass;
-    }
-
-    /**
-     * Устанавливает класс ошибки.
-     */
-    public function setErrorClass(?string $errorClass): self
-    {
-        $this->errorClass = $errorClass;
-        return $this;
-    }
-
-    /**
-     * Возвращает текст ошибки.
-     */
-    public function getErrorMessage(): ?string
-    {
-        return $this->errorMessage;
-    }
-
-    /**
-     * Устанавливает текст ошибки.
-     */
-    public function setErrorMessage(?string $errorMessage): self
-    {
-        $this->errorMessage = $errorMessage;
         return $this;
     }
 
@@ -101,10 +50,17 @@ class ToolEventDto extends BaseEventDto implements IArrayable
     public function toArray(): array
     {
         return array_merge(parent::toArray(), [
-            'toolName'     => $this->toolName,
-            'success'      => $this->success,
-            'errorClass'   => $this->errorClass,
-            'errorMessage' => $this->errorMessage,
+            'toolName' => $this->toolName,
         ]);
+    }
+
+    /**
+     * @return array<string, string|int|float|null>
+     */
+    protected function buildStringParts(): array
+    {
+        return [
+            'tool' => $this->toolName,
+        ] + parent::buildStringParts();
     }
 }

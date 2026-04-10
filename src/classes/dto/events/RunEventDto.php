@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\events;
 
-use app\modules\neuron\interfaces\IArrayable;
-
 /**
  * DTO события уровня run.
  *
- * Хранит метаданные запуска skill/todolist.
+ * Хранит метаданные запуска (тип, имя сценария, количество выполненных шагов).
+ * Используется для событий `run.started` и `run.finished`.
+ * Для события `run.failed` используется наследник {@see RunErrorEventDto}.
  *
  * Пример использования:
  * ```php
@@ -17,19 +17,19 @@ use app\modules\neuron\interfaces\IArrayable;
  *     ->setType('todolist')
  *     ->setName('review')
  *     ->setSteps(3);
+ *
+ * echo (string) $event;
+ * // [RunEvent] type=todolist | name=review | steps=3 | runId=... | agent=...
  * ```
  */
-class RunEventDto extends BaseEventDto implements IArrayable
+class RunEventDto extends BaseEventDto
 {
-    private string $type          = '';
-    private string $name          = '';
-    private int $steps            = 0;
-    private bool $success         = false;
-    private ?string $errorClass   = null;
-    private ?string $errorMessage = null;
+    private string $type = '';
+    private string $name = '';
+    private int $steps   = 0;
 
     /**
-     * Возвращает тип запуска.
+     * Возвращает тип запуска (`todolist`, `skill` и т.д.).
      */
     public function getType(): string
     {
@@ -38,6 +38,8 @@ class RunEventDto extends BaseEventDto implements IArrayable
 
     /**
      * Устанавливает тип запуска.
+     *
+     * @param string $type Тип запуска (`todolist`, `skill`).
      */
     public function setType(string $type): self
     {
@@ -55,6 +57,8 @@ class RunEventDto extends BaseEventDto implements IArrayable
 
     /**
      * Устанавливает имя выполняемого сценария.
+     *
+     * @param string $name Имя TodoList или Skill.
      */
     public function setName(string $name): self
     {
@@ -72,61 +76,12 @@ class RunEventDto extends BaseEventDto implements IArrayable
 
     /**
      * Устанавливает число выполненных шагов.
+     *
+     * @param int $steps Количество пройденных шагов.
      */
     public function setSteps(int $steps): self
     {
         $this->steps = $steps;
-        return $this;
-    }
-
-    /**
-     * Возвращает признак успешности.
-     */
-    public function isSuccess(): bool
-    {
-        return $this->success;
-    }
-
-    /**
-     * Устанавливает признак успешности.
-     */
-    public function setSuccess(bool $success): self
-    {
-        $this->success = $success;
-        return $this;
-    }
-
-    /**
-     * Возвращает класс ошибки.
-     */
-    public function getErrorClass(): ?string
-    {
-        return $this->errorClass;
-    }
-
-    /**
-     * Устанавливает класс ошибки.
-     */
-    public function setErrorClass(?string $errorClass): self
-    {
-        $this->errorClass = $errorClass;
-        return $this;
-    }
-
-    /**
-     * Возвращает текст ошибки.
-     */
-    public function getErrorMessage(): ?string
-    {
-        return $this->errorMessage;
-    }
-
-    /**
-     * Устанавливает текст ошибки.
-     */
-    public function setErrorMessage(?string $errorMessage): self
-    {
-        $this->errorMessage = $errorMessage;
         return $this;
     }
 
@@ -136,12 +91,21 @@ class RunEventDto extends BaseEventDto implements IArrayable
     public function toArray(): array
     {
         return parent::toArray() + [
-            'type'         => $this->type,
-            'name'         => $this->name,
-            'steps'        => $this->steps,
-            'success'      => $this->success,
-            'errorClass'   => $this->errorClass,
-            'errorMessage' => $this->errorMessage,
+            'type'  => $this->type,
+            'name'  => $this->name,
+            'steps' => $this->steps,
         ];
+    }
+
+    /**
+     * @return array<string, string|int|float|null>
+     */
+    protected function buildStringParts(): array
+    {
+        return [
+            'type'  => $this->type,
+            'name'  => $this->name,
+            'steps' => $this->steps,
+        ] + parent::buildStringParts();
     }
 }

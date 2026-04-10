@@ -6,6 +6,7 @@ namespace app\modules\neuron\classes\orchestrators;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\events\OrchestratorEventDto;
+use app\modules\neuron\classes\dto\events\OrchestratorErrorEventDto;
 use app\modules\neuron\classes\dto\events\OrchestratorResumeHistoryMissingEventDto;
 use app\modules\neuron\classes\dto\orchestrator\OrchestratorResultDto;
 use app\modules\neuron\classes\dto\params\SessionParamsDto;
@@ -215,14 +216,14 @@ class TodoListOrchestrator
 
                 // Переходим к новой попытке цикла.
                 ++$restartCount;
+                $restartErrDto = $this->buildOrchestratorErrorEventDto($restartCount);
+                $restartErrDto->setReason('restart_after_error');
+                $restartErrDto->setErrorClass($e::class);
+                $restartErrDto->setErrorMessage($e->getMessage());
                 EventBus::trigger(
                     EventNameEnum::ORCHESTRATOR_RESTARTED->value,
                     $this,
-                    $this->buildOrchestratorEventDto($restartCount)
-                        ->setReason('restart_after_error')
-                        ->setSuccess(false)
-                        ->setErrorClass($e::class)
-                        ->setErrorMessage($e->getMessage())
+                    $restartErrDto
                 );
             }
         }
@@ -247,7 +248,6 @@ class TodoListOrchestrator
                 ->setCompletedRaw($result->getCompletedRaw())
                 ->setCompletedNormalized($result->getCompletedNormalized())
                 ->setReason($result->getReason())
-                ->setSuccess($result->isSuccess())
         );
     }
 
@@ -262,17 +262,15 @@ class TodoListOrchestrator
      */
     protected function onFail(\Throwable|string $reason, ?OrchestratorResultDto $result = null): void
     {
-        $event = $this->buildOrchestratorEventDto($result?->getRestartCount() ?? 0)
-            ->setIterations($result?->getIterations() ?? 0)
-            ->setCompletedRaw($result?->getCompletedRaw())
-            ->setCompletedNormalized($result?->getCompletedNormalized())
-            ->setReason($reason instanceof \Throwable ? 'error' : (string) $reason)
-            ->setSuccess(false);
+        $event = $this->buildOrchestratorErrorEventDto($result?->getRestartCount() ?? 0);
+        $event->setIterations($result?->getIterations() ?? 0);
+        $event->setCompletedRaw($result?->getCompletedRaw());
+        $event->setCompletedNormalized($result?->getCompletedNormalized());
+        $event->setReason($reason instanceof \Throwable ? 'error' : (string) $reason);
 
         if ($reason instanceof \Throwable) {
-            $event
-                ->setErrorClass($reason::class)
-                ->setErrorMessage($reason->getMessage());
+            $event->setErrorClass($reason::class);
+            $event->setErrorMessage($reason->getMessage());
         }
 
         EventBus::trigger(
@@ -426,5 +424,21 @@ class TodoListOrchestrator
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
             ->setAgent(null)
             ->setRestartCount($restartCount);
+    }
+
+    /**
+     * Создает DTO ошибки оркестраторного события.
+     *
+     * @param int $restartCount Текущий номер попытки (0 для первой).
+     * @return OrchestratorErrorEventDto
+     */
+    private function buildOrchestratorErrorEventDto(int $restartCount): OrchestratorErrorEventDto
+    {
+        $dto = new OrchestratorErrorEventDto();
+        $dto->setSessionKey($this->configApp->getSessionKey());
+        $dto->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM));
+        $dto->setAgent(null);
+        $dto->setRestartCount($restartCount);
+        return $dto;
     }
 }

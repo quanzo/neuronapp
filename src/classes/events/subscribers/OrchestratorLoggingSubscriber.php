@@ -6,6 +6,7 @@ namespace app\modules\neuron\classes\events\subscribers;
 
 use app\modules\neuron\classes\dto\events\BaseEventDto;
 use app\modules\neuron\classes\dto\events\OrchestratorEventDto;
+use app\modules\neuron\classes\dto\events\OrchestratorErrorEventDto;
 use app\modules\neuron\classes\dto\events\OrchestratorResumeHistoryMissingEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
@@ -15,8 +16,15 @@ use Psr\Log\LoggerInterface;
  * Подписчик логирования событий оркестратора.
  *
  * Переводит в PSR-3 события, публикуемые {@see \app\modules\neuron\classes\orchestrators\TodoListOrchestrator}:
- * жизненный цикл (`cycle_started`, `step_completed`, `completed`, `failed`, `restarted`) и
- * предупреждение `resume_history_missing` (аналогично {@see RunLoggingSubscriber} для run-событий).
+ * жизненный цикл (`cycle_started`, `step_completed`, `completed`, `restarted`) и
+ * предупреждение `resume_history_missing`.
+ *
+ * - `orchestrator.cycle_started`, `orchestrator.step_completed`, `orchestrator.completed`
+ *    ожидают payload {@see OrchestratorEventDto};
+ * - `orchestrator.failed` ожидает payload {@see OrchestratorErrorEventDto};
+ * - `orchestrator.restarted` ожидает payload {@see OrchestratorErrorEventDto} (с информацией об ошибке,
+ *    вызвавшей рестарт);
+ * - `orchestrator.resume_history_missing` ожидает payload {@see OrchestratorResumeHistoryMissingEventDto}.
  *
  * Пример использования:
  * ```php
@@ -46,7 +54,7 @@ final class OrchestratorLoggingSubscriber
                 }
 
                 self::resolveLoggerFromBaseEventDto($payload, $logger)->info(
-                    'Orchestrator event: cycle_started',
+                    'Orchestrator event: cycle_started | ' . (string) $payload,
                     $payload->toArray()
                 );
             },
@@ -61,7 +69,7 @@ final class OrchestratorLoggingSubscriber
                 }
 
                 self::resolveLoggerFromBaseEventDto($payload, $logger)->info(
-                    'Orchestrator event: step_completed',
+                    'Orchestrator event: step_completed | ' . (string) $payload,
                     $payload->toArray()
                 );
             },
@@ -76,7 +84,7 @@ final class OrchestratorLoggingSubscriber
                 }
 
                 self::resolveLoggerFromBaseEventDto($payload, $logger)->info(
-                    'Orchestrator event: completed',
+                    'Orchestrator event: completed | ' . (string) $payload,
                     $payload->toArray()
                 );
             },
@@ -91,7 +99,7 @@ final class OrchestratorLoggingSubscriber
                 }
 
                 self::resolveLoggerFromBaseEventDto($payload, $logger)->error(
-                    'Orchestrator event: failed',
+                    'Orchestrator event: failed | ' . (string) $payload,
                     $payload->toArray()
                 );
             },
@@ -106,7 +114,7 @@ final class OrchestratorLoggingSubscriber
                 }
 
                 self::resolveLoggerFromBaseEventDto($payload, $logger)->warning(
-                    'Orchestrator event: restarted',
+                    'Orchestrator event: restarted | ' . (string) $payload,
                     $payload->toArray()
                 );
             },
@@ -121,7 +129,7 @@ final class OrchestratorLoggingSubscriber
                 }
 
                 self::resolveLoggerFromBaseEventDto($payload, $logger)->warning(
-                    'Orchestrator event: resume_history_missing',
+                    'Orchestrator event: resume_history_missing | ' . (string) $payload,
                     $payload->toArray()
                 );
             },

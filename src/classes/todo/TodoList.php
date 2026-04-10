@@ -10,7 +10,10 @@ use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\events\RunEventDto;
+use app\modules\neuron\classes\dto\events\RunErrorEventDto;
 use app\modules\neuron\classes\dto\events\TodoEventDto;
+use app\modules\neuron\classes\dto\events\TodoErrorEventDto;
+use app\modules\neuron\classes\dto\events\TodoGotoRejectedEventDto;
 use app\modules\neuron\classes\dto\params\SessionParamsDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
@@ -160,7 +163,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             EventBus::trigger(
                 EventNameEnum::RUN_STARTED->value,
                 $this,
-                $this->buildRunEventDto($sessionCfg, $runId, 0)->setSuccess(true)
+                $this->buildRunEventDto($sessionCfg, $runId, 0)
             );
 
             // здесь передаем в конфигурацию сессии навыки, указанные в опции skills
@@ -275,22 +278,24 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                             ->setTodoAgent($todoSessionCfg->getAgentName())
                     );
                 } catch (\Throwable $e) {
+                    $todoErrDto = $this->buildTodoErrorEventDto($sessionCfg, $runId, $todoIndex, $todoTextRaw);
+                    $todoErrDto->setTodoAgent($todoSessionCfg->getAgentName());
+                    $todoErrDto->setReason($e->getMessage());
+                    $todoErrDto->setErrorClass($e::class);
+                    $todoErrDto->setErrorMessage($e->getMessage());
                     EventBus::trigger(
                         EventNameEnum::TODO_FAILED->value,
                         $this,
-                        $this->buildTodoEventDto($sessionCfg, $runId, $todoIndex, $todoTextRaw)
-                            ->setTodoAgent($todoSessionCfg->getAgentName())
-                            ->setReason($e->getMessage())
+                        $todoErrDto
                     );
+
+                    $runErrDto = $this->buildRunErrorEventDto($sessionCfg, $runId, $stepsExecuted);
+                    $runErrDto->setErrorClass($e::class);
+                    $runErrDto->setErrorMessage($e->getMessage());
                     EventBus::trigger(
                         EventNameEnum::RUN_FAILED->value,
                         $this,
-                        $this->buildRunEventDto($sessionCfg, $runId, $stepsExecuted)
-                            ->setType('todolist')
-                            ->setName($this->getName())
-                            ->setSuccess(false)
-                            ->setErrorClass($e::class)
-                            ->setErrorMessage($e->getMessage())
+                        $runErrDto
                     );
                     throw $e;
                 }
@@ -315,26 +320,28 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                             ->setGotoTransitionsCount($gotoTransitionsCount);
 
                         if ($gotoTransitionsCount > self::MAX_GOTO_TRANSITIONS) {
+                            $rejectDto = $this->buildTodoGotoRejectedEventDto($sessionCfg, $runId, $todoIndex, $todoTextRaw);
+                            $rejectDto->setGotoTargetIndex($gotoRequestedTodoIndex);
+                            $rejectDto->setGotoTransitionsCount($gotoTransitionsCount);
+                            $rejectDto->setReason('max_goto_transitions');
                             EventBus::trigger(
                                 EventNameEnum::TODO_GOTO_REJECTED->value,
                                 $this,
-                                $this->buildTodoEventDto($sessionCfg, $runId, $todoIndex, $todoTextRaw)
-                                    ->setGotoTargetIndex($gotoRequestedTodoIndex)
-                                    ->setGotoTransitionsCount($gotoTransitionsCount)
-                                    ->setReason('max_goto_transitions')
+                                $rejectDto
                             );
                             $runStateDto->write();
                             break;
                         }
 
                         if ($gotoRequestedTodoIndex < 0 || $gotoRequestedTodoIndex >= $todoCount) {
+                            $rejectDto = $this->buildTodoGotoRejectedEventDto($sessionCfg, $runId, $todoIndex, $todoTextRaw);
+                            $rejectDto->setGotoTargetIndex($gotoRequestedTodoIndex);
+                            $rejectDto->setGotoTransitionsCount($gotoTransitionsCount);
+                            $rejectDto->setReason('goto_target_out_of_range');
                             EventBus::trigger(
                                 EventNameEnum::TODO_GOTO_REJECTED->value,
                                 $this,
-                                $this->buildTodoEventDto($sessionCfg, $runId, $todoIndex, $todoTextRaw)
-                                    ->setGotoTargetIndex($gotoRequestedTodoIndex)
-                                    ->setGotoTransitionsCount($gotoTransitionsCount)
-                                    ->setReason('goto_target_out_of_range')
+                                $rejectDto
                             );
                             $runStateDto->write();
                             break;
@@ -364,9 +371,6 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                 EventNameEnum::RUN_FINISHED->value,
                 $this,
                 $this->buildRunEventDto($sessionCfg, $runId, $stepsExecuted)
-                    ->setType('todolist')
-                    ->setName($this->getName())
-                    ->setSuccess(true)
             );
 
             return clone $sessionCfg->getChatHistory();
@@ -464,11 +468,59 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
     }
 
     /**
+     * Создает DTO ошибки run-события для TodoList.
+     */
+    private function buildRunErrorEventDto(ConfigurationAgent $agentCfg, string $runId, int $stepsExecuted): RunErrorEventDto
+    {
+        $dto = new RunErrorEventDto();
+        $dto->setSessionKey($agentCfg->getSessionKey() ?? '');
+        $dto->setRunId($runId);
+        $dto->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM));
+        $dto->setAgent($agentCfg);
+        $dto->setType('todolist');
+        $dto->setName($this->getName());
+        $dto->setSteps($stepsExecuted);
+        return $dto;
+    }
+
+    /**
      * Создает DTO todo-события.
      */
     private function buildTodoEventDto(ConfigurationAgent $agentCfg, string $runId, int $todoIndex, string $todoText): TodoEventDto
     {
         $dto = new TodoEventDto();
+        $dto->setSessionKey($agentCfg->getSessionKey() ?? '');
+        $dto->setRunId($runId);
+        $dto->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM));
+        $dto->setAgent($agentCfg);
+        $dto->setTodoListName($this->getName());
+        $dto->setTodoIndex($todoIndex);
+        $dto->setTodo($todoText);
+        return $dto;
+    }
+
+    /**
+     * Создает DTO ошибки todo-события.
+     */
+    private function buildTodoErrorEventDto(ConfigurationAgent $agentCfg, string $runId, int $todoIndex, string $todoText): TodoErrorEventDto
+    {
+        $dto = new TodoErrorEventDto();
+        $dto->setSessionKey($agentCfg->getSessionKey() ?? '');
+        $dto->setRunId($runId);
+        $dto->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM));
+        $dto->setAgent($agentCfg);
+        $dto->setTodoListName($this->getName());
+        $dto->setTodoIndex($todoIndex);
+        $dto->setTodo($todoText);
+        return $dto;
+    }
+
+    /**
+     * Создает DTO отклонённого goto-перехода.
+     */
+    private function buildTodoGotoRejectedEventDto(ConfigurationAgent $agentCfg, string $runId, int $todoIndex, string $todoText): TodoGotoRejectedEventDto
+    {
+        $dto = new TodoGotoRejectedEventDto();
         $dto->setSessionKey($agentCfg->getSessionKey() ?? '');
         $dto->setRunId($runId);
         $dto->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM));

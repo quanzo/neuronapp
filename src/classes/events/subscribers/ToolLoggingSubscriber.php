@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\events\subscribers;
 
 use app\modules\neuron\classes\dto\events\ToolEventDto;
+use app\modules\neuron\classes\dto\events\ToolErrorEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use Psr\Log\LoggerInterface;
@@ -12,8 +13,13 @@ use Psr\Log\LoggerInterface;
 /**
  * Подписчик логирования tool-событий.
  *
- * Преобразует события tool.started/tool.completed/tool.failed
- * в PSR-3 сообщения.
+ * - `tool.started` и `tool.completed` ожидают payload {@see ToolEventDto};
+ * - `tool.failed` ожидает payload {@see ToolErrorEventDto}.
+ *
+ * Пример использования:
+ * ```php
+ * ToolLoggingSubscriber::register($logger);
+ * ```
  */
 final class ToolLoggingSubscriber
 {
@@ -36,7 +42,7 @@ final class ToolLoggingSubscriber
                 }
 
                 $effectiveLogger = self::resolveLogger($payload, $logger);
-                $effectiveLogger->info('Tool event: started', $payload->toArray());
+                $effectiveLogger->info('Tool event: started | ' . (string) $payload, $payload->toArray());
             },
             '*'
         );
@@ -49,7 +55,7 @@ final class ToolLoggingSubscriber
                 }
 
                 $effectiveLogger = self::resolveLogger($payload, $logger);
-                $effectiveLogger->info('Tool event: completed', $payload->toArray());
+                $effectiveLogger->info('Tool event: completed | ' . (string) $payload, $payload->toArray());
             },
             '*'
         );
@@ -62,7 +68,7 @@ final class ToolLoggingSubscriber
                 }
 
                 $effectiveLogger = self::resolveLogger($payload, $logger);
-                $effectiveLogger->error('Tool event: failed', $payload->toArray());
+                $effectiveLogger->error('Tool event: failed | ' . (string) $payload, $payload->toArray());
             },
             '*'
         );

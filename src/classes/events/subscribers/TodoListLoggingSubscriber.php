@@ -5,17 +5,24 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\events\subscribers;
 
 use app\modules\neuron\classes\dto\events\TodoEventDto;
+use app\modules\neuron\classes\dto\events\TodoErrorEventDto;
+use app\modules\neuron\classes\dto\events\TodoGotoRejectedEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use Psr\Log\LoggerInterface;
 
-use function mb_strlen;
-use function mb_substr;
-use function preg_replace;
-use function trim;
-
 /**
  * Подписчик логирования todo-событий.
+ *
+ * - `todo.started`, `todo.completed`, `todo.goto_requested`, `todo.agent_switched`
+ *    ожидают payload {@see TodoEventDto};
+ * - `todo.failed` ожидает payload {@see TodoErrorEventDto};
+ * - `todo.goto_rejected` ожидает payload {@see TodoGotoRejectedEventDto}.
+ *
+ * Пример использования:
+ * ```php
+ * TodoListLoggingSubscriber::register($logger);
+ * ```
  */
 final class TodoListLoggingSubscriber
 {
@@ -35,7 +42,7 @@ final class TodoListLoggingSubscriber
                 return;
             }
             self::resolveLogger($payload, $logger)->info(
-                self::buildTodoMessage('started', $payload),
+                'Todo event: started | ' . (string) $payload,
                 $payload->toArray()
             );
         }, '*');
@@ -45,7 +52,7 @@ final class TodoListLoggingSubscriber
                 return;
             }
             self::resolveLogger($payload, $logger)->info(
-                self::buildTodoMessage('completed', $payload),
+                'Todo event: completed | ' . (string) $payload,
                 $payload->toArray()
             );
         }, '*');
@@ -55,7 +62,7 @@ final class TodoListLoggingSubscriber
                 return;
             }
             self::resolveLogger($payload, $logger)->error(
-                self::buildTodoMessage('failed', $payload),
+                'Todo event: failed | ' . (string) $payload,
                 $payload->toArray()
             );
         }, '*');
@@ -65,7 +72,7 @@ final class TodoListLoggingSubscriber
                 return;
             }
             self::resolveLogger($payload, $logger)->info(
-                self::buildTodoMessage('goto_requested', $payload),
+                'Todo event: goto_requested | ' . (string) $payload,
                 $payload->toArray()
             );
         }, '*');
@@ -75,7 +82,7 @@ final class TodoListLoggingSubscriber
                 return;
             }
             self::resolveLogger($payload, $logger)->warning(
-                self::buildTodoMessage('goto_rejected', $payload),
+                'Todo event: goto_rejected | ' . (string) $payload,
                 $payload->toArray()
             );
         }, '*');
@@ -85,7 +92,7 @@ final class TodoListLoggingSubscriber
                 return;
             }
             self::resolveLogger($payload, $logger)->info(
-                self::buildTodoMessage('agent_switched', $payload),
+                'Todo event: agent_switched | ' . (string) $payload,
                 $payload->toArray()
             );
         }, '*');
@@ -101,6 +108,9 @@ final class TodoListLoggingSubscriber
         self::$isRegistered = false;
     }
 
+    /**
+     * Возвращает логгер из конфигурации агента события или fallback-логгер.
+     */
     private static function resolveLogger(TodoEventDto $payload, LoggerInterface $fallbackLogger): LoggerInterface
     {
         $agentCfg = $payload->getAgent();
@@ -109,36 +119,5 @@ final class TodoListLoggingSubscriber
         }
 
         return $fallbackLogger;
-    }
-
-    private static function buildTodoMessage(string $status, TodoEventDto $payload): string
-    {
-        $todo = self::buildTodoPreview($payload->getTodo(), 250);
-        return $todo === ''
-            ? 'Todo event: ' . $status
-            : 'Todo event: ' . $status . ': ' . $todo;
-    }
-
-    private static function buildTodoPreview(string $todo, int $maxLength): string
-    {
-        $todo = trim($todo);
-        if ($todo === '') {
-            return '';
-        }
-
-        $firstLine = preg_replace("/\r\n|\r/u", "\n", $todo) ?? $todo;
-        $pos = strpos($firstLine, "\n");
-        if ($pos !== false) {
-            $firstLine = mb_substr($firstLine, 0, $pos);
-        }
-
-        $firstLine = preg_replace('/\s+/u', ' ', $firstLine) ?? $firstLine;
-        $firstLine = trim($firstLine);
-
-        if (mb_strlen($firstLine) <= $maxLength) {
-            return $firstLine;
-        }
-
-        return mb_substr($firstLine, 0, $maxLength) . '...[truncated]';
     }
 }

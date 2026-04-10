@@ -7,6 +7,7 @@ namespace Tests\Config;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\attachments\TextAttachmentDto;
 use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
+use app\modules\neuron\classes\dto\events\AgentMessageErrorEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\neuron\Agent;
 use app\modules\neuron\enums\EventNameEnum;
@@ -171,7 +172,6 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
         $this->assertSame('completed', $events[1]['type']);
         $this->assertInstanceOf(AgentMessageEventDto::class, $events[0]['payload']);
         $this->assertSame(1, $events[0]['payload']->getAttachmentsCount());
-        $this->assertTrue($events[1]['payload']->isSuccess());
     }
 
     public function testSendMessageWithAttachmentsEmitsFailedEventOnException(): void
@@ -210,8 +210,7 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
             $this->assertSame('boom', $e->getMessage());
         }
 
-        $this->assertInstanceOf(AgentMessageEventDto::class, $failedPayload);
-        $this->assertFalse($failedPayload->isSuccess());
+        $this->assertInstanceOf(AgentMessageErrorEventDto::class, $failedPayload);
         $this->assertSame(\RuntimeException::class, $failedPayload->getErrorClass());
     }
 }

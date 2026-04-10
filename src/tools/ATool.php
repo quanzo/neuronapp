@@ -6,6 +6,7 @@ namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\events\ToolEventDto;
+use app\modules\neuron\classes\dto\events\ToolErrorEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use NeuronAI\Tools\Tool;
@@ -48,12 +49,10 @@ abstract class ATool extends Tool
      */
     public function execute(): void
     {
-        $name   = $this->getName();
-
         EventBus::trigger(
             EventNameEnum::TOOL_STARTED->value,
             static::class,
-            $this->buildToolEventDto()->setSuccess(true)
+            $this->buildToolEventDto()
         );
 
         try {
@@ -61,16 +60,16 @@ abstract class ATool extends Tool
             EventBus::trigger(
                 EventNameEnum::TOOL_COMPLETED->value,
                 static::class,
-                $this->buildToolEventDto()->setSuccess(true)
+                $this->buildToolEventDto()
             );
         } catch (\Throwable $e) {
+            $errorDto = $this->buildToolErrorEventDto();
+            $errorDto->setErrorClass($e::class);
+            $errorDto->setErrorMessage($e->getMessage());
             EventBus::trigger(
                 EventNameEnum::TOOL_FAILED->value,
                 static::class,
-                $this->buildToolEventDto()
-                    ->setSuccess(false)
-                    ->setErrorClass($e::class)
-                    ->setErrorMessage($e->getMessage())
+                $errorDto
             );
             throw $e;
         }
@@ -90,5 +89,22 @@ abstract class ATool extends Tool
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
             ->setAgent($this->getAgentCfg())
             ->setToolName($toolName);
+    }
+
+    /**
+     * Создаёт DTO ошибки события инструмента.
+     */
+    protected function buildToolErrorEventDto(): ToolErrorEventDto
+    {
+        $toolName = $this->getName();
+        $agentCfg = $this->getAgentCfg();
+        $sessionKey = $agentCfg?->getSessionKey() ?? '';
+        $dto = new ToolErrorEventDto();
+        $dto->setSessionKey($sessionKey);
+        $dto->setRunId('');
+        $dto->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM));
+        $dto->setAgent($this->getAgentCfg());
+        $dto->setToolName($toolName);
+        return $dto;
     }
 }
