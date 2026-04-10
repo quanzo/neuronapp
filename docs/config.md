@@ -78,6 +78,7 @@ Edge cases:
   - `contextWindow` — размер контекстного окна LLM;
   - `provider` — конфигурация провайдера (`AIProviderInterface` или `callable`);
   - `instructions` — системный промпт (строка, `Stringable` или `callable`);
+  - `useAgentsFile` — подключать ли содержимое `AGENTS.md` к системному промпту (по умолчанию `false`).\n    Файл ищется через `ConfigurationApp->getDirPriority()->resolveFile('AGENTS.md')` и **добавляется в конец** системного промпта;
   - `tools` — базовый набор инструментов (`ToolInterface`/`ToolkitInterface` и пр.);
   - `skills` — список skills, которые будут подключены как tools для этого агента;
   - `toolMaxTries` — лимит попыток использования инструмента;

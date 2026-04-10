@@ -10,6 +10,7 @@
 - определяет размер контекста (`contextWindow`);
 - управляет историей чата (`enableChatHistory`);
 - содержит системный промпт (`instructions`);
+- может подключать содержимое `AGENTS.md` к системному промпту (`useAgentsFile`);
 - объявляет доступные инструменты (`tools`, `mcp`, RAG‑компоненты).
 
 Реализация: `src/classes/config/ConfigurationAgent.php`.
@@ -43,6 +44,27 @@
 - `ConfigurationAgent::makeFromArray(array $cfg, ConfigurationApp $configApp): ?ConfigurationAgent`:
   - заполняет свойства агента по известным ключам (`enableChatHistory`, `contextWindow`, `provider`, `instructions`, `tools`, `mcp`, `embeddingProvider`, `vectorStore` и т.д.);
   - устанавливает `ConfigurationApp` и `sessionKey` (через `configApp->getSessionKey()`).
+
+#### Подключение `AGENTS.md` к system prompt
+
+Если в конфигурации агента включить `useAgentsFile: true`, то при формировании системного промпта к нему будет **в конец** добавлено содержимое файла `AGENTS.md` (если он найден в приоритетных директориях приложения через `DirPriority::resolveFile('AGENTS.md')`).
+
+Пример (PHP):
+
+```php
+return [
+    // ...
+    'useAgentsFile' => true,
+];
+```
+
+Пример (JSONC):
+
+```json
+{
+  "useAgentsFile": true
+}
+```
 
 ### `AgentProducer` — фабрика агентов
 

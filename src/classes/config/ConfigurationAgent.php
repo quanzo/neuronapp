@@ -168,6 +168,13 @@ class ConfigurationAgent implements IDependConfigApp
     public $instructions = '';
 
     /**
+     * Разрешает подключать содержимое файла AGENTS.md к системному промпту агента.
+     *
+     * Файл ищется через {@see ConfigurationApp::getDirPriority()} в приоритетных директориях приложения.
+     */
+    public bool $useAgentsFile = false;
+
+    /**
      * Дополнительные инструменты, которые может использовать LLM
      *
      * @see vendor/neuron-core/neuron-ai/src/Tools/Toolkits/Calculator/DivideTool.php
@@ -640,10 +647,56 @@ class ConfigurationAgent implements IDependConfigApp
      */
     public function getInstructions()
     {
+        $baseInstructions = '';
         if (CallableWrapper::isCallable($this->instructions)) {
-            return CallableWrapper::call($this->instructions);
+            $baseInstructions = (string) CallableWrapper::call($this->instructions);
+        } else {
+            $baseInstructions = (string) $this->instructions;
         }
-        return (string) $this->instructions;
+
+        return $this->appendAgentsFileToInstructions($baseInstructions);
+    }
+
+    /**
+     * Подмешивает содержимое AGENTS.md к системному промпту, если это включено.
+     *
+     * Если файл не найден или не читается, возвращает исходные инструкции без ошибок.
+     *
+     * @param string $instructions Исходный системный промпт.
+     *
+     * @return string Итоговый системный промпт.
+     */
+    private function appendAgentsFileToInstructions(string $instructions): string
+    {
+        if ($this->useAgentsFile !== true) {
+            return $instructions;
+        }
+
+        $configApp = $this->getConfigurationApp() ?? ConfigurationApp::getInstance();
+        $agentsPath = $configApp->getDirPriority()->resolveFile('AGENTS.md');
+        if ($agentsPath === null || $agentsPath === '' || !is_file($agentsPath)) {
+            return $instructions;
+        }
+
+        $contents = @file_get_contents($agentsPath);
+        if ($contents === false) {
+            return $instructions;
+        }
+
+        $contents = trim((string) $contents);
+        if ($contents === '') {
+            return $instructions;
+        }
+
+        $maxChars = 20000;
+        if (mb_strlen($contents, 'UTF-8') > $maxChars) {
+            $contents = mb_substr($contents, 0, $maxChars, 'UTF-8')
+                . "\n\n[AGENTS.md truncated]";
+        }
+
+        $suffix = "\n\n---\nAGENTS.md\n---\n" . $contents . "\n";
+
+        return $instructions . $suffix;
     }
 
     /**
@@ -1075,6 +1128,10 @@ class ConfigurationAgent implements IDependConfigApp
 
         if (array_key_exists('instructions', $cfg)) {
             $config->instructions = $cfg['instructions'];
+        }
+
+        if (array_key_exists('useAgentsFile', $cfg)) {
+            $config->useAgentsFile = (bool) $cfg['useAgentsFile'];
         }
 
         if (array_key_exists('tools', $cfg)) {
