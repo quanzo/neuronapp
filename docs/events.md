@@ -83,6 +83,8 @@ BaseEventDto (implements IArrayable, Stringable)
 │
 ├── AgentMessageEventDto  (attachmentsCount, structured, durationSeconds)
 │   └── AgentMessageErrorEventDto  (implements IErrorEvent; +errorClass, +errorMessage)
+│
+└── LlmInferenceEventDto  (toolsCount, toolsNames, toolRequiredParams, instructionsPreview, instructionsLength, userMessagePreview, userMessageLength, messagesCount?, messagesSanitized?)
 ```
 
 ### Принцип разделения normal/error
@@ -162,6 +164,9 @@ BaseEventDto (implements IArrayable, Stringable)
 - `orchestrator.restarted` — рестарт после ошибки (payload: `OrchestratorErrorEventDto`)
 - `orchestrator.resume_history_missing` — resume без history_message_count (payload: `OrchestratorResumeHistoryMissingEventDto`)
 
+### LLM Inference
+- `llm.inference.prepared` — контекст инференса подготовлен и готов к отправке провайдеру (payload: `LlmInferenceEventDto`)
+
 ## Подписчики
 
 Подписчики находятся в `src/classes/events/subscribers`.
@@ -173,6 +178,7 @@ BaseEventDto (implements IArrayable, Stringable)
 - `SkillLoggingSubscriber` — логирует `skill.*` события в PSR-3 логгер.
 - `TodoListLoggingSubscriber` — логирует `todo.*` события в PSR-3 логгер.
 - `OrchestratorLoggingSubscriber` — логирует события `orchestrator.*` из `TodoListOrchestrator` в PSR-3 логгер.
+- `LlmInferenceLoggingSubscriber` — логирует `llm.inference.prepared` в PSR-3 логгер (уровень `info`).
 
 Подписчики используют `(string) $payload` как сообщение PSR-3 и `$payload->toArray()` как контекст.
 Формат сообщения: `"<Domain> event: <action> | [<Tag>] key=value | key=value | ..."`.

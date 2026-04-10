@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\neuron\nodes;
 
+use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\dto\events\LlmInferenceEventDto;
+use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\helpers\LlmPayloadLogSanitizer;
 use NeuronAI\Agent\Events\AIInferenceEvent;
 use NeuronAI\Chat\Messages\Message;
 use NeuronAI\Providers\AIProviderInterface;
 use NeuronAI\Tools\ToolInterface;
-use Psr\Log\LoggerInterface;
 
 use function array_map;
 use function count;
@@ -19,25 +22,27 @@ use function trim;
 /**
  * Узел выполнения инференса с логированием входных данных в LLM.
  *
- * Логирует системный промпт и список инструментов до передачи запроса провайдеру.
+ * Публикует событие `llm.inference.prepared` через {@see EventBus}
+ * с полным контекстом инференса (system prompt, инструменты, user-сообщение).
+ * Логирование выполняется подписчиком {@see \app\modules\neuron\classes\events\subscribers\LlmInferenceLoggingSubscriber}.
  */
 final class LoggingChatNode extends \NeuronAI\Agent\Nodes\ChatNode
 {
     /**
-     * @param AIProviderInterface $provider Провайдер LLM.
-     * @param LoggerInterface     $logger Логгер приложения.
-     * @param string              $mode Режим детализации логов: summary|debug.
+     * @param AIProviderInterface      $provider Провайдер LLM.
+     * @param ?ConfigurationAgent      $agentCfg Конфигурация агента (для DTO и resolve логгера).
+     * @param string                   $mode Режим детализации логов: summary|debug.
      */
     public function __construct(
         AIProviderInterface $provider,
-        private readonly LoggerInterface $logger,
+        private readonly ?ConfigurationAgent $agentCfg = null,
         private readonly string $mode = 'summary',
     ) {
         parent::__construct($provider);
     }
 
     /**
-     * Логирует подготовленный контекст инференса и делегирует запрос провайдеру.
+     * Публикует событие подготовки инференса и делегирует запрос провайдеру.
      *
      * @param AIInferenceEvent $event Событие инференса.
      * @param Message[]        $messages История сообщений.
@@ -51,31 +56,29 @@ final class LoggingChatNode extends \NeuronAI\Agent\Nodes\ChatNode
         $preview = LlmPayloadLogSanitizer::preview($event->instructions);
         $lastUserMessage = $this->getLastUserMessageText($messages);
         $userMessagePreview = $this->buildOneLinePreview($lastUserMessage, 300);
-        $context = [
-            'event'       => 'llm.inference.prepared',
-            'tools_count' => count($tools),
-            'tools_names' => array_map(
+
+        $dto = (new LlmInferenceEventDto())
+            ->setAgent($this->agentCfg)
+            ->setSessionKey($this->agentCfg?->getSessionKey() ?? '')
+            ->setRunId('')
+            ->setTimestamp(date(\DateTimeInterface::ATOM))
+            ->setToolsCount(count($tools))
+            ->setToolsNames(array_map(
                 static fn (ToolInterface $tool): string => $tool->getName(),
                 $tools
-            ),
-            'tool_required_params' => $this->toolRequiredParams($tools),
-            'instructions_preview' => $preview['preview'],
-            'instructions_length'  => $preview['length'],
-            'llm_user_message_preview' => $userMessagePreview['preview'],
-            'llm_user_message_length' => $userMessagePreview['length'],
-        ];
+            ))
+            ->setToolRequiredParams($this->toolRequiredParams($tools))
+            ->setInstructionsPreview($preview['preview'])
+            ->setInstructionsLength($preview['length'])
+            ->setUserMessagePreview($userMessagePreview['preview'])
+            ->setUserMessageLength($userMessagePreview['length']);
 
         if ($this->mode === 'debug') {
-            $context['messages_count'] = count($messages);
-            $context['messages']       = LlmPayloadLogSanitizer::sanitize($messages, 1000, 5);
+            $dto->setMessagesCount(count($messages))
+                ->setMessagesSanitized(LlmPayloadLogSanitizer::sanitize($messages, 1000, 5));
         }
 
-        $logMessage = 'llm.inference.prepared';
-        if ($userMessagePreview['preview'] !== '') {
-            $logMessage .= ': ' . $userMessagePreview['preview'];
-        }
-
-        $this->logger->info($logMessage, $context);
+        EventBus::trigger(EventNameEnum::LLM_INFERENCE_PREPARED->value, '*', $dto);
 
         return parent::inference($event, $messages);
     }

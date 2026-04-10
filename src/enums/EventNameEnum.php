@@ -44,4 +44,7 @@ enum EventNameEnum: string
     case ORCHESTRATOR_RESTARTED      = 'orchestrator.restarted';
     /** Resume без history_message_count в RunStateDto (возможны дубликаты сообщений). */
     case ORCHESTRATOR_RESUME_HISTORY_MISSING = 'orchestrator.resume_history_missing';
+
+    /** Контекст инференса подготовлен и готов к отправке провайдеру. */
+    case LLM_INFERENCE_PREPARED = 'llm.inference.prepared';
 }

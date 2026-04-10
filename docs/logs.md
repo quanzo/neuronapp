@@ -83,11 +83,12 @@
 Для диагностики вызовов инструментов добавлено двухуровневое логирование LLM-запроса через `ConfigurationAgent`:
 
 - событие `llm.inference.prepared`:
-  - пишется в кастомном узле `LoggingChatNode` (`src/classes/neuron/nodes/LoggingChatNode.php`);
-  - содержит `instructions_preview`, `instructions_length`, `tools_count`, `tools_names`, `tool_required_params`;
-  - в **текстовой части сообщения** дополнительно выводит превью последнего user-сообщения (одной строкой);
-  - в `context` дополнительно выводит `llm_user_message_preview` и `llm_user_message_length`;
-  - использует контекст `agent` через `ContextualLogger` (ключи `session`/`sessionKey` не пишутся в JSON-контекст).
+  - публикуется через `EventBus` в кастомном узле `LoggingChatNode` (`src/classes/neuron/nodes/LoggingChatNode.php`);
+  - payload — `LlmInferenceEventDto` (`src/classes/dto/events/LlmInferenceEventDto.php`);
+  - содержит `toolsCount`, `toolsNames`, `toolRequiredParams`, `instructionsPreview`, `instructionsLength`, `userMessagePreview`, `userMessageLength`;
+  - в debug-режиме дополнительно включает `messagesCount` и `messagesSanitized`;
+  - подписчик `LlmInferenceLoggingSubscriber` (`src/classes/events/subscribers/LlmInferenceLoggingSubscriber.php`) пишет лог уровня `info`;
+  - resolve логгера через `ConfigurationAgent` из payload (fallback на глобальный логгер).
 - событие `llm.request.payload`:
   - пишется в декораторе `LoggingAIProviderDecorator` (`src/classes/neuron/providers/LoggingAIProviderDecorator.php`);
   - содержит информацию о подготовленном payload перед отправкой к провайдеру:

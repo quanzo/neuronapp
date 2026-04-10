@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\neuron;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
-use app\modules\neuron\classes\logger\NullLogger;
 use app\modules\neuron\classes\neuron\nodes\LoggingChatNode;
 use app\modules\neuron\traits\AgentUseModuleTrait;
 use app\modules\neuron\traits\RagUseModuleTrait;
 use NeuronAI\RAG\RAG as NeuronRAG;
 use NeuronAI\Agent\Nodes\ChatNode;
 use NeuronAI\Workflow\Node;
-use Psr\Log\LoggerInterface;
 
 use function array_map;
 use function is_array;
@@ -38,9 +36,10 @@ class RAG extends NeuronRAG
 
         $nodes = array_map(function (Node $node): Node {
             if ($node instanceof ChatNode) {
+                $agentCfg = $this->config instanceof ConfigurationAgent ? $this->config : null;
                 return new LoggingChatNode(
                     $this->resolveProvider(),
-                    $this->resolveLogger(),
+                    $agentCfg,
                     $this->resolvePayloadLogMode()
                 );
             }
@@ -49,20 +48,6 @@ class RAG extends NeuronRAG
         }, $nodes);
 
         parent::compose($nodes);
-    }
-
-    /**
-     * Возвращает логгер из конфигурации агента.
-     *
-     * @return LoggerInterface
-     */
-    private function resolveLogger(): LoggerInterface
-    {
-        if (isset($this->config) && $this->config instanceof ConfigurationAgent) {
-            return $this->config->getLoggerWithContext();
-        }
-
-        return new NullLogger();
     }
 
     /**
