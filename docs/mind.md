@@ -37,6 +37,7 @@
 - DTO: `AgentMessageEventDto` — `outgoingMessage` (отправленное в агент), `incomingMessage` (ответ ассистента как `NeuronMessage`, если есть: из `chat()` или последнее assistant-сообщение из истории после `structured()`), плюс `attachmentsCount`, `structured`, `durationSeconds`, базовые поля `BaseEventDto`.
 - Публикация: `ConfigurationAgent::dispatchMessageToAgent()` после успешного `performAgentRequest()` (включая structured и обычный `chat()`), а также после успешного wait-cycle без исключения (в этом случае `incomingMessage` может быть null).
 - Идентификатор пользователя для файлов `.mind` берётся из `ConfigurationApp::getUserId()` внутри подписчика.
+- Глобально сбор в `.mind` можно отключить в `config.jsonc`: `mind.collect: false` (или вложенный объект `"mind": { "collect": false }`). Тогда `ConfigurationApp::isLongTermMindCollectionEnabled()` возвращает `false`, и подписчик не пишет в storage (по умолчанию опция включена).
 - Если у `AgentMessageEventDto::getAgent()` выставлено `ConfigurationAgent::isExcludeLongTermMind() === true`, подписчик **полностью пропускает** запись (используется при исполнении Skill/TodoList с опцией `pure_context: true`, см. `docs/skills.md`, `docs/todolist.md`).
 - `LongTermMindSubscriber` не пишет сообщения, распознанные как служебные циклом `LlmCycleHelper` (`isCycleEmptyMsg`, `isCycleRequestMsg`, `isCycleResponseMsg`), и не пишет пустой текст после нормализации тела.
 

@@ -95,6 +95,38 @@ class LongTermMindSubscriberTest extends TestCase
     }
 
     /**
+     * При `mind.collect: false` в конфигурации приложения подписчик не пишет в `.mind`.
+     */
+    public function testWhenMindCollectDisabledNothingWritten(): void
+    {
+        $app = ConfigurationApp::getInstance();
+        $ref = new \ReflectionProperty(ConfigurationApp::class, 'config');
+        $ref->setAccessible(true);
+        $ref->setValue($app, array_merge($app->getAll(), [
+            'mind' => [
+                'collect' => false,
+            ],
+        ]));
+
+        $this->assertFalse($app->isLongTermMindCollectionEnabled());
+
+        $normalUser  = new NeuronMessage(MessageRole::USER, 'Текст при выключенном сборе в конфиге');
+        $assistantOk = new NeuronMessage(MessageRole::ASSISTANT, 'Ответ');
+
+        $dto = (new AgentMessageEventDto())
+            ->setSessionKey('20260602-mind-collect-off')
+            ->setRunId('')
+            ->setTimestamp('2026-06-02T10:00:00+00:00')
+            ->setOutgoingMessage($normalUser)
+            ->setIncomingMessage($assistantOk);
+
+        EventBus::trigger(EventNameEnum::AGENT_MESSAGE_COMPLETED->value, '*', $dto);
+
+        $storage = new UserMindMarkdownStorage($app->getMindDir(), 501);
+        $this->assertNull($storage->getByRecordId(1));
+    }
+
+    /**
      * Параметры для {@see self::testMindPersistenceRespectsExcludeLongTermMind()}: агент, флаг исключения,
      * тексты сообщений, ожидание наличия записи id=1, опции клона и сброса флага.
      *

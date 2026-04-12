@@ -19,8 +19,10 @@ use Throwable;
  *
  * Реагирует на {@see EventNameEnum::AGENT_MESSAGE_COMPLETED}, фильтрует служебные сообщения цикла
  * {@see LlmCycleHelper} и пустые тексты, затем дописывает блоки через {@see UserMindMarkdownStorage}.
+ * Если в {@see ConfigurationApp} выключена опция {@see ConfigurationApp::isLongTermMindCollectionEnabled()}
+ * (`mind.collect` в `config.jsonc`), запись в `.mind` для всего процесса не выполняется.
  * Если у агента в DTO включено {@see \app\modules\neuron\classes\config\ConfigurationAgent::isExcludeLongTermMind()}
- * (исполнение Skill/TodoList с `pure_context: true`), запись в `.mind` не выполняется.
+ * (исполнение Skill/TodoList с `pure_context: true`), запись в `.mind` не выполняется для этого агента.
  *
  * Пример:
  *
@@ -50,6 +52,10 @@ final class LongTermMindSubscriber
 
                 $agent = $payload->getAgent();
                 if ($agent !== null && $agent->isExcludeLongTermMind()) {
+                    return;
+                }
+
+                if (!ConfigurationApp::getInstance()->isLongTermMindCollectionEnabled()) {
                     return;
                 }
 

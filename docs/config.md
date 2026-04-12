@@ -31,6 +31,7 @@
 - доступ к настройкам:
   - `getAll(): array<string,mixed>`;
   - `get(string $key, mixed $default = null): mixed` — поддерживает ключи вида `"context_files.allowed_paths"`;
+  - `isLongTermMindCollectionEnabled(): bool` — читает `mind.collect` из `config.jsonc` (по умолчанию `true`); при `false` подписчик `LongTermMindSubscriber` не пишет в `.mind` (см. `docs/mind.md`);
   - `getLogContext()` — контекст логирования уровня приложения (содержит `session`).
 
 Файл `config.jsonc`:

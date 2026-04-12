@@ -14,6 +14,7 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\logger\ContextualLogger;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\helpers\JsonHelper;
+use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\SessionKeyHelper;
 use app\modules\neuron\helpers\StorageFileHelper;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
@@ -280,6 +281,25 @@ class ConfigurationApp
         }
 
         return $path;
+    }
+
+    /**
+     * Разрешён ли сбор данных для долговременной памяти `.mind`.
+     *
+     * Читается из `config.jsonc` ключом `mind.collect` (вложенный объект `mind`, поле `collect`).
+     * Значения `1`, `true`, строка `'true'` трактуются как включено; `0`, `false`, строка `'false'` — как выключено.
+     * При отсутствии ключа по умолчанию сбор **включён** (обратная совместимость).
+     * Подписчик {@see \app\modules\neuron\classes\events\subscribers\LongTermMindSubscriber} при выключенной опции
+     * не записывает сообщения в файлы `.mind` (см. `docs/mind.md`).
+     *
+     * Пример в `config.jsonc`:
+     * ```jsonc
+     * { "mind": { "collect": false } }
+     * ```
+     */
+    public function isLongTermMindCollectionEnabled(): bool
+    {
+        return OptionsHelper::toBool($this->get('mind.collect', true));
     }
 
     /**
