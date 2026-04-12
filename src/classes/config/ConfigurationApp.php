@@ -234,6 +234,16 @@ class ConfigurationApp
     }
 
     /**
+     * Возвращает короткое имя директории долговременной памяти сообщений (Markdown).
+     *
+     * @return string Имя поддиректории (например, `.mind`).
+     */
+    public static function getMindDirName(): string
+    {
+        return '.mind';
+    }
+
+    /**
      * Возвращает полный путь к директории хранения сессий.
      *
      * Путь формируется как {@see APP_WORK_DIR} + разделитель + {@see getSessionDirName()}.
@@ -253,6 +263,23 @@ class ConfigurationApp
     public function getLogDir(): string
     {
         return $this->dirPriority->resolveDir(self::getLogDirName());
+    }
+
+    /**
+     * Возвращает полный путь к директории долговременной памяти сообщений.
+     *
+     * Путь формируется через {@see DirPriority::resolveDir()} для {@see getMindDirName()}.
+     *
+     * @return string Абсолютный путь к папке `.mind`.
+     */
+    public function getMindDir(): string
+    {
+        $path = $this->dirPriority->resolveDir(self::getMindDirName());
+        if ($path === null || $path === '') {
+            throw new RuntimeException('Директория долговременной памяти (.mind) не найдена.');
+        }
+
+        return $path;
     }
 
     /**

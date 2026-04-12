@@ -33,7 +33,7 @@ new DirPriority([APP_START_DIR, APP_WORK_DIR]);
 
 - конфиг `config.jsonc`;
 - директории `agents/`, `skills/`, `todos/`;
-- служебные папки `.sessions`, `.logs`, `.store`;
+- служебные папки `.sessions`, `.logs`, `.store`, `.mind`;
 - файлы по @‑ссылкам в тексте skills/todos (см. `AttachmentHelper::buildContextAttachments()`).
 
 ### `ConfigurationApp` и расположение файлов
@@ -45,6 +45,7 @@ new DirPriority([APP_START_DIR, APP_WORK_DIR]);
   - `getSessionDir()` → `.sessions`;
   - `getLogDir()` → `.logs`;
   - `getStoreDir()` → `.store` (чекпоинты выполнения todolist);
+  - `getMindDir()` → `.mind` (долговременная память сообщений LLM, см. `docs/mind.md`);
 - создания producers:
   - `AgentProducer` (папка `agents/`);
   - `TodoListProducer` (папка `todos/`);
@@ -73,7 +74,7 @@ Source of truth для этих расширений:
 - `testapp/skills` — текстовые навыки;
 - `testapp/todos` — сценарии TodoList;
 - `testapp/docs` — файлы контекста, доступные через `@docs/...`;
-- `testapp/.sessions`, `testapp/.logs`, `testapp/.store` — служебные директории.
+- `testapp/.sessions`, `testapp/.logs`, `testapp/.store`, `testapp/.mind` — служебные директории.
 
 При запуске:
 

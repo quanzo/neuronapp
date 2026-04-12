@@ -84,7 +84,8 @@ BaseEventDto (implements IArrayable, Stringable)
 ├── AgentMessageEventDto  (attachmentsCount, structured, durationSeconds)
 │   └── AgentMessageErrorEventDto  (implements IErrorEvent; +errorClass, +errorMessage)
 │
-└── LlmInferenceEventDto  (toolsCount, toolsNames, toolRequiredParams, instructionsPreview, instructionsLength, userMessagePreview, userMessageLength, messagesCount?, messagesSanitized?)
+├── LlmInferenceEventDto  (toolsCount, toolsNames, toolRequiredParams, instructionsPreview, instructionsLength, userMessagePreview, userMessageLength, messagesCount?, messagesSanitized?)
+└── LlmTurnCompletedEventDto  (userId, userMessage?, assistantMessage?; базовые sessionKey/runId/timestamp/agent)
 ```
 
 ### Принцип разделения normal/error
@@ -166,6 +167,7 @@ BaseEventDto (implements IArrayable, Stringable)
 
 ### LLM Inference
 - `llm.inference.prepared` — контекст инференса подготовлен и готов к отправке провайдеру (payload: `LlmInferenceEventDto`)
+- `llm.turn.completed` — завершён один шаг диалога user → assistant после ответа провайдера (payload: `LlmTurnCompletedEventDto`); см. `docs/mind.md`
 
 ## Подписчики
 
@@ -179,6 +181,7 @@ BaseEventDto (implements IArrayable, Stringable)
 - `TodoListLoggingSubscriber` — логирует `todo.*` события в PSR-3 логгер.
 - `OrchestratorLoggingSubscriber` — логирует события `orchestrator.*` из `TodoListOrchestrator` в PSR-3 логгер.
 - `LlmInferenceLoggingSubscriber` — логирует `llm.inference.prepared` в PSR-3 логгер (уровень `info`).
+- `LongTermMindSubscriber` — пишет `llm.turn.completed` в файлы `.mind` (см. `docs/mind.md`).
 
 Подписчики используют `(string) $payload` как сообщение PSR-3 и `$payload->toArray()` как контекст.
 Формат сообщения: `"<Domain> event: <action> | [<Tag>] key=value | key=value | ..."`.

@@ -34,6 +34,7 @@ class ConfigurationAppTest extends TestCase
         mkdir($this->tmpDir . '/.sessions', 0777, true);
         mkdir($this->tmpDir . '/.store', 0777, true);
         mkdir($this->tmpDir . '/.logs', 0777, true);
+        mkdir($this->tmpDir . '/.mind', 0777, true);
 
         $this->resetSingleton();
     }
@@ -273,6 +274,29 @@ class ConfigurationAppTest extends TestCase
         ConfigurationApp::init($dp);
         $logDir = ConfigurationApp::getInstance()->getLogDir();
         $this->assertSame($this->tmpDir . '/.logs', $logDir);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  mind — долговременная память сообщений
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * Имя директории долговременной памяти — константная строка «.mind».
+     */
+    public function testGetMindDirName(): void
+    {
+        $this->assertSame('.mind', ConfigurationApp::getMindDirName());
+    }
+
+    /**
+     * getMindDir() возвращает полный путь к директории `.mind`.
+     */
+    public function testGetMindDir(): void
+    {
+        $dp = new DirPriority([$this->tmpDir]);
+        ConfigurationApp::init($dp);
+        $mindDir = ConfigurationApp::getInstance()->getMindDir();
+        $this->assertSame($this->tmpDir . '/.mind', $mindDir);
     }
 
     // ══════════════════════════════════════════════════════════════

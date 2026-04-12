@@ -23,6 +23,8 @@ use NeuronAI\Chat\History\ChatHistoryInterface;
 use NeuronAI\Chat\History\FileChatHistory;
 use NeuronAI\Chat\History\InMemoryChatHistory;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
+use NeuronAI\Chat\Messages\ToolCallMessage;
+use NeuronAI\Chat\Messages\ToolResultMessage;
 use NeuronAI\Chat\Messages\ContentBlocks\ContentBlockInterface;
 use NeuronAI\MCP\McpConnector;
 use NeuronAI\Providers\AIProviderInterface;
@@ -31,6 +33,7 @@ use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
 use app\modules\neuron\classes\dto\events\AgentMessageErrorEventDto;
+use app\modules\neuron\classes\dto\events\LlmTurnCompletedEventDto;
 use app\modules\neuron\classes\dto\run\RunStateDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\logger\ContextualLogger;
@@ -48,6 +51,7 @@ use app\modules\neuron\interfaces\IDependConfigApp;
 use app\modules\neuron\classes\storage\VarStorage;
 use app\modules\neuron\classes\WaitSuccess;
 use app\modules\neuron\exceptions\RunStateNotFoundException;
+use app\modules\neuron\helpers\ChatHistoryEditHelper;
 use app\modules\neuron\helpers\LlmCycleHelper;
 use app\modules\neuron\helpers\TodoListResumeHelper;
 use app\modules\neuron\tools\ATool;
@@ -340,6 +344,10 @@ class ConfigurationAgent implements IDependConfigApp
         $duration = $this->calculateDurationSeconds($start);
         $this->triggerAgentMessageCompleted($attachmentsCount, $isStructured, $duration);
 
+        if (!$this->hasStructuredResponseClass()) {
+            $this->publishLlmTurnCompletedAfterChatTurn($message, $response);
+        }
+
         /**
          * @var Agent|RAG $agent
          *
@@ -423,12 +431,86 @@ class ConfigurationAgent implements IDependConfigApp
     private function performAgentRequest(AgentInterface $agent, NeuronMessage $message): mixed
     {
         if ($this->hasStructuredResponseClass()) {
-            return $agent->structured($message, $this->reponseStructClass, 2);
+            $structuredOutput = $agent->structured($message, $this->reponseStructClass, 2);
+            if ($agent instanceof Agent || $agent instanceof RAG) {
+                $this->publishLlmTurnCompletedAfterStructured($message);
+            }
+
+            return $structuredOutput;
         }
 
         $handler = $agent->chat($message);
 
         return $handler->getMessage();
+    }
+
+    /**
+     * Публикует `llm.turn.completed` после structured-ветки (без {@see \NeuronAI\Agent\Nodes\ChatNode}).
+     *
+     * @param NeuronMessage $userMessage Сообщение пользователя, переданное в `structured()`.
+     */
+    private function publishLlmTurnCompletedAfterStructured(NeuronMessage $userMessage): void
+    {
+        $messages = ChatHistoryEditHelper::getMessages($this->getChatHistory());
+        $assistant = self::findLastAssistantMessageForMind($messages);
+        $this->triggerLlmTurnCompletedEvent($userMessage, $assistant);
+    }
+
+    /**
+     * Публикует `llm.turn.completed` после обычного `chat()` в рамках {@see sendMessageWithAttachments}.
+     *
+     * Для режима structured output событие уже отправлено из {@see performAgentRequest()}, здесь не дублируем.
+     *
+     * @param NeuronMessage $userMessage Сообщение пользователя (уже с вложениями), отправленное в агент.
+     * @param mixed         $response    Ответ агента: {@see NeuronMessage} или иной тип (DTO/null) — в память уходит только сообщение.
+     */
+    private function publishLlmTurnCompletedAfterChatTurn(NeuronMessage $userMessage, mixed $response): void
+    {
+        $assistant = $response instanceof NeuronMessage ? $response : null;
+        $this->triggerLlmTurnCompletedEvent($userMessage, $assistant);
+    }
+
+    /**
+     * Ищет последнее сообщение ассистента (не tool) с конца истории.
+     *
+     * @param array<int, NeuronMessage> $messages Сообщения истории.
+     */
+    private static function findLastAssistantMessageForMind(array $messages): ?NeuronMessage
+    {
+        for ($i = count($messages) - 1; $i >= 0; $i--) {
+            $m = $messages[$i] ?? null;
+            if ($m instanceof ToolCallMessage || $m instanceof ToolResultMessage) {
+                continue;
+            }
+            if ($m instanceof NeuronMessage && $m->getRole() === MessageRole::ASSISTANT->value) {
+                return $m;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Формирует DTO и публикует событие завершённого шага LLM.
+     *
+     * @param NeuronMessage|null $userMessage    User-сторона шага или null.
+     * @param NeuronMessage|null $assistantMessage Ответ ассистента или null.
+     */
+    private function triggerLlmTurnCompletedEvent(?NeuronMessage $userMessage, ?NeuronMessage $assistantMessage): void
+    {
+        $appCfg = $this->getConfigurationApp();
+        $userId = $appCfg !== null ? $appCfg->getUserId() : 0;
+
+        $dto = (new LlmTurnCompletedEventDto())
+            ->setUserId($userId)
+            ->setSessionKey($this->getSessionKey() ?? '')
+            ->setRunId('')
+            ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
+            ->setAgent($this)
+            ->setUserMessage($userMessage)
+            ->setAssistantMessage($assistantMessage);
+
+        EventBus::trigger(EventNameEnum::LLM_TURN_COMPLETED->value, $this, $dto);
     }
 
     /**

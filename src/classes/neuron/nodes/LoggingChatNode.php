@@ -24,6 +24,7 @@ use function trim;
  *
  * Публикует событие `llm.inference.prepared` через {@see EventBus}
  * с полным контекстом инференса (system prompt, инструменты, user-сообщение).
+ * События долговременной памяти (`llm.turn.completed`) публикует {@see \app\modules\neuron\classes\config\ConfigurationAgent}, не этот узел.
  * Логирование выполняется подписчиком {@see \app\modules\neuron\classes\events\subscribers\LlmInferenceLoggingSubscriber}.
  */
 final class LoggingChatNode extends \NeuronAI\Agent\Nodes\ChatNode

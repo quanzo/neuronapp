@@ -6,6 +6,7 @@ namespace app\modules\neuron\classes\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\events\subscribers\LlmInferenceLoggingSubscriber;
+use app\modules\neuron\classes\events\subscribers\LongTermMindSubscriber;
 use app\modules\neuron\classes\events\subscribers\OrchestratorLoggingSubscriber;
 use app\modules\neuron\classes\events\subscribers\RunLoggingSubscriber;
 use app\modules\neuron\classes\events\subscribers\SkillLoggingSubscriber;
@@ -36,5 +37,6 @@ class AbstractAgentCommand extends Command
         ToolLoggingSubscriber::register($logger);
         OrchestratorLoggingSubscriber::register($logger);
         LlmInferenceLoggingSubscriber::register($logger);
+        LongTermMindSubscriber::register();
     }
 }

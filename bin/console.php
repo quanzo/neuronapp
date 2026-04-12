@@ -70,7 +70,8 @@ foreach ([
         ConfigurationApp::getSessionDirName(),
         AgentProducer::getStorageDirName(),
         ConfigurationApp::getLogDirName(),
-        ConfigurationApp::getStoreDirName()
+        ConfigurationApp::getStoreDirName(),
+        ConfigurationApp::getMindDirName()
     ] as $subDir
 ) {
     $path = $workDir . DIRECTORY_SEPARATOR . $subDir;
