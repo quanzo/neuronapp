@@ -52,7 +52,8 @@ $ar = [
                 'think'          => false,
             ],
         ],
-        'model' => 'qwen3.5:4b',
+        //'model' => 'qwen3.5:9b',
+        'model' => 'qwen3.5:cloud',
         //'model' => 'gemma4:e4b',
     ],
 
