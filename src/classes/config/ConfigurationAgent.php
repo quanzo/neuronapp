@@ -179,6 +179,22 @@ class ConfigurationAgent implements IDependConfigApp
     public bool $useAgentsFile = false;
 
     /**
+     * Не записывать шаги LLM этого агента в долговременную память `.mind`.
+     *
+     * Включается для конфигурации, используемой при исполнении Skill/TodoList с опцией
+     * `pure_context: true` ({@see \app\modules\neuron\classes\AbstractPromptWithParams::isPureContext()}).
+     * Подписчик {@see \app\modules\neuron\classes\events\subscribers\LongTermMindSubscriber} проверяет флаг
+     * через {@see self::isExcludeLongTermMind()}.
+     *
+     * Пример:
+     * ```php
+     * $clone = $agent->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY);
+     * $clone->setExcludeLongTermMind(true);
+     * ```
+     */
+    private bool $excludeLongTermMind = false;
+
+    /**
      * Дополнительные инструменты, которые может использовать LLM
      *
      * @see vendor/neuron-core/neuron-ai/src/Tools/Toolkits/Calculator/DivideTool.php
@@ -702,8 +718,28 @@ class ConfigurationAgent implements IDependConfigApp
         }
 
         $clone->setChatHistory($targetHistory);
+        $clone->excludeLongTermMind = false;
 
         return $clone;
+    }
+
+    /**
+     * Возвращает, отключена ли запись завершённых сообщений в `.mind` для этого экземпляра агента.
+     */
+    public function isExcludeLongTermMind(): bool
+    {
+        return $this->excludeLongTermMind;
+    }
+
+    /**
+     * Включает или выключает исключение записи в долговременную память `.mind`.
+     *
+     * @param bool $exclude true — не писать в `.mind` (исполнение с `pure_context`).
+     */
+    public function setExcludeLongTermMind(bool $exclude): self
+    {
+        $this->excludeLongTermMind = $exclude;
+        return $this;
     }
 
     //-----------------------------------------

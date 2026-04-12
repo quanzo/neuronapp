@@ -96,8 +96,9 @@ skills: helper/prepare_context, helper/summarize
 
 - **`agent`** — имя агента‑исполнителя (см. `docs/config.md` и `docs/agents.md`). Если не указан, используется агент, переданный извне, либо установленный как `default` в приложении.
 - **`pure_context`** — управляет использованием истории чата:
-  - по умолчанию (`Skill::getDefaultPureContext()` возвращает `false`) навык выполняется **в общем контексте агента** (копия истории не создаётся);
-  - при `pure_context: 1` или `true` используется клон сессии через `ChatHistoryCloneMode::RESET_EMPTY` / `COPY_CONTEXT` (см. реализацию в `AbstractPromptWithParams::isPureContext()` и `Skill::execute()`).
+  - по умолчанию (`Skill::getDefaultPureContext()` возвращает `false`) навык выполняется с клоном `ChatHistoryCloneMode::COPY_CONTEXT` (изолированная копия истории, см. `Skill::execute()`);
+  - при `pure_context: 1` или `true` используется клон `ChatHistoryCloneMode::RESET_EMPTY` (см. `AbstractPromptWithParams::isPureContext()` и `Skill::execute()`);
+  - при `pure_context: true` на клоне агента включается `ConfigurationAgent::setExcludeLongTermMind(true)` — переписка этого запуска **не записывается** в `.mind` (`LongTermMindSubscriber`, см. `docs/mind.md`).
 
 ### Выполнение навыка (`execute()`)
 

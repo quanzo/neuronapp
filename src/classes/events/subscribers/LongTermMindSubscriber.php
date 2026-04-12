@@ -19,6 +19,8 @@ use Throwable;
  *
  * Реагирует на {@see EventNameEnum::AGENT_MESSAGE_COMPLETED}, фильтрует служебные сообщения цикла
  * {@see LlmCycleHelper} и пустые тексты, затем дописывает блоки через {@see UserMindMarkdownStorage}.
+ * Если у агента в DTO включено {@see \app\modules\neuron\classes\config\ConfigurationAgent::isExcludeLongTermMind()}
+ * (исполнение Skill/TodoList с `pure_context: true`), запись в `.mind` не выполняется.
  *
  * Пример:
  *
@@ -43,6 +45,11 @@ final class LongTermMindSubscriber
             EventNameEnum::AGENT_MESSAGE_COMPLETED->value,
             static function (mixed $payload): void {
                 if (!$payload instanceof AgentMessageEventDto) {
+                    return;
+                }
+
+                $agent = $payload->getAgent();
+                if ($agent !== null && $agent->isExcludeLongTermMind()) {
                     return;
                 }
 

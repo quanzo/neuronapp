@@ -160,6 +160,9 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             $normalizedStartFromTodoIndex = max(0, $startFromTodoIndex);
 
             $sessionCfg = $this->isPureContext() ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) : $agentCfg;
+            if ($this->isPureContext()) {
+                $sessionCfg->setExcludeLongTermMind(true);
+            }
             EventBus::trigger(
                 EventNameEnum::RUN_STARTED->value,
                 $this,
@@ -208,6 +211,9 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                             $r = $resolvedAgent->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY); // агент с пустой историей
                             $r->setChatHistory($sessionCfg->getChatHistory()); // передаем ему историю текущего контекста исполнения
                             $r->tools       = $sessionCfg->getTools(); // и инструменты
+                            if ($sessionCfg->isExcludeLongTermMind()) {
+                                $r->setExcludeLongTermMind(true);
+                            }
                             $todoSessionCfg = $r;
                             EventBus::trigger(
                                 EventNameEnum::TODO_AGENT_SWITCHED->value,
