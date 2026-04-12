@@ -8,10 +8,12 @@ use app\modules\neuron\classes\dto\mind\MindRecordDto;
 use app\modules\neuron\classes\dto\mind\MindSliceEstimateDto;
 use app\modules\neuron\classes\neuron\trimmers\TokenCounter;
 use app\modules\neuron\helpers\JsonHelper;
+use app\modules\neuron\helpers\MarkdownChunckHelper;
 use app\modules\neuron\helpers\MindStorageFilenameHelper;
 use DateTimeImmutable;
 use DateTimeInterface;
 use NeuronAI\Chat\Enums\MessageRole;
+use InvalidArgumentException;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
 use RuntimeException;
 
@@ -27,7 +29,9 @@ use function fwrite;
 use function fseek;
 use function implode;
 use function is_dir;
+use function mb_strlen;
 use function mkdir;
+use function preg_match_all;
 use function preg_replace;
 use function rename;
 use function strlen;
@@ -37,6 +41,7 @@ use function usort;
 use const DIRECTORY_SEPARATOR;
 use const LOCK_EX;
 use const LOCK_SH;
+use const PREG_SET_ORDER;
 
 /**
  * Файловое UTF-8 хранилище долговременной памяти сообщений пользователя (Markdown-блоки + индекс).
@@ -52,6 +57,7 @@ use const LOCK_SH;
  * $mind = new UserMindMarkdownStorage('/home/user/.neuronapp/.mind', 7);
  * $id = $mind->appendMessage('20260412-120000-1-0', 'user', 'Привет');
  * $row = $mind->getByRecordId($id);
+ * $hits = $mind->searchBlocks('ключевое слово', 5000);
  * ```
  */
 class UserMindMarkdownStorage
@@ -267,6 +273,111 @@ class UserMindMarkdownStorage
                 ->setCharacterCount($chars)
                 ->setTokenCount($tokens);
         });
+    }
+
+    /**
+     * Ищет блоки памяти по тексту или regex, ранжирует по числу и «весу» совпадений, ограничивает суммарный размер.
+     *
+     * Параметр `$query` нормализуется через {@see MarkdownChunckHelper::buildLineRegex()} (regex с разделителями
+     * или обычная строка/фраза). Поиск выполняется по **полному** тексту блока (заголовок и тело).
+     * Блоки без совпадений отбрасываются. Сортировка: больше совпадений → больше суммарная длина совпадений в символах
+     * UTF-8 → больший `recordId`. При лимите `maxChars` блоки добавляются по этому порядку целиком; не помещающийся
+     * блок пропускается, перебор продолжается (могут попасть более слабые, но меньшие по размеру блоки).
+     *
+     * @param string    $query    Строка поиска (regex с `/…/` и модификаторами или обычный текст).
+     * @param int|null  $maxChars Максимум суммарных символов UTF-8 возвращаемых блоков; `null` — без ограничения; по умолчанию 100000.
+     *
+     * @return list<MindRecordDto> Отсортированные подходящие блоки с учётом лимита.
+     */
+    public function searchBlocks(string $query, ?int $maxChars = 100000): array
+    {
+        if ($query === '') {
+            throw new InvalidArgumentException('Параметр query не должен быть пустым.');
+        }
+        if ($maxChars !== null && $maxChars <= 0) {
+            throw new InvalidArgumentException('Параметр maxChars должен быть больше 0 или null.');
+        }
+
+        $regex = MarkdownChunckHelper::buildLineRegex($query, false);
+
+        return $this->withSharedLock(function () use ($regex, $maxChars): array {
+            $entries = $this->loadIndexEntriesUnlocked();
+            usort($entries, static fn(array $a, array $b): int => $a['offset'] <=> $b['offset']);
+
+            /** @var list<array{raw: string, dto: MindRecordDto, matches: int, matchCharLen: int, recordId: int, utf8Len: int}> $candidates */
+            $candidates = [];
+            foreach ($entries as $entry) {
+                $raw = $this->readBlockBytesUnlocked((int) $entry['offset'], (int) $entry['length']);
+                if ($raw === '') {
+                    continue;
+                }
+                $score = $this->scoreRawBlock($raw, $regex);
+                if ($score === null) {
+                    continue;
+                }
+                $dto = $this->parseBlockString($raw);
+                if ($dto === null) {
+                    continue;
+                }
+                $candidates[] = [
+                    'raw'          => $raw,
+                    'dto'          => $dto,
+                    'matches'      => $score['matches'],
+                    'matchCharLen' => $score['matchCharLen'],
+                    'recordId'     => $dto->getRecordId(),
+                    'utf8Len'      => mb_strlen($raw, 'UTF-8'),
+                ];
+            }
+
+            usort(
+                $candidates,
+                static function (array $a, array $b): int {
+                    if ($a['matches'] !== $b['matches']) {
+                        return $b['matches'] <=> $a['matches'];
+                    }
+                    if ($a['matchCharLen'] !== $b['matchCharLen']) {
+                        return $b['matchCharLen'] <=> $a['matchCharLen'];
+                    }
+
+                    return $b['recordId'] <=> $a['recordId'];
+                }
+            );
+
+            $out = [];
+            $totalUtf8 = 0;
+            foreach ($candidates as $c) {
+                if ($maxChars !== null && $totalUtf8 + $c['utf8Len'] > $maxChars) {
+                    continue;
+                }
+                $out[] = $c['dto'];
+                $totalUtf8 += $c['utf8Len'];
+            }
+
+            return $out;
+        });
+    }
+
+    /**
+     * Считает совпадения regex в сыром блоке для ранжирования.
+     *
+     * @return array{matches: int, matchCharLen: int}|null null, если совпадений нет или ошибка PCRE.
+     */
+    private function scoreRawBlock(string $raw, string $regex): ?array
+    {
+        $n = @preg_match_all($regex, $raw, $matches, PREG_SET_ORDER);
+        if ($n === false || $n < 1) {
+            return null;
+        }
+
+        $matchCharLen = 0;
+        foreach ($matches as $set) {
+            $matchCharLen += mb_strlen($set[0], 'UTF-8');
+        }
+
+        return [
+            'matches'      => $n,
+            'matchCharLen' => $matchCharLen,
+        ];
     }
 
     /**

@@ -6,6 +6,7 @@ namespace Tests\Storage;
 
 use app\modules\neuron\classes\dto\mind\MindRecordDto;
 use app\modules\neuron\classes\storage\UserMindMarkdownStorage;
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -187,6 +188,152 @@ class UserMindMarkdownStorageTest extends TestCase
         $s = new UserMindMarkdownStorage($this->tmpMind, 'foo/bar');
         $s->appendMessage('sk', 'user', 'x', null);
         $this->assertFileExists($this->tmpMind . '/user_foo_bar.md');
+    }
+
+    /**
+     * Пустое хранилище: поиск возвращает пустой массив.
+     */
+    public function testSearchBlocksEmptyStoreReturnsEmptyArray(): void
+    {
+        $s = new UserMindMarkdownStorage($this->tmpMind, 200);
+        $this->assertSame([], $s->searchBlocks('anything'));
+    }
+
+    /**
+     * Ранжирование: больше вхождений паттерна — выше в результате (regex `/hit/u`).
+     */
+    public function testSearchBlocksSortsByMatchCountDescending(): void
+    {
+        $s = new UserMindMarkdownStorage($this->tmpMind, 201);
+        $s->appendMessage('sk', 'user', 'one hit', null);
+        $s->appendMessage('sk', 'user', 'hit hit hit', null);
+        $rows = $s->searchBlocks('/hit/u');
+        $this->assertCount(2, $rows);
+        $this->assertStringContainsString('hit hit hit', $rows[0]->getBody());
+        $this->assertStringContainsString('one hit', $rows[1]->getBody());
+    }
+
+    /**
+     * maxChars: слишком большой первый блок пропускается, помещается меньший по рангу следующий.
+     */
+    public function testSearchBlocksMaxCharsSkipsOversizedBlock(): void
+    {
+        $s = new UserMindMarkdownStorage($this->tmpMind, 202);
+        $s->appendMessage('sk', 'user', str_repeat('hit ', 50), null);
+        $s->appendMessage('sk', 'user', 'hit', null);
+        $raw = (string) file_get_contents($this->tmpMind . '/user_202.md');
+        $parts = explode("\n\n\n\n", $raw);
+        $this->assertCount(2, $parts);
+        $len2 = mb_strlen($parts[1], 'UTF-8');
+        $this->assertGreaterThan($len2 + 10, mb_strlen($parts[0], 'UTF-8'));
+
+        $rows = $s->searchBlocks('/hit/u', $len2 + 1);
+        $this->assertCount(1, $rows);
+        $this->assertSame('hit', $rows[0]->getBody());
+    }
+
+    /**
+     * maxChars: null — без ограничения суммарного размера (все совпавшие блоки).
+     */
+    public function testSearchBlocksNullMaxCharsReturnsAllMatches(): void
+    {
+        $s = new UserMindMarkdownStorage($this->tmpMind, 203);
+        $s->appendMessage('sk', 'user', 'a', null);
+        $s->appendMessage('sk', 'user', 'a b', null);
+        $rows = $s->searchBlocks('/a/u', null);
+        $this->assertCount(2, $rows);
+    }
+
+    /**
+     * Пустой query — InvalidArgumentException.
+     */
+    public function testSearchBlocksEmptyQueryThrows(): void
+    {
+        $s = new UserMindMarkdownStorage($this->tmpMind, 204);
+        $s->appendMessage('sk', 'user', 'x', null);
+        $this->expectException(InvalidArgumentException::class);
+        $s->searchBlocks('');
+    }
+
+    /**
+     * maxChars <= 0 — InvalidArgumentException (некорректные данные).
+     */
+    public function testSearchBlocksNonPositiveMaxCharsThrows(): void
+    {
+        $s = new UserMindMarkdownStorage($this->tmpMind, 205);
+        $this->expectException(InvalidArgumentException::class);
+        $s->searchBlocks('x', 0);
+    }
+
+    /**
+     * Нет совпадений — пустой массив.
+     */
+    public function testSearchBlocksNoMatchesReturnsEmpty(): void
+    {
+        $s = new UserMindMarkdownStorage($this->tmpMind, 206);
+        $s->appendMessage('sk', 'user', 'no match here', null);
+        $this->assertSame([], $s->searchBlocks('/ZZZZ/u'));
+    }
+
+    /**
+     * Невалидный regex при виде «regex» — исключение из buildLineRegex.
+     */
+    public function testSearchBlocksInvalidRegexThrows(): void
+    {
+        $s = new UserMindMarkdownStorage($this->tmpMind, 207);
+        $s->appendMessage('sk', 'user', 'x', null);
+        $this->expectException(InvalidArgumentException::class);
+        $s->searchBlocks('/(/u');
+    }
+
+    /**
+     * UTF-8: поиск по обычному тексту с кириллицей (фразовый режим buildLineRegex).
+     */
+    public function testSearchBlocksUtf8Query(): void
+    {
+        $s = new UserMindMarkdownStorage($this->tmpMind, 208);
+        $s->appendMessage('sk', 'user', '€Язык', null);
+        $rows = $s->searchBlocks('Язык');
+        $this->assertCount(1, $rows);
+        $this->assertStringContainsString('Язык', $rows[0]->getBody());
+    }
+
+    /**
+     * При равных метриках совпадений сортировка по убыванию recordId (новее выше).
+     */
+    public function testSearchBlocksTieBreaksByRecordIdDescending(): void
+    {
+        $s = new UserMindMarkdownStorage($this->tmpMind, 209);
+        $s->appendMessage('sk', 'user', 'same', null);
+        $s->appendMessage('sk', 'user', 'same', null);
+        $rows = $s->searchBlocks('/same/u');
+        $this->assertCount(2, $rows);
+        $this->assertSame(2, $rows[0]->getRecordId());
+        $this->assertSame(1, $rows[1]->getRecordId());
+    }
+
+    /**
+     * Совпадение в заголовке блока (sessionKey в тексте) учитывается при поиске по raw.
+     */
+    public function testSearchBlocksMatchesHeaderLine(): void
+    {
+        $s = new UserMindMarkdownStorage($this->tmpMind, 210);
+        $s->appendMessage('unique-session-xyz', 'user', 'body', null);
+        $rows = $s->searchBlocks('/unique-session-xyz/u');
+        $this->assertCount(1, $rows);
+        $this->assertSame('unique-session-xyz', $rows[0]->getSessionKey());
+    }
+
+    /**
+     * Дефолтный maxChars 100000 не отсекает два небольших блока.
+     */
+    public function testSearchBlocksDefaultMaxCharsFitsTypicalBlocks(): void
+    {
+        $s = new UserMindMarkdownStorage($this->tmpMind, 211);
+        $s->appendMessage('sk', 'user', 'p1', null);
+        $s->appendMessage('sk', 'user', 'p2', null);
+        $rows = $s->searchBlocks('/p/u');
+        $this->assertCount(2, $rows);
     }
 
     private function removeTree(string $dir): void
