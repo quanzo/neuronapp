@@ -33,7 +33,6 @@ use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
 use app\modules\neuron\classes\dto\events\AgentMessageErrorEventDto;
-use app\modules\neuron\classes\dto\events\LlmTurnCompletedEventDto;
 use app\modules\neuron\classes\dto\run\RunStateDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\logger\ContextualLogger;
@@ -325,27 +324,15 @@ class ConfigurationAgent implements IDependConfigApp
          * @var Agent|RAG $agent
          */
 
-        $start = microtime(true);
-        $this->triggerAgentMessageStarted($attachmentsCount, $isStructured);
-
         try {
             $this->appendAttachmentsToMessage($message, $attachments);
-            $response = $this->dispatchMessageToAgent($agent, $message);
+            $response = $this->dispatchMessageToAgent($agent, $message, $attachmentsCount, $isStructured);
         } catch (\Throwable $e) {
-            $duration = $this->calculateDurationSeconds($start);
-            $this->triggerAgentMessageFailed($attachmentsCount, $isStructured, $duration, $e);
             $this->getLogger()->error('Ошибка при отправке сообщения агенту', array_merge(
                 $this->getLogContext(),
                 ['exception' => $e]
             ));
             throw $e;
-        }
-
-        $duration = $this->calculateDurationSeconds($start);
-        $this->triggerAgentMessageCompleted($attachmentsCount, $isStructured, $duration);
-
-        if (!$this->hasStructuredResponseClass()) {
-            $this->publishLlmTurnCompletedAfterChatTurn($message, $response);
         }
 
         /**
@@ -397,27 +384,93 @@ class ConfigurationAgent implements IDependConfigApp
     /**
      * Отправляет сообщение агенту и при сбое пытается восстановить рабочий цикл.
      *
-     * @param AgentInterface $agent   Экземпляр агента.
-     * @param NeuronMessage $message Сообщение с уже прикреплёнными вложениями.
+     * @param AgentInterface $agent            Экземпляр агента.
+     * @param NeuronMessage  $message          Сообщение с уже прикреплёнными вложениями.
+     * @param int            $attachmentsCount Число вложений (метаданные события).
+     * @param bool           $isStructured     Режим structured output.
      *
      * @return mixed Ответ агента или null, если после восстановления исходный ответ недоступен.
      *
      * @throws RuntimeException При неуспешном восстановлении рабочего цикла агента.
      */
-    private function dispatchMessageToAgent(AgentInterface $agent, NeuronMessage $message): mixed
-    {
+    private function dispatchMessageToAgent(
+        AgentInterface $agent,
+        NeuronMessage $message,
+        int $attachmentsCount,
+        bool $isStructured
+    ): mixed {
+        $start = microtime(true);
+        $this->triggerAgentMessageStarted($attachmentsCount, $isStructured, $message);
+
         try {
-            return $this->performAgentRequest($agent, $message);
-        } catch (\Throwable) {
-            $cycles = LlmCycleHelper::waitCycleAgent($agent, 5, 7);
-            if (!empty($cycles['error'])) {
-                throw new RuntimeException(
-                    !empty($cycles['errorMsg']) ? $cycles['errorMsg'] : 'Ошибка при отправке сообщения в чат'
-                );
+            $response = $this->performAgentRequest($agent, $message);
+        } catch (\Throwable $performError) {
+            if (!($agent instanceof Agent) && !($agent instanceof RAG)) {
+                $duration = $this->calculateDurationSeconds($start);
+                $this->triggerAgentMessageFailed($attachmentsCount, $isStructured, $message, $duration, $performError);
+                throw $performError;
             }
+
+            try {
+                $cycles = LlmCycleHelper::waitCycleAgent($agent, 5, 7);
+            } catch (\Throwable $waitThrown) {
+                $duration = $this->calculateDurationSeconds($start);
+                $this->triggerAgentMessageFailed($attachmentsCount, $isStructured, $message, $duration, $waitThrown);
+                throw $waitThrown;
+            }
+
+            if (!empty($cycles['error'])) {
+                $duration = $this->calculateDurationSeconds($start);
+                $wrapped = new RuntimeException(
+                    !empty($cycles['errorMsg']) ? (string) $cycles['errorMsg'] : 'Ошибка при отправке сообщения в чат'
+                );
+                $this->triggerAgentMessageFailed($attachmentsCount, $isStructured, $message, $duration, $wrapped);
+                throw $wrapped;
+            }
+
+            $duration = $this->calculateDurationSeconds($start);
+            $this->triggerAgentMessageCompleted(
+                $attachmentsCount,
+                $isStructured,
+                $message,
+                null,
+                $duration
+            );
 
             return null;
         }
+
+        $duration = $this->calculateDurationSeconds($start);
+        $incoming = $this->resolveIncomingMessageForCompleted($response);
+        $this->triggerAgentMessageCompleted(
+            $attachmentsCount,
+            $isStructured,
+            $message,
+            $incoming,
+            $duration
+        );
+
+        return $response;
+    }
+
+    /**
+     * Определяет входящее сообщение (ответ ассистента) для события `agent.message.completed`.
+     *
+     * @param mixed $response Сырой ответ {@see performAgentRequest()}.
+     */
+    private function resolveIncomingMessageForCompleted(mixed $response): ?NeuronMessage
+    {
+        if ($response instanceof NeuronMessage) {
+            return $response;
+        }
+
+        if (!$this->hasStructuredResponseClass()) {
+            return null;
+        }
+
+        $messages = ChatHistoryEditHelper::getMessages($this->getChatHistory());
+
+        return self::findLastAssistantMessageForMind($messages);
     }
 
     /**
@@ -431,43 +484,12 @@ class ConfigurationAgent implements IDependConfigApp
     private function performAgentRequest(AgentInterface $agent, NeuronMessage $message): mixed
     {
         if ($this->hasStructuredResponseClass()) {
-            $structuredOutput = $agent->structured($message, $this->reponseStructClass, 2);
-            if ($agent instanceof Agent || $agent instanceof RAG) {
-                $this->publishLlmTurnCompletedAfterStructured($message);
-            }
-
-            return $structuredOutput;
+            return $agent->structured($message, $this->reponseStructClass, 2);
         }
 
         $handler = $agent->chat($message);
 
         return $handler->getMessage();
-    }
-
-    /**
-     * Публикует `llm.turn.completed` после structured-ветки (без {@see \NeuronAI\Agent\Nodes\ChatNode}).
-     *
-     * @param NeuronMessage $userMessage Сообщение пользователя, переданное в `structured()`.
-     */
-    private function publishLlmTurnCompletedAfterStructured(NeuronMessage $userMessage): void
-    {
-        $messages = ChatHistoryEditHelper::getMessages($this->getChatHistory());
-        $assistant = self::findLastAssistantMessageForMind($messages);
-        $this->triggerLlmTurnCompletedEvent($userMessage, $assistant);
-    }
-
-    /**
-     * Публикует `llm.turn.completed` после обычного `chat()` в рамках {@see sendMessageWithAttachments}.
-     *
-     * Для режима structured output событие уже отправлено из {@see performAgentRequest()}, здесь не дублируем.
-     *
-     * @param NeuronMessage $userMessage Сообщение пользователя (уже с вложениями), отправленное в агент.
-     * @param mixed         $response    Ответ агента: {@see NeuronMessage} или иной тип (DTO/null) — в память уходит только сообщение.
-     */
-    private function publishLlmTurnCompletedAfterChatTurn(NeuronMessage $userMessage, mixed $response): void
-    {
-        $assistant = $response instanceof NeuronMessage ? $response : null;
-        $this->triggerLlmTurnCompletedEvent($userMessage, $assistant);
     }
 
     /**
@@ -491,29 +513,6 @@ class ConfigurationAgent implements IDependConfigApp
     }
 
     /**
-     * Формирует DTO и публикует событие завершённого шага LLM.
-     *
-     * @param NeuronMessage|null $userMessage    User-сторона шага или null.
-     * @param NeuronMessage|null $assistantMessage Ответ ассистента или null.
-     */
-    private function triggerLlmTurnCompletedEvent(?NeuronMessage $userMessage, ?NeuronMessage $assistantMessage): void
-    {
-        $appCfg = $this->getConfigurationApp();
-        $userId = $appCfg !== null ? $appCfg->getUserId() : 0;
-
-        $dto = (new LlmTurnCompletedEventDto())
-            ->setUserId($userId)
-            ->setSessionKey($this->getSessionKey() ?? '')
-            ->setRunId('')
-            ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
-            ->setAgent($this)
-            ->setUserMessage($userMessage)
-            ->setAssistantMessage($assistantMessage);
-
-        EventBus::trigger(EventNameEnum::LLM_TURN_COMPLETED->value, $this, $dto);
-    }
-
-    /**
      * Возвращает длительность операции в секундах с округлением до сотых.
      */
     private function calculateDurationSeconds(float $start): float
@@ -523,26 +522,42 @@ class ConfigurationAgent implements IDependConfigApp
 
     /**
      * Публикует событие начала отправки сообщения агенту.
+     *
+     * @param NeuronMessage $outgoingMessage Сообщение, отправляемое в агент (с вложениями).
      */
-    private function triggerAgentMessageStarted(int $attachmentsCount, bool $isStructured): void
-    {
+    private function triggerAgentMessageStarted(
+        int $attachmentsCount,
+        bool $isStructured,
+        NeuronMessage $outgoingMessage
+    ): void {
         EventBus::trigger(
             EventNameEnum::AGENT_MESSAGE_STARTED->value,
             $this,
             $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
+                ->setOutgoingMessage($outgoingMessage)
                 ->setDurationSeconds(0.0)
         );
     }
 
     /**
      * Публикует событие успешного завершения отправки сообщения.
+     *
+     * @param NeuronMessage      $outgoingMessage Исходящее сообщение шага.
+     * @param NeuronMessage|null $incomingMessage Ответ ассистента или null.
      */
-    private function triggerAgentMessageCompleted(int $attachmentsCount, bool $isStructured, float $duration): void
-    {
+    private function triggerAgentMessageCompleted(
+        int $attachmentsCount,
+        bool $isStructured,
+        NeuronMessage $outgoingMessage,
+        ?NeuronMessage $incomingMessage,
+        float $duration
+    ): void {
         EventBus::trigger(
             EventNameEnum::AGENT_MESSAGE_COMPLETED->value,
             $this,
             $this->buildAgentMessageEventDto($attachmentsCount, $isStructured)
+                ->setOutgoingMessage($outgoingMessage)
+                ->setIncomingMessage($incomingMessage)
                 ->setDurationSeconds($duration)
         );
     }
@@ -550,15 +565,18 @@ class ConfigurationAgent implements IDependConfigApp
     /**
      * Публикует событие ошибки при отправке сообщения агенту.
      *
-     * @param \Throwable $error Перехваченное исключение.
+     * @param NeuronMessage $outgoingMessage Сообщение, при отправке которого произошла ошибка.
+     * @param \Throwable    $error           Перехваченное исключение.
      */
     private function triggerAgentMessageFailed(
         int $attachmentsCount,
         bool $isStructured,
+        NeuronMessage $outgoingMessage,
         float $duration,
         \Throwable $error
     ): void {
         $dto = $this->buildAgentMessageErrorEventDto($attachmentsCount, $isStructured);
+        $dto->setOutgoingMessage($outgoingMessage);
         $dto->setDurationSeconds($duration);
         $dto->setErrorClass($error::class);
         $dto->setErrorMessage($error->getMessage());

@@ -81,11 +81,10 @@ BaseEventDto (implements IArrayable, Stringable)
 │   ├── OrchestratorErrorEventDto  (implements IErrorEvent; +errorClass, +errorMessage)
 │   └── OrchestratorResumeHistoryMissingEventDto  (+todolistName, +lastCompletedTodoIndex, +startFromTodoIndex)
 │
-├── AgentMessageEventDto  (attachmentsCount, structured, durationSeconds)
-│   └── AgentMessageErrorEventDto  (implements IErrorEvent; +errorClass, +errorMessage)
+├── AgentMessageEventDto  (outgoingMessage?, incomingMessage?, attachmentsCount, structured, durationSeconds)
+│   └── AgentMessageErrorEventDto  (implements IErrorEvent; +errorClass, +errorMessage; исходящее сообщение в родительских полях)
 │
 ├── LlmInferenceEventDto  (toolsCount, toolsNames, toolRequiredParams, instructionsPreview, instructionsLength, userMessagePreview, userMessageLength, messagesCount?, messagesSanitized?)
-└── LlmTurnCompletedEventDto  (userId, userMessage?, assistantMessage?; базовые sessionKey/runId/timestamp/agent)
 ```
 
 ### Принцип разделения normal/error
@@ -153,9 +152,9 @@ BaseEventDto (implements IArrayable, Stringable)
 - `tool.failed` — ошибка инструмента (payload: `ToolErrorEventDto`)
 
 ### Agent Message
-- `agent.message.started` — начало запроса к LLM (payload: `AgentMessageEventDto`)
-- `agent.message.completed` — успешный ответ LLM (payload: `AgentMessageEventDto`)
-- `agent.message.failed` — ошибка запроса к LLM (payload: `AgentMessageErrorEventDto`)
+- `agent.message.started` — начало запроса к LLM (payload: `AgentMessageEventDto` с заполненным `outgoingMessage`)
+- `agent.message.completed` — успешный шаг отправки (payload: `AgentMessageEventDto` с `outgoingMessage` и опционально `incomingMessage` — ответ ассистента или null при structured без сообщения / после wait-cycle без ответа)
+- `agent.message.failed` — ошибка запроса к LLM (payload: `AgentMessageErrorEventDto` с `outgoingMessage` и полями ошибки)
 
 ### Orchestrator
 - `orchestrator.cycle_started` — начало цикла (payload: `OrchestratorEventDto`)
@@ -167,7 +166,6 @@ BaseEventDto (implements IArrayable, Stringable)
 
 ### LLM Inference
 - `llm.inference.prepared` — контекст инференса подготовлен и готов к отправке провайдеру (payload: `LlmInferenceEventDto`)
-- `llm.turn.completed` — завершён один шаг диалога user → assistant после ответа провайдера (payload: `LlmTurnCompletedEventDto`); см. `docs/mind.md`
 
 ## Подписчики
 
@@ -181,7 +179,7 @@ BaseEventDto (implements IArrayable, Stringable)
 - `TodoListLoggingSubscriber` — логирует `todo.*` события в PSR-3 логгер.
 - `OrchestratorLoggingSubscriber` — логирует события `orchestrator.*` из `TodoListOrchestrator` в PSR-3 логгер.
 - `LlmInferenceLoggingSubscriber` — логирует `llm.inference.prepared` в PSR-3 логгер (уровень `info`).
-- `LongTermMindSubscriber` — пишет `llm.turn.completed` в файлы `.mind` (см. `docs/mind.md`).
+- `LongTermMindSubscriber` — пишет `agent.message.completed` в файлы `.mind` (см. `docs/mind.md`).
 
 Подписчики используют `(string) $payload` как сообщение PSR-3 и `$payload->toArray()` как контекст.
 Формат сообщения: `"<Domain> event: <action> | [<Tag>] key=value | key=value | ..."`.

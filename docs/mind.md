@@ -1,6 +1,6 @@
 # Долговременная память сообщений (`.mind`)
 
-Каталог `.mind` в рабочем окружении приложения хранит Markdown-файлы с перепиской по пользователю. Запись выполняется подписчиком `LongTermMindSubscriber` по событию `llm.turn.completed`.
+Каталог `.mind` в рабочем окружении приложения хранит Markdown-файлы с перепиской по пользователю. Запись выполняется подписчиком `LongTermMindSubscriber` по событию `agent.message.completed`.
 
 ## Расположение
 
@@ -33,11 +33,10 @@
 
 ## Событие и фильтрация
 
-- Событие: `EventNameEnum::LLM_TURN_COMPLETED` (`llm.turn.completed`).
-- DTO: `LlmTurnCompletedEventDto` (`userId`, `sessionKey`, опционально `userMessage` / `assistantMessage`, базовые поля `BaseEventDto`).
-- Публикация (только `ConfigurationAgent`, без смешивания с низкоуровневым `LoggingChatNode`):
-  - после успешного `sendMessageWithAttachments` для обычного диалога: внутри `ConfigurationAgent` после ответа `chat()` (если не включён structured output);
-  - после `structured()`: в `ConfigurationAgent::performAgentRequest()` (ветка без `ChatNode`).
+- Событие: `EventNameEnum::AGENT_MESSAGE_COMPLETED` (`agent.message.completed`).
+- DTO: `AgentMessageEventDto` — `outgoingMessage` (отправленное в агент), `incomingMessage` (ответ ассистента как `NeuronMessage`, если есть: из `chat()` или последнее assistant-сообщение из истории после `structured()`), плюс `attachmentsCount`, `structured`, `durationSeconds`, базовые поля `BaseEventDto`.
+- Публикация: `ConfigurationAgent::dispatchMessageToAgent()` после успешного `performAgentRequest()` (включая structured и обычный `chat()`), а также после успешного wait-cycle без исключения (в этом случае `incomingMessage` может быть null).
+- Идентификатор пользователя для файлов `.mind` берётся из `ConfigurationApp::getUserId()` внутри подписчика.
 - `LongTermMindSubscriber` не пишет сообщения, распознанные как служебные циклом `LlmCycleHelper` (`isCycleEmptyMsg`, `isCycleRequestMsg`, `isCycleResponseMsg`), и не пишет пустой текст после нормализации тела.
 
 Регистрация подписчика: `AbstractAgentCommand::resolveFileLogger()` рядом с остальными logging-subscribers.

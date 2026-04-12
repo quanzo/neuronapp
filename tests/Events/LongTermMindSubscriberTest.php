@@ -6,7 +6,7 @@ namespace Tests\Events;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
-use app\modules\neuron\classes\dto\events\LlmTurnCompletedEventDto;
+use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\events\subscribers\LongTermMindSubscriber;
 use app\modules\neuron\classes\storage\UserMindMarkdownStorage;
@@ -62,30 +62,28 @@ class LongTermMindSubscriberTest extends TestCase
         $normalUser = new NeuronMessage(MessageRole::USER, 'Реальный вопрос');
         $assistantCycle = new NeuronMessage(MessageRole::ASSISTANT, 'YES');
 
-        $dto = (new LlmTurnCompletedEventDto())
-            ->setUserId(501)
+        $dto = (new AgentMessageEventDto())
             ->setSessionKey('20260412-120000-1-0')
             ->setRunId('')
             ->setTimestamp('2026-04-12T12:00:00+00:00')
-            ->setUserMessage($cycleUser)
-            ->setAssistantMessage($assistantCycle);
+            ->setOutgoingMessage($cycleUser)
+            ->setIncomingMessage($assistantCycle);
 
-        EventBus::trigger(EventNameEnum::LLM_TURN_COMPLETED->value, '*', $dto);
+        EventBus::trigger(EventNameEnum::AGENT_MESSAGE_COMPLETED->value, '*', $dto);
 
         $storage = new UserMindMarkdownStorage(ConfigurationApp::getInstance()->getMindDir(), 501);
         $this->assertNull($storage->getByRecordId(1));
 
         $assistantOk = new NeuronMessage(MessageRole::ASSISTANT, 'Обычный ответ');
 
-        $dto2 = (new LlmTurnCompletedEventDto())
-            ->setUserId(501)
+        $dto2 = (new AgentMessageEventDto())
             ->setSessionKey('20260412-120000-1-0')
             ->setRunId('')
             ->setTimestamp('2026-04-12T12:00:01+00:00')
-            ->setUserMessage($normalUser)
-            ->setAssistantMessage($assistantOk);
+            ->setOutgoingMessage($normalUser)
+            ->setIncomingMessage($assistantOk);
 
-        EventBus::trigger(EventNameEnum::LLM_TURN_COMPLETED->value, '*', $dto2);
+        EventBus::trigger(EventNameEnum::AGENT_MESSAGE_COMPLETED->value, '*', $dto2);
 
         $storage2 = new UserMindMarkdownStorage(ConfigurationApp::getInstance()->getMindDir(), 501);
         $r1 = $storage2->getByRecordId(1);

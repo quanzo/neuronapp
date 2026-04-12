@@ -10,13 +10,15 @@ use app\modules\neuron\traits\HasErrorInfoTrait;
 /**
  * DTO события ошибки отправки сообщения агентом.
  *
- * Расширяет {@see AgentMessageEventDto} полями ошибки (errorClass, errorMessage).
+ * Расширяет {@see AgentMessageEventDto} полями ошибки (errorClass, errorMessage) и наследует
+ * {@see AgentMessageEventDto::setOutgoingMessage()} для фиксации отправленного сообщения.
  * Реализует {@see IErrorEvent} для единообразного распознавания ошибочных событий.
  * Используется для события `agent.message.failed`.
  *
  * Пример использования:
  * ```php
  * $event = (new AgentMessageErrorEventDto())
+ *     ->setOutgoingMessage($userMsg)
  *     ->setAttachmentsCount(1)
  *     ->setStructured(false)
  *     ->setDurationSeconds(30.0)

@@ -47,7 +47,4 @@ enum EventNameEnum: string
 
     /** Контекст инференса подготовлен и готов к отправке провайдеру. */
     case LLM_INFERENCE_PREPARED = 'llm.inference.prepared';
-
-    /** Завершён один шаг диалога (user → assistant) после вызова провайдера. */
-    case LLM_TURN_COMPLETED = 'llm.turn.completed';
 }

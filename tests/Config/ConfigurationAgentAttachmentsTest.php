@@ -165,13 +165,25 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
             $events[] = ['type' => 'completed', 'payload' => $payload];
         }, '*');
 
-        $cfg->sendMessageWithAttachments(new Message(MessageRole::USER, 'hi'), [new TextAttachmentDto('a1')]);
+        $out = new Message(MessageRole::USER, 'hi');
+        $cfg->sendMessageWithAttachments($out, [new TextAttachmentDto('a1')]);
 
         $this->assertCount(2, $events);
         $this->assertSame('started', $events[0]['type']);
         $this->assertSame('completed', $events[1]['type']);
         $this->assertInstanceOf(AgentMessageEventDto::class, $events[0]['payload']);
         $this->assertSame(1, $events[0]['payload']->getAttachmentsCount());
+        /** @var AgentMessageEventDto $started */
+        $started = $events[0]['payload'];
+        $this->assertNotNull($started->getOutgoingMessage());
+        $this->assertSame($out, $started->getOutgoingMessage(), 'started: тот же экземпляр после прикрепления вложений');
+        $this->assertNull($started->getIncomingMessage());
+        /** @var AgentMessageEventDto $completed */
+        $completed = $events[1]['payload'];
+        $this->assertNotNull($completed->getOutgoingMessage());
+        $this->assertSame($out, $completed->getOutgoingMessage());
+        $this->assertNotNull($completed->getIncomingMessage());
+        $this->assertSame('ok', $completed->getIncomingMessage()->getContent());
     }
 
     public function testSendMessageWithAttachmentsEmitsFailedEventOnException(): void
@@ -212,5 +224,7 @@ final class ConfigurationAgentAttachmentsTest extends TestCase
 
         $this->assertInstanceOf(AgentMessageErrorEventDto::class, $failedPayload);
         $this->assertSame(\RuntimeException::class, $failedPayload->getErrorClass());
+        $this->assertNotNull($failedPayload->getOutgoingMessage());
+        $this->assertSame('hi', $failedPayload->getOutgoingMessage()->getContent());
     }
 }

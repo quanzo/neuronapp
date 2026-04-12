@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\events\subscribers;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
-use app\modules\neuron\classes\dto\events\LlmTurnCompletedEventDto;
+use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\storage\UserMindMarkdownStorage;
 use app\modules\neuron\enums\EventNameEnum;
@@ -17,7 +17,7 @@ use Throwable;
 /**
  * Подписчик записи завершённых шагов LLM в долговременную память `.mind`.
  *
- * Реагирует на {@see EventNameEnum::LLM_TURN_COMPLETED}, фильтрует служебные сообщения цикла
+ * Реагирует на {@see EventNameEnum::AGENT_MESSAGE_COMPLETED}, фильтрует служебные сообщения цикла
  * {@see LlmCycleHelper} и пустые тексты, затем дописывает блоки через {@see UserMindMarkdownStorage}.
  *
  * Пример:
@@ -31,7 +31,7 @@ final class LongTermMindSubscriber
     private static bool $isRegistered = false;
 
     /**
-     * Регистрирует обработчик события `llm.turn.completed`.
+     * Регистрирует обработчик события `agent.message.completed`.
      */
     public static function register(): void
     {
@@ -40,9 +40,9 @@ final class LongTermMindSubscriber
         }
 
         EventBus::on(
-            EventNameEnum::LLM_TURN_COMPLETED->value,
+            EventNameEnum::AGENT_MESSAGE_COMPLETED->value,
             static function (mixed $payload): void {
-                if (!$payload instanceof LlmTurnCompletedEventDto) {
+                if (!$payload instanceof AgentMessageEventDto) {
                     return;
                 }
 
@@ -52,7 +52,8 @@ final class LongTermMindSubscriber
                     return;
                 }
 
-                $storage = new UserMindMarkdownStorage($mindDir, $payload->getUserId());
+                $userId = ConfigurationApp::getInstance()->getUserId();
+                $storage = new UserMindMarkdownStorage($mindDir, $userId);
                 $sessionKey = $payload->getSessionKey();
                 if ($sessionKey === '') {
                     $sessionKey = 'unknown';
@@ -60,7 +61,7 @@ final class LongTermMindSubscriber
 
                 $captured = self::parseCapturedAt($payload->getTimestamp());
 
-                $user = $payload->getUserMessage();
+                $user = $payload->getOutgoingMessage();
                 if (
                     $user !== null
                     && !LlmCycleHelper::isCycleEmptyMsg($user)
@@ -72,7 +73,7 @@ final class LongTermMindSubscriber
                     }
                 }
 
-                $assistant = $payload->getAssistantMessage();
+                $assistant = $payload->getIncomingMessage();
                 if (
                     $assistant !== null
                     && !LlmCycleHelper::isCycleEmptyMsg($assistant)
