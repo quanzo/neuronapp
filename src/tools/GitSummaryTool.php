@@ -47,7 +47,9 @@ class GitSummaryTool extends ATool
     ) {
         parent::__construct(name: $name, description: $description);
 
-        $this->workingDirectory = $workingDirectory !== '' ? $workingDirectory : (string) getcwd();
+        // workingDirectory по умолчанию будет подставлен из ConfigurationApp::getStartDir()
+        // в {@see ATool::setAgentCfg()}.
+        $this->workingDirectory = $workingDirectory;
         $this->logLimit = $logLimit;
     }
 

@@ -267,6 +267,26 @@ class ConfigurationApp
     }
 
     /**
+     * Возвращает директорию старта приложения.
+     *
+     * По соглашению проекта директория старта — это **самая приоритетная** базовая
+     * директория в {@see DirPriority}, которая задаётся при bootstrap (обычно это
+     * {@see getcwd()} на момент запуска `bin/console.php`).
+     *
+     * @return string Абсолютный путь к директории старта.
+     *
+     * @throws RuntimeException Если директория старта не определена.
+     */
+    public function getStartDir(): string
+    {
+        $path = $this->dirPriority->resolveDir('');
+        if ($path === null || $path === '') {
+            throw new RuntimeException('Директория старта не определена.');
+        }
+        return $path;
+    }
+
+    /**
      * Возвращает полный путь к директории долговременной памяти сообщений.
      *
      * Путь формируется через {@see DirPriority::resolveDir()} для {@see getMindDirName()}.

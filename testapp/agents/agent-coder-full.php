@@ -1,8 +1,7 @@
 <?php
 
 /**
- * Пример конфигурации агента "coder" — помощник по программированию.
- * Скопируйте в agents/coder.php для использования.
+ * Кодер со всеми инструментами
  */
 
 use app\modules\neuron\helpers\CallableWrapper;
@@ -78,15 +77,7 @@ return [
         [VarSetTool::class, 'make'],
         [VarListTool::class, 'make'],
         [VarPadTool::class, 'make'],
-        
-        
-        
-        [CurrentDateTimeTool::class, 'make'],
-        [ChatHistorySizeTool::class, 'make'],
-        [ChatHistoryMetaTool::class, 'make'],
-        [ChatHistoryMessageTool::class, 'make'],
-        /*
-        [FactorialTool::class, 'make'],
+
         [
             CallableWrapper::class,
             'call',
@@ -100,16 +91,34 @@ return [
                 'description'      => 'Статус git'
             ],
         ],
-        */
-        [GlobTool::class, 'make'],
-        [GrepTool::class, 'make'],
+
+        // Поиск по содержимому файлов
+        [
+            CallableWrapper::class,
+            'createObject',
+            'class'        => GrepTool::class,
+            //'basePath'     => dirname(__DIR__, 2),
+            'maxMatches'   => 200,
+            'maxFileSize'  => 2 * 1024 * 1024,
+            'excludePatterns' => ['.git', 'temp'],
+        ],
+
+        // Поиск файлов по маске
+        [
+            CallableWrapper::class,
+            'createObject',
+            'class'        => GlobTool::class,
+            //'basePath'     => dirname(__DIR__, 2),
+            'maxResults'   => 2000,
+            'excludePatterns' => ['.git', 'temp'],
+        ],
+
         [ViewTool::class, 'make'],
 
     ],
 
-    /**/
     'mcp' => [
-        /*
+
         [
             // Поиск
             CallableWrapper::class,
@@ -141,7 +150,6 @@ return [
                 //"headers" => ["CONTEXT7_API_KEY" => "ctx7sk-7010e527-1111-4d81-983e-1111111"],
             ]
         ],
-        */
 
         /*
         [
@@ -154,7 +162,6 @@ return [
             ]
         ],
         //*/
-
     ]
     //*/
 ];

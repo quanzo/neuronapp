@@ -46,7 +46,9 @@ class SearchReplaceTool extends ATool
         string $description = 'Поиск и замена текста в файлах с поддержкой dry-run и отчётом по изменениям.',
     ) {
         parent::__construct(name: $name, description: $description);
-        $this->basePath = $basePath !== '' ? $basePath : (string) getcwd();
+        // basePath по умолчанию будет подставлен из ConfigurationApp::getStartDir()
+        // в {@see ATool::setAgentCfg()}.
+        $this->basePath = $basePath;
         $this->maxReplacements = $maxReplacements;
     }
 

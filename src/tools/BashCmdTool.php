@@ -99,13 +99,27 @@ class BashCmdTool extends ATool
 
         $this->commandTemplate = $commandTemplate;
         $this->executor = new BashTool(
-            defaultTimeout: $defaultTimeout,
-            maxOutputSize: $maxOutputSize,
+            defaultTimeout  : $defaultTimeout,
+            maxOutputSize   : $maxOutputSize,
             workingDirectory: $workingDirectory,
-            allowedPatterns: $allowedPatterns,
-            blockedPatterns: $blockedPatterns,
-            env: $env,
+            allowedPatterns : $allowedPatterns,
+            blockedPatterns : $blockedPatterns,
+            env             : $env,
         );
+    }
+
+    /**
+     * Устанавливает конфигурацию агента для инструмента и делегата-исполнителя.
+     *
+     * @param \app\modules\neuron\classes\config\ConfigurationAgent $agentCfg
+     *
+     * @return static
+     */
+    public function setAgentCfg(\app\modules\neuron\classes\config\ConfigurationAgent $agentCfg): static
+    {
+        parent::setAgentCfg($agentCfg);
+        $this->executor->setAgentCfg($agentCfg);
+        return $this;
     }
 
     /**

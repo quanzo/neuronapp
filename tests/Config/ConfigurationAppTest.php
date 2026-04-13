@@ -276,6 +276,22 @@ class ConfigurationAppTest extends TestCase
         $this->assertSame($this->tmpDir . '/.logs', $logDir);
     }
 
+    /**
+     * getStartDir() возвращает самую приоритетную базовую директорию (директорию старта).
+     */
+    public function testGetStartDirReturnsFirstPriorityDir(): void
+    {
+        $secondDir = sys_get_temp_dir() . '/neuronapp_appconf_second_' . uniqid();
+        mkdir($secondDir, 0777, true);
+        try {
+            $dp = new DirPriority([$this->tmpDir, $secondDir]);
+            ConfigurationApp::init($dp);
+            $this->assertSame($this->tmpDir, ConfigurationApp::getInstance()->getStartDir());
+        } finally {
+            $this->removeDir($secondDir);
+        }
+    }
+
     // ══════════════════════════════════════════════════════════════
     //  mind — долговременная память сообщений
     // ══════════════════════════════════════════════════════════════

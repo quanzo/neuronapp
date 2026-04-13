@@ -1,11 +1,13 @@
 <?php
 
 /**
- * Пример конфигурации агента
+ * Агент для работы с git
  */
 
 use app\modules\neuron\helpers\CallableWrapper;
+use app\modules\neuron\tools\BashTool;
 use app\modules\neuron\tools\GlobTool;
+use app\modules\neuron\tools\GrepTool;
 use app\modules\neuron\tools\VarGetTool;
 use app\modules\neuron\tools\VarListTool;
 use app\modules\neuron\tools\VarPadTool;
@@ -23,7 +25,7 @@ if ($homeDir === false || $homeDir === '') {
 
 $url           = 'http://localhost:11434/api';
 $contextWindow = 8192 * 4 * 2 * 2;
-$prompt        = include (__DIR__ . '/../prompts/system/base.php');
+$prompt        = include (__DIR__ . '/../prompts/system/git.php');
 
 $ar = [
     'enableChatHistory' => true,
@@ -53,8 +55,6 @@ $ar = [
             ],
         ],
         'model' => 'qwen3.5:9b',
-        //'model' => 'qwen3.5:cloud',
-        //'model' => 'gemma4:e4b',
     ],
 
     'instructions' => [
@@ -71,11 +71,46 @@ $ar = [
         [VarSetTool::class, 'make'],
         [VarListTool::class, 'make'],
         [VarPadTool::class, 'make'],
-    ],
+        
+        [ViewTool::class, 'make'],
 
-    'skills' => [
-        'skill-file-block-summarize',
-        'skill-text-finder'
+        // Поиск по содержимому файлов
+        [
+            CallableWrapper::class,
+            'createObject',
+            'class'        => GrepTool::class,
+            //'basePath'     => dirname(__DIR__, 2),
+            'maxMatches'   => 200,
+            'maxFileSize'  => 2 * 1024 * 1024,
+            'excludePatterns' => ['.git', 'temp'],
+        ],
+
+        // Поиск файлов по маске
+        [
+            CallableWrapper::class,
+            'createObject',
+            'class'        => GlobTool::class,
+            //'basePath'     => dirname(__DIR__, 2),
+            'maxResults'   => 2000,
+            'excludePatterns' => ['.git', 'temp'],
+        ],
+
+        // работа с git
+        [
+            CallableWrapper::class,
+            'createObject',
+            'class'        => BashTool::class,
+            'name' => 'git',
+            'description' => 'Работа с репозиторием git',
+            'allowedPatterns' => [
+                '/^git /i'
+            ],
+            'blockedPatterns' => [
+                '/^sudo /',
+                '/^rm /',
+            ],
+        ],
+
     ],
 ];
 return $ar;

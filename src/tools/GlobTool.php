@@ -14,7 +14,6 @@ use NeuronAI\Tools\ToolProperty;
 use function array_slice;
 use function array_values;
 use function count;
-use function getcwd;
 use function glob;
 use function is_dir;
 use function natsort;
@@ -85,7 +84,9 @@ class GlobTool extends ATool
     ) {
         parent::__construct(name: $name, description: $description);
 
-        $this->basePath = $basePath !== '' ? $basePath : (string) getcwd();
+        // basePath по умолчанию будет подставлен из ConfigurationApp::getStartDir()
+        // в {@see ATool::setAgentCfg()}.
+        $this->basePath = $basePath;
         $this->maxResults = $maxResults;
         $this->excludePatterns = $excludePatterns;
         $this->followSymlinks = $followSymlinks;

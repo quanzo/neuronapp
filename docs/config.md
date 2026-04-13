@@ -28,6 +28,8 @@
   - `getLogDirName()` / `getLogDir()` → `.logs`;
   - `getStoreDirName()` / `getStoreDir()` → `.store` (чекпоинты выполнения todolist);
   - `getVarStorage()` — объектное хранилище результатов (`VarStorage`) для директории `.store`;
+- директории и базовые пути:
+  - `getStartDir()` — директория старта приложения (самая приоритетная базовая директория в `DirPriority`, обычно `getcwd()` на момент запуска `bin/console.php`);
 - доступ к настройкам:
   - `getAll(): array<string,mixed>`;
   - `get(string $key, mixed $default = null): mixed` — поддерживает ключи вида `"context_files.allowed_paths"`;

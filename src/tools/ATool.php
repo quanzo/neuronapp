@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\events\ToolEventDto;
 use app\modules\neuron\classes\dto\events\ToolErrorEventDto;
 use app\modules\neuron\classes\events\EventBus;
@@ -39,7 +40,94 @@ abstract class ATool extends Tool
     public function setAgentCfg(ConfigurationAgent $agentCfg): static
     {
         $this->_agentCfg = $agentCfg;
+        $this->applyStartDirDefaultsFromAgentCfg($agentCfg);
         return $this;
+    }
+
+    /**
+     * Применяет директорию старта (ConfigurationApp::getStartDir()) к типовым свойствам инструмента.
+     *
+     * Многие инструменты имеют свойства вроде basePath/workingDirectory и раньше по умолчанию
+     * брали {@see getcwd()}. Но рабочая директория процесса может меняться (chdir),
+     * поэтому закрепляемся на директории старта приложения.
+     *
+     * @param ConfigurationAgent $agentCfg Конфигурация агента текущей сессии.
+     */
+    protected function applyStartDirDefaultsFromAgentCfg(ConfigurationAgent $agentCfg): void
+    {
+        // Сначала проверяем, есть ли смысл вычислять startDir (это может требовать инициализации singleton'а).
+        if (!$this->hasEmptyStringProperty('basePath') && !$this->hasEmptyStringProperty('workingDirectory')) {
+            return;
+        }
+
+        $configApp = $agentCfg->getConfigurationApp();
+        if ($configApp === null) {
+            try {
+                $configApp = ConfigurationApp::getInstance();
+            } catch (\Throwable) {
+                return;
+            }
+        }
+
+        $startDir = $configApp->getStartDir();
+
+        $this->setObjectPropertyIfEmpty('basePath', $startDir);
+        $this->setObjectPropertyIfEmpty('workingDirectory', $startDir);
+    }
+
+    /**
+     * Проверяет наличие строкового свойства со значением '' (или нестроковым значением).
+     *
+     * @param string $propertyName
+     */
+    private function hasEmptyStringProperty(string $propertyName): bool
+    {
+        try {
+            $ref = new \ReflectionObject($this);
+            if (!$ref->hasProperty($propertyName)) {
+                return false;
+            }
+            $prop = $ref->getProperty($propertyName);
+            if ($prop->isStatic()) {
+                return false;
+            }
+            $prop->setAccessible(true);
+            $current = $prop->getValue($this);
+            return !is_string($current) || $current === '';
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Устанавливает свойство объекта в значение по умолчанию, если оно пустое.
+     *
+     * Используем Reflection, т.к. свойства объявлены в конкретных Tool-классах и могут быть protected.
+     *
+     * @param string $propertyName Имя свойства.
+     * @param string $value        Значение по умолчанию.
+     */
+    private function setObjectPropertyIfEmpty(string $propertyName, string $value): void
+    {
+        try {
+            $ref = new \ReflectionObject($this);
+            if (!$ref->hasProperty($propertyName)) {
+                return;
+            }
+            $prop = $ref->getProperty($propertyName);
+            if ($prop->isStatic()) {
+                return;
+            }
+            $prop->setAccessible(true);
+            $current = $prop->getValue($this);
+            if (is_string($current) && $current !== '') {
+                return;
+            }
+            $prop->setValue($this, $value);
+        } catch (\Throwable) {
+            // В случае необычной реализации tool — не мешаем работе инструмента.
+            return;
+        }
     }
 
     /**

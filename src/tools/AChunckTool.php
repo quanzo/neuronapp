@@ -10,7 +10,6 @@ use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
 use function filesize;
-use function getcwd;
 use function is_file;
 use function is_readable;
 use function sprintf;
@@ -47,7 +46,9 @@ abstract class AChunckTool extends ATool
     ) {
         parent::__construct(name: $name, description: $description);
 
-        $this->basePath = $basePath !== '' ? $basePath : (string) getcwd();
+        // basePath по умолчанию будет подставлен из ConfigurationApp::getStartDir()
+        // в {@see ATool::setAgentCfg()}.
+        $this->basePath = $basePath;
         $this->maxFileSize = $maxFileSize;
     }
 

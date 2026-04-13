@@ -18,7 +18,6 @@ use function explode;
 use function file_get_contents;
 use function filesize;
 use function fnmatch;
-use function getcwd;
 use function is_dir;
 use function is_file;
 use function mb_strlen;
@@ -92,11 +91,13 @@ class GrepTool extends ATool
     ) {
         parent::__construct(name: $name, description: $description);
 
-        $this->basePath        = $basePath !== '' ? $basePath : (string) getcwd();
-        $this->maxMatches      = $maxMatches;
-        $this->maxFileSize     = $maxFileSize;
+        // basePath по умолчанию будет подставлен из ConfigurationApp::getStartDir()
+        // в {@see ATool::setAgentCfg()}.
+        $this->basePath = $basePath;
+        $this->maxMatches = $maxMatches;
+        $this->maxFileSize = $maxFileSize;
         $this->excludePatterns = $excludePatterns;
-        $this->contextLines    = $contextLines;
+        $this->contextLines = $contextLines;
     }
 
     /**

@@ -16,7 +16,6 @@ use function count;
 use function explode;
 use function file_get_contents;
 use function filesize;
-use function getcwd;
 use function implode;
 use function is_file;
 use function is_readable;
@@ -85,7 +84,9 @@ class ViewTool extends ATool
     ) {
         parent::__construct(name: $name, description: $description);
 
-        $this->basePath = $basePath !== '' ? $basePath : (string) getcwd();
+        // basePath по умолчанию будет подставлен из ConfigurationApp::getStartDir()
+        // в {@see ATool::setAgentCfg()}.
+        $this->basePath = $basePath;
         $this->maxFileSize = $maxFileSize;
         $this->maxLines = $maxLines;
         $this->encoding = $encoding;

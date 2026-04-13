@@ -14,7 +14,6 @@ use function array_merge;
 use function count;
 use function fclose;
 use function fread;
-use function getcwd;
 use function is_resource;
 use function microtime;
 use function preg_match;
@@ -112,7 +111,9 @@ class BashTool extends ATool
 
         $this->defaultTimeout = $defaultTimeout;
         $this->maxOutputSize = $maxOutputSize;
-        $this->workingDirectory = $workingDirectory !== '' ? $workingDirectory : (string) getcwd();
+        // workingDirectory по умолчанию будет подставлен из ConfigurationApp::getStartDir()
+        // в {@see ATool::setAgentCfg()}.
+        $this->workingDirectory = $workingDirectory;
         $this->allowedPatterns = $allowedPatterns;
         $this->blockedPatterns = $blockedPatterns;
         $this->env = $env;
@@ -178,7 +179,8 @@ class BashTool extends ATool
             ? array_merge(getenv(), $this->env)
             : null;
 
-        $process = proc_open($command, $descriptors, $pipes, $this->workingDirectory, $envVars);
+        $cwd = $this->workingDirectory !== '' ? $this->workingDirectory : null;
+        $process = proc_open($command, $descriptors, $pipes, $cwd, $envVars);
 
         if (!is_resource($process)) {
             $dto = new BashResultDto(
