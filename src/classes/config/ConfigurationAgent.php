@@ -850,12 +850,44 @@ class ConfigurationAgent implements IDependConfigApp
     }
 
     /**
+     * Созданные инструменты
+     *
+     * @var array|null
+     */
+    protected $_tools = null;
+
+    /**
      * Дополнительные инструменты для использования LLM.
      * ! конфигурирование агента - не использовать вне модуля
      *
      * @return array<ToolInterface|ToolkitInterface|ProviderToolInterface>
      */
     public function getTools(): array
+    {
+        if (is_null($this->_tools)) {
+            $this->_tools = $this->makeTools();
+        }
+        return $this->_tools;
+    }
+
+    /**
+     * Задать инструменты своим списком
+     *
+     * @param array $tools
+     * @return void
+     */
+    public function setTools(array $tools): void
+    {
+        $this->_tools = $tools;
+    }
+
+    /**
+     * Дополнительные инструменты для использования LLM.
+     * ! конфигурирование агента - не использовать вне модуля
+     *
+     * @return array<ToolInterface|ToolkitInterface|ProviderToolInterface>
+     */
+    protected function makeTools(): array
     {
         $tools = [];
         if (CallableWrapper::isCallable($this->tools)) {

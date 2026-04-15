@@ -100,6 +100,25 @@ trait AttachesSkillToolsTrait
             $sessionTools = array_merge($sessionTools, $attached);
         }
 
-        $sessionCfg->tools = $sessionTools;
+        // в сессии skill его самого быть не должно - не может skill пользоваться самим собой
+        $currentName = $this instanceof Skill ? $this->name : null;
+        $arNames     = [];
+        $counter     = 0;
+        foreach ($sessionTools as $i => $objTool) {
+            if ($currentName != $objTool->getName()) {
+                // исключаем дублирование по имени, убираем для skill самого себя
+                $arNames[$objTool->getName()] = $i;
+                $counter++;
+            }
+        }
+        if ($counter != sizeof($sessionTools)) {
+            $sessionTools2 = [];
+            foreach ($arNames as $name => $i) {
+                $sessionTools2[] = $sessionTools[$i];
+            }
+            $sessionCfg->setTools($sessionTools2);
+        } else {
+            $sessionCfg->setTools($sessionTools);
+        }
     }
 }
