@@ -167,7 +167,14 @@ ToolRegistry::registerAlias('my_tool_v2', 'my_tool');
 - `VarListTool` (`src/tools/VarListTool.php`) — возвращает список всех результатов для текущего `sessionKey`;
 - `VarExistTool` (`src/tools/VarExistTool.php`) — проверяет наличие результата по метке.
  - `VarUnsetTool` (`src/tools/VarUnsetTool.php`) — удаляет сохранённый результат по метке.
-- `VarPadTool` (`src/tools/VarPadTool.php`) — дополняет (append) строковые данные по метке, сохраняя переводы строк.
+- `VarPadTool` (`src/tools/VarPadTool.php`) — дополняет (pad/append) данные по метке **типобезопасно**:
+  - для **строк** — аккуратно склеивает текст, сохраняя переводы строк;
+  - для **чисел** — выполняет сложение (existing + append), append передаётся как JSON-число;
+  - для **массивов**:
+    - list + list → конкатенация,
+    - list + scalar/map → добавление одного элемента в конец,
+    - map + map → merge по ключам с overwrite (append заменяет existing).
+  Вход `data` остаётся строкой: если это валидный JSON — используется decoded значение, иначе добавляется как обычный текст.
 
 Общее:
 

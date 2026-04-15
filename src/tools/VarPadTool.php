@@ -5,17 +5,30 @@ declare(strict_types=1);
 namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\dto\tools\VarToolResultDto;
+use app\modules\neuron\enums\VarDataTypeEnum;
+use app\modules\neuron\helpers\JsonHelper;
+use app\modules\neuron\helpers\VarMergeHelper;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
 use function is_string;
-use function ltrim;
-use function str_ends_with;
-use function str_starts_with;
+use function json_last_error;
 use function trim;
 
+use const JSON_ERROR_NONE;
+
 /**
- * Инструмент `VarPadTool`: дополняет (append) строковые данные по указанной метке.
+ * Инструмент `VarPadTool`: дополняет (pad/append) данные по указанной метке.
+ *
+ * Поддерживает типобезопасное дополнение (typed pad):
+ * - string: склеивание с сохранением переводов строк
+ * - array: дополнение list/map по правилам VarMergeHelper
+ * - number: арифметическое сложение
+ * - null: трактуется как “пусто” (результат становится append)
+ *
+ * Входной параметр `data` остаётся строкой: если это валидный JSON — будет
+ * распарсен как значение (array/number/boolean/null/string), иначе считается
+ * обычным текстом.
  */
 final class VarPadTool extends AVarTool
 {
@@ -28,7 +41,7 @@ final class VarPadTool extends AVarTool
 
     public function __construct(
         string $name = 'var_pad',
-        string $description = 'Дополняет (append) строковые данные в переменной по ее имени, сохраняя переводы строк. Если переменная не существует - создаёт новую запись.',
+        string $description = 'Дополняет (append) данные по имени переменной. data — строка: если это валидный JSON, используется decoded значение. Поддерживает string/array/number/null; array: list+list=concat, map+map=merge(overwrite). number: existing+append. boolean/object не поддерживает (используйте var_set).',
     ) {
         parent::__construct(name: $name, description: $description);
     }
@@ -40,22 +53,22 @@ final class VarPadTool extends AVarTool
     {
         return [
             ToolProperty::make(
-                name: 'name',
-                type: PropertyType::STRING,
+                name       : 'name',
+                type       : PropertyType::STRING,
                 description: 'Имя переменной, которую нужно дополнить.',
-                required: true,
+                required   : true,
             ),
             ToolProperty::make(
-                name: 'description',
-                type: PropertyType::STRING,
+                name       : 'description',
+                type       : PropertyType::STRING,
                 description: 'Краткое описание (1 строка) того, что хранится под этой меткой. Обязательна (может обновлять описание).',
-                required: true,
+                required   : true,
             ),
             ToolProperty::make(
-                name: 'data',
-                type: PropertyType::STRING,
-                description: 'Текст, который нужно добавить в конец. Данные должны быть строковыми.',
-                required: true,
+                name       : 'data',
+                type       : PropertyType::STRING,
+                description: 'Строка для дополнения. Если это валидный JSON — будет использовано decoded значение (JSON-число/массив/объект/null/строка). Иначе добавится как обычный текст.',
+                required   : true,
             ),
         ];
     }
@@ -89,29 +102,30 @@ final class VarPadTool extends AVarTool
 
         $loaded = $storage->load($sessionKey, $nameTrimmed);
         $existing = $loaded['data'] ?? null;
+        $append = $this->parseDataString($data);
 
-        if ($loaded !== null && $existing !== null && !is_string($existing)) {
+        $merge = VarMergeHelper::mergeForPad($existing, $append);
+        if (!$merge->success) {
+            $descriptionOut = is_string($loaded['description'] ?? null) ? (string) $loaded['description'] : null;
+            $savedAtOut     = is_string($loaded['savedAt'] ?? null) ? (string) $loaded['savedAt'] : null;
+            $dataTypeOut    = is_string($loaded['dataType'] ?? null) ? (string) $loaded['dataType'] : null;
+
             return $this->resultJson(new VarToolResultDto(
                 action     : 'pad',
                 success    : false,
-                message    : 'Pad поддерживает только строковые данные. Текущие данные не строка.',
+                message    : $merge->message,
                 sessionKey : $sessionKey,
-                name      : $nameTrimmed,
-                fileName   : $storage->resultFileName($sessionKey, $nameTrimmed),
-                description: is_string($loaded['description'] ?? null) ? (string) $loaded['description'] : null,
-                savedAt    : is_string($loaded['savedAt'] ?? null) ? (string) $loaded['savedAt'] : null,
-                dataType   : is_string($loaded['dataType'] ?? null) ? (string) $loaded['dataType'] : null,
-                exists     : true,
+                name       : $nameTrimmed,
+                fileName   : $loaded === null ? null : $storage->resultFileName($sessionKey, $nameTrimmed),
+                description: $descriptionOut,
+                savedAt    : $savedAtOut,
+                dataType   : $dataTypeOut ?? $merge->existingType->value,
+                exists     : $loaded !== null,
             ));
         }
 
-        $existingText = is_string($existing) ? $existing : '';
-        $appendText = $data;
-
-        $merged = $this->mergeWithNewline($existingText, $appendText);
-
         try {
-            $item = $storage->save($sessionKey, $nameTrimmed, $merged, $descTrimmed);
+            $item = $storage->save($sessionKey, $nameTrimmed, $merge->merged, $descTrimmed);
         } catch (\Throwable $e) {
             return $this->resultJson(new VarToolResultDto(
                 action    : 'pad',
@@ -136,26 +150,27 @@ final class VarPadTool extends AVarTool
         ));
     }
 
-    private function mergeWithNewline(string $existing, string $append): string
+    /**
+     * Парсит входной параметр `data` (строка) в typed-значение.
+     *
+     * Правило совпадает с `VarSetTool`: если строка — валидный JSON, сохраняем decoded значение,
+     * иначе сохраняем как обычный текст.
+     *
+     * @param string $raw Входные данные инструмента.
+     * @return mixed Decoded JSON или исходная строка.
+     */
+    private function parseDataString(string $raw): mixed
     {
-        if ($existing === '') {
-            return $append;
-        }
-        if ($append === '') {
-            return $existing;
+        $trimmed = trim($raw);
+        if ($trimmed === '') {
+            return '';
         }
 
-        $existingEndsNl = str_ends_with($existing, "\n");
-        $appendStartsNl = str_starts_with($append, "\n");
-
-        if (!$existingEndsNl && !$appendStartsNl) {
-            return $existing . "\n" . $append;
+        $decoded = JsonHelper::decodeAssociative($trimmed);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            return $decoded;
         }
 
-        if ($existingEndsNl && $appendStartsNl) {
-            return $existing . ltrim($append, "\n");
-        }
-
-        return $existing . $append;
+        return $raw;
     }
 }
