@@ -19,6 +19,7 @@ use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\AttachmentHelper;
+use app\modules\neuron\helpers\ChatHistoryCopyHelper;
 use app\modules\neuron\helpers\ChatHistoryTruncateHelper;
 use app\modules\neuron\helpers\LlmCycleHelper;
 use app\modules\neuron\interfaces\ITodo;
@@ -27,6 +28,7 @@ use app\modules\neuron\traits\HasNeedSkillsTrait;
 use app\modules\neuron\traits\AttachesSkillToolsTrait;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\ChatHistoryInterface;
+use NeuronAI\Chat\History\InMemoryChatHistory;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
 
 /**
@@ -142,7 +144,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
      *                                                      {@see LlmCycleHelper::waitCycle()} — гарантий корректного продолжения нет.
      *                                                      `null` и `false` — обычная отправка тела каждого todo.
      *
-     * @return Future<ChatHistoryInterface> Завершается копией истории сообщений агента после выполнения всех заданий.
+     * @return Future<ChatHistoryInterface> Завершается in-memory копией истории сообщений агента после выполнения всех заданий.
      */
     public function execute(
         MessageRole $role = MessageRole::USER,
@@ -379,7 +381,10 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                 $this->buildRunEventDto($sessionCfg, $runId, $stepsExecuted)
             );
 
-            return clone $sessionCfg->getChatHistory();
+            $targetHistory = new InMemoryChatHistory($sessionCfg->contextWindow);
+            ChatHistoryCopyHelper::copy($sessionCfg->getChatHistory(), $targetHistory);
+
+            return $targetHistory;
         });
     }
 

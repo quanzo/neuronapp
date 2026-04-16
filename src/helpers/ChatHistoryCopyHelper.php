@@ -31,7 +31,7 @@ final class ChatHistoryCopyHelper
     {
         /** @var Message $message */
         foreach ($from->getMessages() as $message) {
-            $to->addMessage($message);
+            $to->addMessage(clone $message);
         }
     }
 }
