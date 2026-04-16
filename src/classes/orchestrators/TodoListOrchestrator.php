@@ -16,6 +16,7 @@ use app\modules\neuron\classes\todo\TodoList;
 use app\modules\neuron\helpers\TodoCompletedStatusHelper;
 use app\modules\neuron\helpers\TodoListResumeHelper;
 use NeuronAI\Chat\Enums\MessageRole;
+use NeuronAI\Chat\History\ChatHistoryInterface;
 use Revolt\EventLoop;
 
 /**
@@ -127,6 +128,7 @@ class TodoListOrchestrator
             ->setSessionKey($this->configApp->getSessionKey())
             ->setIterations(0)
             ->setRestartCount(0);
+        $resultChatHistory = null;
 
         // Защита от некорректных входных параметров.
         $maxIterations = max(1, $maxIterations);
@@ -158,8 +160,8 @@ class TodoListOrchestrator
                     $iterations = $i;
 
                     // Читаем completed, который должен выставляться шагами.
-                    $completedRaw = $this->getCompleted();
-                    $completedNormalized = $this->normalizeCompleted($completedRaw);
+                    $completedRaw        = $this->getCompleted();
+                    $completedNormalized = TodoCompletedStatusHelper::normalize($completedRaw);
 
                     // Публикуем состояние после каждой итерации шага.
                     EventBus::trigger(
@@ -186,19 +188,21 @@ class TodoListOrchestrator
 
                 if ($completedByLimit) {
                     // Лимит итераций исчерпан: finish выполняем все равно.
-                    $this->executeTodoList($finishTodoList, $sessionParams);
+                    $resultChatHistory = $this->executeTodoList($finishTodoList, $sessionParams);
                     $result
                         ->setSuccess(false)
                         ->setReason('max_iterations');
                     $this->onFail('max_iterations', $result);
                 } else {
                     // Нормальное завершение: финализируем и публикуем complete.
-                    $this->executeTodoList($finishTodoList, $sessionParams);
+                    $resultChatHistory = $this->executeTodoList($finishTodoList, $sessionParams);
                     $result
                         ->setSuccess(true)
                         ->setReason('completed');
                     $this->onComplete($result);
                 }
+
+                $result->setMessage($resultChatHistory);
 
                 return $result;
             } catch (\Throwable $e) {
@@ -281,24 +285,6 @@ class TodoListOrchestrator
     }
 
     /**
-     * Нормализует completed к значениям:
-     * - 1: выполнено
-     * - 0: не выполнено
-     * - null: неизвестно/невалидно
-     *
-     * Для совместимости поддерживаются строки:
-     * "исполнено", "не исполнено", "done", "not_done", "true", "false", "1", "0".
-     *
-     * @param mixed $raw Сырое значение из storage.
-     *
-     * @return int|null 1/0 для валидных значений, null для неизвестного формата.
-     */
-    protected function normalizeCompleted(mixed $raw): ?int
-    {
-        return TodoCompletedStatusHelper::normalize($raw);
-    }
-
-    /**
      * Принудительно записывает completed в промежуточное хранилище.
      *
      * @param int $value Нормализованное значение completed (обычно 0 или 1).
@@ -337,19 +323,20 @@ class TodoListOrchestrator
      * @param TodoList $todoList Список заданий для исполнения.
      * @param SessionParamsDto|null $sessionParams Параметры подстановки в todo.
      *
-     * @return void
+     * @return ChatHistoryInterface|null возвращает историю чата
      *
      * @throws \Throwable Ошибка, произошедшая во время выполнения TodoList.
      */
-    private function executeTodoList(TodoList $todoList, ?SessionParamsDto $sessionParams): void
+    private function executeTodoList(TodoList $todoList, ?SessionParamsDto $sessionParams): ChatHistoryInterface|null
     {
         $error = null;
+        $resultChatHistory = null;
 
         $startFromTodoIndex = $this->resolveStartFromTodoIndexForTodoList($todoList);
 
-        EventLoop::queue(static function () use ($todoList, $sessionParams, $startFromTodoIndex, &$error): void {
+        EventLoop::queue(static function () use ($todoList, $sessionParams, $startFromTodoIndex, &$error, &$resultChatHistory): void {
             try {
-                $todoList->execute(
+                $resultChatHistory = $todoList->execute(
                     MessageRole::USER,
                     [],
                     null,
@@ -366,6 +353,8 @@ class TodoListOrchestrator
         if ($error instanceof \Throwable) {
             throw $error;
         }
+
+        return $resultChatHistory;
     }
 
     /**

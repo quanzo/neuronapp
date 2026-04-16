@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\orchestrator;
 
+use app\modules\neuron\helpers\ChatHistoryEditHelper;
 use app\modules\neuron\interfaces\IArrayable;
+use NeuronAI\Chat\History\ChatHistoryInterface;
+use NeuronAI\Chat\Messages\Message;
 
 /**
  * DTO результата выполнения оркестратора TodoList-циклов.
@@ -22,13 +25,37 @@ use app\modules\neuron\interfaces\IArrayable;
  */
 final class OrchestratorResultDto implements IArrayable
 {
-    private bool $success = false;
-    private string $reason = '';
-    private int $iterations = 0;
-    private int $restartCount = 0;
-    private mixed $completedRaw = null;
+    private bool $success             = false;
+    private string $reason            = '';
+    private int $iterations           = 0;
+    private int $restartCount         = 0;
+    private mixed $completedRaw       = null;
     private ?int $completedNormalized = null;
-    private string $sessionKey = '';
+    private string $sessionKey        = '';
+    private $resultMessage            = null;
+
+    /**
+     * Записать результирующее сообщение результата работы
+     *
+     * @param ChatHistoryInterface $history
+     * @return Message|null
+     */
+    public function setMessage(ChatHistoryInterface $history): Message|null {
+        $this->resultMessage = ChatHistoryEditHelper::getLastMessage($history);
+        if (!$this->resultMessage) {
+            $this->resultMessage = null;
+        }
+        return $this->resultMessage;
+    }
+
+    /**
+     * Прочитать результат
+     *
+     * @return Message|null
+     */
+    public function getMessage(): Message|null {
+        return $this->resultMessage;
+    }
 
     /**
      * Признак успешного завершения цикла.
