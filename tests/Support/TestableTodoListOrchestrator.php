@@ -16,11 +16,6 @@ final class TestableTodoListOrchestrator extends TodoListOrchestrator
     public int $completeCalls = 0;
     public int $failCalls = 0;
 
-    public function normalizeProxy(mixed $raw): ?int
-    {
-        return $this->normalizeCompleted($raw);
-    }
-
     /**
      * Прокси к {@see TodoListOrchestrator::resolveStartFromTodoIndexForTodoList()} для тестов.
      */

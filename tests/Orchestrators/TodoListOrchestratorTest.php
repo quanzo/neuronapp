@@ -12,8 +12,10 @@ use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\classes\orchestrators\TodoListOrchestrator;
 use app\modules\neuron\classes\todo\TodoList;
+use app\modules\neuron\helpers\TodoCompletedStatusHelper;
 use app\modules\neuron\helpers\RunStateCheckpointHelper;
 use NeuronAI\Chat\Enums\MessageRole;
+use NeuronAI\Chat\Messages\Message;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\TestableTodoListOrchestrator;
@@ -107,6 +109,7 @@ final class TodoListOrchestratorTest extends TestCase
         $this->assertSame(3, $result->getIterations());
         $this->assertSame(1, $orchestrator->completeCalls);
         $this->assertSame(0, $orchestrator->failCalls);
+        $this->assertInstanceOf(Message::class, $result->getMessage());
     }
 
     /**
@@ -124,6 +127,7 @@ final class TodoListOrchestratorTest extends TestCase
         $this->assertSame(2, $result->getIterations());
         $this->assertSame(0, $orchestrator->completeCalls);
         $this->assertSame(1, $orchestrator->failCalls);
+        $this->assertInstanceOf(Message::class, $result->getMessage());
     }
 
     /**
@@ -208,8 +212,7 @@ final class TodoListOrchestratorTest extends TestCase
     #[DataProvider('provideCompletedNormalizationCases')]
     public function testNormalizeCompleted(mixed $raw, ?int $expected): void
     {
-        $orchestrator = new TestableTodoListOrchestrator($this->configApp);
-        $this->assertSame($expected, $orchestrator->normalizeProxy($raw));
+        $this->assertSame($expected, TodoCompletedStatusHelper::normalize($raw));
     }
 
     /**
