@@ -3,7 +3,6 @@
 require __DIR__ . '/../vendor/autoload.php';
 
 use app\modules\neuron\classes\command\HelloCommand;
-use app\modules\neuron\classes\command\InteractiveCommand;
 use app\modules\neuron\classes\command\RuwikiCommand;
 use app\modules\neuron\classes\command\SimpleMessageCommand;
 use app\modules\neuron\classes\command\TodolistCommand;
@@ -11,11 +10,12 @@ use app\modules\neuron\classes\command\ClearAllSessionsCommand;
 use app\modules\neuron\classes\command\ClearSessionCommand;
 use app\modules\neuron\classes\command\OrchestrateCommand;
 use app\modules\neuron\classes\command\WikiCommand;
-use app\modules\neuron\classes\tui\command\handlers\ClearCommandHandler;
-use app\modules\neuron\classes\tui\command\handlers\ExitCommandHandler;
-use app\modules\neuron\classes\tui\command\handlers\HelpCommandHandler;
-use app\modules\neuron\classes\tui\command\handlers\WorkspaceCommandHandler;
-use app\modules\neuron\classes\tui\hooks\DefaultTuiPostOutputHook;
+use quanzo\tui\classes\command\InteractiveCommand;
+use quanzo\tui\classes\tui\command\handlers\ClearCommandHandler;
+use quanzo\tui\classes\tui\command\handlers\ExitCommandHandler;
+use quanzo\tui\classes\tui\command\handlers\HelpCommandHandler;
+use quanzo\tui\classes\tui\command\handlers\WorkspaceCommandHandler;
+use quanzo\tui\classes\tui\hooks\DefaultTuiPostOutputHook;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\console\TimedConsoleApplication;
 use app\modules\neuron\classes\dir\DirPriority;

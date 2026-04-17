@@ -2,9 +2,20 @@
 
 Этот документ описывает внутреннюю архитектуру интерактивного TUI-интерфейса команды `interactive`.
 
+Важно: базовая реализация TUI вынесена в пакет `vendor/quanzo/tui`. Локальные классы TUI в `src/classes/tui` удалены как дубли.
+
+### TUI находится в `vendor/quanzo/tui`
+
+Source of truth для TUI — пакет `quanzo/tui`, подключённый в проект как `vendor/quanzo/tui`.
+
+- **Класс команды**: `vendor/quanzo/tui/src/classes/command/InteractiveCommand.php` (`quanzo\tui\classes\command\InteractiveCommand`)
+- **Handlers**: `vendor/quanzo/tui/src/classes/tui/command/handlers/*` (например, `/help`, `/ws`, `/clear`, `/exit`)
+- **Рендер/ввод/состояние/terminal modes**: `vendor/quanzo/tui/src/classes/tui/**`
+- **DTO/интерфейсы/enums/helpers**: `vendor/quanzo/tui/src/classes/dto/**`, `vendor/quanzo/tui/src/interfaces/**`, `vendor/quanzo/tui/src/enums/**`, `vendor/quanzo/tui/src/helpers/**`
+
 ### Назначение
 
-Команда `interactive` (`src/classes/command/InteractiveCommand.php`) предоставляет простой текстовый UI:
+Команда `interactive` использует класс из vendor-пакета: `vendor/quanzo/tui/src/classes/command/InteractiveCommand.php` и предоставляет простой текстовый UI:
 
 - область вывода (история сообщений) с прокруткой;
 - многострочное поле ввода (viewport 3 строки) с редактированием;
@@ -13,67 +24,67 @@
 
 ### Архитектура (компоненты)
 
-- **Terminal режимы**: `src/classes/tui/terminal/TerminalModeManager.php`
+- **Terminal режимы**: `vendor/quanzo/tui/src/classes/tui/terminal/TerminalModeManager.php`
   - включает `stty -icanon -echo`, alt-buffer, скрывает курсор;
   - включает **Bracketed Paste Mode** (`ESC[?2004h`) для корректной многострочной вставки;
   - обязательно использовать через `try/finally`, чтобы терминал гарантированно восстановился.
 
-- **Ввод**: `src/classes/tui/input/`
+- **Ввод**: `vendor/quanzo/tui/src/classes/tui/input/`
   - `Utf8CharReader` — читает один UTF‑8 символ из потока;
   - `KeySequenceParser` — превращает поток в события `KeyEventDto`:
     - стрелки, PageUp/PageDown, Tab, Enter, Backspace, Delete, Home/End, Ctrl+C, текст;
     - **bracketed paste**: `ESC[200~...ESC[201~` → `TYPE_PASTE`.
 
-- **Состояние**: `src/classes/dto/tui/`
+- **Состояние**: `vendor/quanzo/tui/src/classes/dto/tui/`
   - `TuiStateDto` — модель состояния (history/input/cursor/focus/scroll + поля для partial redraw);
   - `LayoutDto` — вычисленная геометрия (координаты областей и `getOutputVisibleLines()`);
   - `TerminalSizeDto` — размеры терминала (width/height);
   - `KeyEventDto` — нормализованное событие клавиатуры.
 
-- **Обработка событий (reducer)**: `src/classes/tui/state/TuiReducer.php`
+- **Обработка событий (reducer)**: `vendor/quanzo/tui/src/classes/tui/state/TuiReducer.php`
   - единственное место, где описаны правила изменения `TuiStateDto` по `KeyEventDto`;
   - важно: логика остановки по `Ctrl+C` обрабатывается до вставки текста.
 
-- **История (Variant C)**: `src/classes/dto/tui/history/`
+- **История (Variant C)**: `vendor/quanzo/tui/src/classes/dto/tui/history/`
   - `TuiHistoryDto` — список записей `TuiHistoryEntryDto`;
   - `TuiHistoryEntryDto` — атом истории (user_input/output/event) с `blocks` (виджетами) и `meta`.
 
 - **Rich-вывод (виджеты)**:
-  - `src/interfaces/tui/view/TuiBlockInterface.php` — контракт блока;
-  - `src/classes/dto/tui/view/blocks/*` — блоки: `Text/Heading/Panel/Table/List/Code/Notice/Divider/KeyHints`;
-  - `src/classes/tui/render/TuiHistoryFormatter.php` — форматтер entries/blocks → плоские строки;
-  - `src/classes/dto/tui/view/TuiThemeDto.php` — ANSI-тема.
+  - `vendor/quanzo/tui/src/interfaces/tui/view/TuiBlockInterface.php` — контракт блока;
+  - `vendor/quanzo/tui/src/classes/dto/tui/view/blocks/*` — блоки: `Text/Heading/Panel/Table/List/Code/Notice/Divider/KeyHints`;
+  - `vendor/quanzo/tui/src/classes/tui/render/TuiHistoryFormatter.php` — форматтер entries/blocks → плоские строки;
+  - `vendor/quanzo/tui/src/classes/dto/tui/view/TuiThemeDto.php` — ANSI-тема.
 
 - **Hooks вывода (pre/post)**:
-  - `src/interfaces/tui/TuiPreOutputHookInterface.php` — решает, какие entries добавить в историю и как управлять циклом (`clear/exit`);
-  - `src/classes/dto/tui/TuiPreHookDecisionDto.php` — DTO решения pre-hook;
-  - `src/interfaces/tui/TuiPostOutputHookInterface.php` — вызывается после рендера кадра, может дописать дополнительный многострочный вывод в history;
+  - `vendor/quanzo/tui/src/interfaces/tui/TuiPreOutputHookInterface.php` — решает, какие entries добавить в историю и как управлять циклом (`clear/exit`);
+  - `vendor/quanzo/tui/src/classes/dto/tui/TuiPreHookDecisionDto.php` — DTO решения pre-hook;
+  - `vendor/quanzo/tui/src/interfaces/tui/TuiPostOutputHookInterface.php` — вызывается после рендера кадра, может дописать дополнительный многострочный вывод в history;
   - дефолтные реализации:
-    - `src/classes/tui/hooks/WorkspaceTuiPreOutputHook.php` — собственная система команд (parser → dispatcher → handlers);
-    - `src/classes/tui/hooks/DefaultTuiPostOutputHook.php` — возвращает `вывод + дата/время`.
+    - `vendor/quanzo/tui/src/classes/tui/hooks/WorkspaceTuiPreOutputHook.php` — собственная система команд (parser → dispatcher → handlers);
+    - `vendor/quanzo/tui/src/classes/tui/hooks/DefaultTuiPostOutputHook.php` — возвращает `вывод + дата/время`.
 
 ### Wiring handlers (рекомендованный способ)
 
 Регистрируйте TUI handlers через `InteractiveCommand`, чтобы `bin/console.php` оставался минимальным, а команда сама владела набором доступных TUI-команд:
 
 ```php
-$interactive = (new \app\modules\neuron\classes\command\InteractiveCommand())
+$interactive = (new \quanzo\tui\classes\command\InteractiveCommand())
     ->setCommandName('interactive')
     ->setDescriptionText('Интерактивный TUI (workspace)')
-    ->addHandler(new \app\modules\neuron\classes\tui\command\handlers\HelpCommandHandler())
-    ->addHandler(new \app\modules\neuron\classes\tui\command\handlers\WorkspaceCommandHandler())
-    ->addHandler(new \app\modules\neuron\classes\tui\command\handlers\ClearCommandHandler())
-    ->addHandler(new \app\modules\neuron\classes\tui\command\handlers\ExitCommandHandler())
-    ->setPostHook(new \app\modules\neuron\classes\tui\hooks\DefaultTuiPostOutputHook());
+    ->addHandler(new \quanzo\tui\classes\tui\command\handlers\HelpCommandHandler())
+    ->addHandler(new \quanzo\tui\classes\tui\command\handlers\WorkspaceCommandHandler())
+    ->addHandler(new \quanzo\tui\classes\tui\command\handlers\ClearCommandHandler())
+    ->addHandler(new \quanzo\tui\classes\tui\command\handlers\ExitCommandHandler())
+    ->setPostHook(new \quanzo\tui\classes\tui\hooks\DefaultTuiPostOutputHook());
 
 $app->add($interactive);
 ```
 
-- **Отрисовка**: `src/classes/tui/render/TuiRenderer.php`
+- **Отрисовка**: `vendor/quanzo/tui/src/classes/tui/render/TuiRenderer.php`
   - full render (очистка и полная отрисовка рамок/контента/курсора);
   - partial render (обновление только изменившихся строк ввода и статус-бара);
-  - для переносов/выравнивания использует `src/helpers/TuiTextHelper.php`.
-- для операций над буфером ввода использует `src/helpers/TuiInputBufferHelper.php`.
+  - для переносов/выравнивания использует `vendor/quanzo/tui/src/helpers/TuiTextHelper.php`.
+- для операций над буфером ввода использует `vendor/quanzo/tui/src/helpers/TuiInputBufferHelper.php`.
 
 ### Поток данных
 
@@ -102,12 +113,5 @@ InteractiveCommand -->|PostHook (after render)| HistoryEntries
 
 ### Тесты
 
-Тесты на «чистые» части вынесены в `tests/Tui/`:
-
-- `KeySequenceParserTest` — распознавание событий (включая ESC-последовательности и UTF‑8);
-- `TuiReducerTest` — граничные условия редактирования/скролла/фокуса;
-- `LayoutDtoTest` — вычисление производных значений.
-- `DefaultTuiPreOutputHookTest` — поведение дефолтного pre-hook;
-- `DefaultTuiPostOutputHookTest` — поведение дефолтного post-hook и формат даты/времени.
-- `TuiHistoryFormatterTest` — форматирование rich-истории (widgets → строки) и граничные случаи по ширине.
+Базовые тесты TUI находятся в репозитории/пакете `quanzo/tui` (в `vendor/quanzo/tui/tests`).
 
