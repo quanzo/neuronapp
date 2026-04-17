@@ -11,13 +11,20 @@
         "html2text/html2text": "^4",
         "psr/cache": "^3.0",
         "psr/log": "^3.0",
-        "amphp/parallel-functions": "^2.0"
+        "amphp/parallel-functions": "^2.0",
+        "quanzo/tui": "dev-main"
     },
     "require-dev": {
         "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^13.0",
         "squizlabs/php_codesniffer": "^4.0"
     },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/quanzo/tui.git"
+        }
+    ],
     "autoload": {
         "psr-4": {
             "app\\modules\\neuron\\": "src/"
