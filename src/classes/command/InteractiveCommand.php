@@ -3,12 +3,14 @@
 namespace app\modules\neuron\classes\command;
 
 use app\modules\neuron\classes\status\ModeStatus;
-use app\modules\neuron\classes\command\terminal\TerminalModeManager;
-use app\modules\neuron\classes\command\input\KeySequenceParser;
-use app\modules\neuron\classes\command\input\Utf8CharReader;
-use app\modules\neuron\classes\command\state\TuiReducer;
-use app\modules\neuron\classes\command\render\TuiHistoryFormatter;
-use app\modules\neuron\classes\command\render\TuiRenderer;
+use app\modules\neuron\classes\tui\terminal\TerminalModeManager;
+use app\modules\neuron\classes\tui\input\KeySequenceParser;
+use app\modules\neuron\classes\tui\input\Utf8CharReader;
+use app\modules\neuron\classes\tui\state\TuiReducer;
+use app\modules\neuron\classes\tui\render\TuiHistoryFormatter;
+use app\modules\neuron\classes\tui\render\TuiRenderer;
+use app\modules\neuron\classes\tui\command\TuiCommandDispatcher;
+use app\modules\neuron\classes\tui\hooks\WorkspaceTuiPreOutputHook;
 use app\modules\neuron\classes\dto\tui\history\TuiHistoryDto;
 use app\modules\neuron\classes\dto\tui\KeyEventDto;
 use app\modules\neuron\classes\dto\tui\LayoutDto;
@@ -19,6 +21,7 @@ use app\modules\neuron\classes\dto\tui\TuiPreHookDecisionDto;
 use app\modules\neuron\classes\dto\tui\view\TuiThemeDto;
 use app\modules\neuron\interfaces\tui\TuiPostOutputHookInterface;
 use app\modules\neuron\interfaces\tui\TuiPreOutputHookInterface;
+use app\modules\neuron\interfaces\tui\command\TuiCommandHandlerInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -40,6 +43,20 @@ use app\modules\neuron\classes\status\StatusBar;
 class InteractiveCommand extends Command
 {
     protected static $defaultName = 'interactive';
+
+    /**
+     * Пользовательское имя команды (переопределяет `$defaultName`).
+     *
+     * Если задано, применяется в `configure()` и/или при вызове `setCommandName()`.
+     */
+    private ?string $commandName = null;
+
+    /**
+     * Пользовательское описание команды.
+     *
+     * Если задано, применяется в `configure()` и/или при вызове `setDescriptionText()`.
+     */
+    private ?string $descriptionText = null;
 
     /** @var Terminal Объект для получения размеров терминала */
     private Terminal $terminal;
@@ -99,14 +116,139 @@ class InteractiveCommand extends Command
     /** Минимальная высота терминала, необходимая для работы (9 строк) */
     private const MIN_HEIGHT = 9;
 
-    private TuiPreOutputHookInterface $preHook;
-    private TuiPostOutputHookInterface $postHook;
+    /**
+     * Pre-hook (команды/диспетчеризация).
+     *
+     * Может быть задан извне (например, в `bin/console.php`) через fluent API.
+     */
+    private ?TuiPreOutputHookInterface $preHook = null;
+
+    /**
+     * Post-hook (добавочный вывод после кадра).
+     *
+     * Может быть задан извне (например, в `bin/console.php`) через fluent API.
+     */
+    private ?TuiPostOutputHookInterface $postHook = null;
+
+    /**
+     * Диспетчер TUI-команд (handlers).
+     *
+     * Инкапсулируется внутри `InteractiveCommand`, чтобы wiring в `bin/console.php` был максимально простым:
+     * handlers добавляются через `addHandler()`, а дефолтный pre-hook (Workspace) использует этот dispatcher.
+     */
+    private ?TuiCommandDispatcher $dispatcher = null;
 
     private ?PostOutputContextDto $pendingPostHookContext = null;
 
     protected function configure(): void
     {
-        $this->setDescription('Запускает интерактивный TUI-интерфейс (адаптивный)');
+        if ($this->commandName !== null && $this->commandName !== '') {
+            $this->setName($this->commandName);
+        }
+
+        $this->setDescription($this->descriptionText ?: 'Запускает интерактивный TUI-интерфейс (адаптивный)');
+    }
+
+    /**
+     * Устанавливает имя команды (fluent API).
+     *
+     * Используется для создания нескольких TUI-команд на базе одного класса (разные наборы handlers/hooks).
+     *
+     * @param string $name Имя команды в Symfony Console (например, `workspace:tui`)
+     * @return self
+     */
+    public function setCommandName(string $name): self
+    {
+        $this->commandName = $name;
+        if ($name !== '') {
+            $this->setName($name);
+        }
+        return $this;
+    }
+
+    /**
+     * Устанавливает описание команды (fluent API).
+     *
+     * @param string $description
+     * @return self
+     */
+    public function setDescriptionText(string $description): self
+    {
+        $this->descriptionText = $description;
+        if ($description !== '') {
+            $this->setDescription($description);
+        }
+        return $this;
+    }
+
+    /**
+     * Подключает pre-hook (fluent API).
+     *
+     * Pre-hook отвечает за интерпретацию введённого текста (парсинг/диспетчеризацию/команды).
+     *
+     * @param TuiPreOutputHookInterface $hook
+     * @return self
+     */
+    public function setPreHook(TuiPreOutputHookInterface $hook): self
+    {
+        $this->preHook = $hook;
+        return $this;
+    }
+
+    /**
+     * Подключает post-hook (fluent API).
+     *
+     * Post-hook вызывается после рендера кадра и может вернуть дополнительный текст,
+     * который будет добавлен в историю.
+     *
+     * @param TuiPostOutputHookInterface $hook
+     * @return self
+     */
+    public function setPostHook(TuiPostOutputHookInterface $hook): self
+    {
+        $this->postHook = $hook;
+        return $this;
+    }
+
+    /**
+     * Регистрирует handler TUI-команды (fluent API).
+     *
+     * Поведение при совпадении имён: overwrite (последний добавленный handler побеждает).
+     *
+     * Важно: если вы используете кастомный pre-hook через `setPreHook()`, то добавленные сюда handlers
+     * не будут автоматически применяться, пока ваш pre-hook сам не использует dispatcher.
+     *
+     * @param TuiCommandHandlerInterface $handler
+     * @return self
+     */
+    public function addHandler(TuiCommandHandlerInterface $handler): self
+    {
+        $this->getDispatcher()->addHandler($handler);
+        return $this;
+    }
+
+    /**
+     * Удаляет handler по имени команды.
+     *
+     * @param string $name Имя команды (без `/`)
+     * @return bool true если handler был найден и удалён, иначе false
+     */
+    public function removeHandlerByName(string $name): bool
+    {
+        return $this->getDispatcher()->removeHandlerByName($name);
+    }
+
+    /**
+     * Удаляет handler по экземпляру.
+     *
+     * Удаление выполняется по имени handler'а (`$handler->getName()`).
+     *
+     * @param TuiCommandHandlerInterface $handler
+     * @return bool true если handler был найден и удалён, иначе false
+     */
+    public function removeHandler(TuiCommandHandlerInterface $handler): bool
+    {
+        return $this->getDispatcher()->removeHandler($handler);
     }
 
     /**
@@ -117,15 +259,15 @@ class InteractiveCommand extends Command
         // Устанавливаем локаль для корректной работы mbstring с UTF-8
         setlocale(LC_ALL, 'en_US.UTF-8');
 
-        $this->terminal = new Terminal();
-        $this->history = new TuiHistoryDto();
-        $this->statusBar = new StatusBar();
-        $this->prevWidth = $this->terminal->getWidth();
+        $this->terminal   = new Terminal();
+        $this->history    = new TuiHistoryDto();
+        $this->statusBar  = new StatusBar();
+        $this->prevWidth  = $this->terminal->getWidth();
         $this->prevHeight = $this->terminal->getHeight();
 
         $this->initHooks();
 
-        // Проверяем, достаточно ли высоты для отображения всех элементов
+          // Проверяем, достаточно ли высоты для отображения всех элементов
         if (!$this->checkMinSize()) {
             $output->writeln("<error>Терминал слишком маленький. Нужна высота не менее " . self::MIN_HEIGHT . " строк.</error>");
             return Command::FAILURE;
@@ -222,10 +364,10 @@ class InteractiveCommand extends Command
     private function renderFull(TuiRenderer $renderer): void
     {
         $this->terminal = new Terminal();
-        $size = new TerminalSizeDto($this->terminal->getWidth(), $this->terminal->getHeight());
-        $layout = $this->buildLayoutDto();
-        $state = $this->buildStateDto();
-        $state = $renderer->renderFull($state, $layout, $size, $this->statusBar);
+        $size           = new TerminalSizeDto($this->terminal->getWidth(), $this->terminal->getHeight());
+        $layout         = $this->buildLayoutDto();
+        $state          = $this->buildStateDto();
+        $state          = $renderer->renderFull($state, $layout, $size, $this->statusBar);
         $this->applyStateDto($state);
     }
 
@@ -238,10 +380,10 @@ class InteractiveCommand extends Command
     private function renderPartial(TuiRenderer $renderer): void
     {
         $this->terminal = new Terminal();
-        $size = new TerminalSizeDto($this->terminal->getWidth(), $this->terminal->getHeight());
-        $layout = $this->buildLayoutDto();
-        $state = $this->buildStateDto();
-        $state = $renderer->renderPartial($state, $layout, $size, $this->statusBar);
+        $size           = new TerminalSizeDto($this->terminal->getWidth(), $this->terminal->getHeight());
+        $layout         = $this->buildLayoutDto();
+        $state          = $this->buildStateDto();
+        $state          = $renderer->renderPartial($state, $layout, $size, $this->statusBar);
         $this->applyStateDto($state);
     }
 
@@ -253,20 +395,20 @@ class InteractiveCommand extends Command
      */
     private function applyKeyEvent(KeyEventDto $event, TuiReducer $reducer): void
     {
-        $state = $this->buildStateDto();
+        $state  = $this->buildStateDto();
         $layout = $this->buildLayoutDto();
         $result = $reducer->applyKeyEventWithResult($state, $event, $layout);
         $this->applyStateDto($result->getState());
 
         $submittedInput = $result->getSubmittedInput();
         if ($submittedInput !== null) {
-            $decision = $this->preHook->decide($submittedInput);
+            $decision = $this->getPreHook()->decide($submittedInput);
             $this->applyPreHookDecision($decision);
         }
 
-        // Clamp прокрутку после любых изменений.
-        $this->terminal = new Terminal();
-        $maxScroll = $this->getMaxOutputScroll();
+          // Clamp прокрутку после любых изменений.
+        $this->terminal     = new Terminal();
+        $maxScroll          = $this->getMaxOutputScroll();
         $this->outputScroll = min($this->outputScroll, $maxScroll);
     }
 
@@ -277,8 +419,58 @@ class InteractiveCommand extends Command
      */
     private function initHooks(): void
     {
-        $this->preHook = new \app\modules\neuron\classes\command\hooks\WorkspaceTuiPreOutputHook();
-        $this->postHook = new \app\modules\neuron\classes\command\hooks\DefaultTuiPostOutputHook();
+        if ($this->preHook === null) {
+            $this->preHook = new WorkspaceTuiPreOutputHook($this->getDispatcher());
+        }
+        if ($this->postHook === null) {
+            $this->postHook = new \app\modules\neuron\classes\tui\hooks\DefaultTuiPostOutputHook();
+        }
+    }
+
+    /**
+     * Возвращает dispatcher, гарантируя его инициализацию.
+     *
+     * По умолчанию dispatcher пустой — handlers должны быть добавлены через `addHandler()`.
+     *
+     * @return TuiCommandDispatcher
+     */
+    private function getDispatcher(): TuiCommandDispatcher
+    {
+        if ($this->dispatcher === null) {
+            $this->dispatcher = new TuiCommandDispatcher([]);
+        }
+
+        return $this->dispatcher;
+    }
+
+    /**
+     * Возвращает актуальный pre-hook, гарантируя его инициализацию.
+     *
+     * @return TuiPreOutputHookInterface
+     */
+    private function getPreHook(): TuiPreOutputHookInterface
+    {
+        if ($this->preHook === null) {
+            $this->initHooks();
+        }
+        /** @var TuiPreOutputHookInterface $hook */
+        $hook = $this->preHook;
+        return $hook;
+    }
+
+    /**
+     * Возвращает актуальный post-hook, гарантируя его инициализацию.
+     *
+     * @return TuiPostOutputHookInterface
+     */
+    private function getPostHook(): TuiPostOutputHookInterface
+    {
+        if ($this->postHook === null) {
+            $this->initHooks();
+        }
+        /** @var TuiPostOutputHookInterface $hook */
+        $hook = $this->postHook;
+        return $hook;
     }
 
     /**
@@ -302,18 +494,18 @@ class InteractiveCommand extends Command
             $this->running = false;
         }
 
-        $this->terminal = new Terminal();
+        $this->terminal     = new Terminal();
         $this->outputScroll = $this->getMaxOutputScroll();
-        $this->fullRedraw = true;
+        $this->fullRedraw   = true;
 
         $renderedOutput = '';
         if (!empty($append)) {
-            $last = end($append);
+            $last           = end($append);
             $renderedOutput = (string) ($last?->getPlainText() ?? '');
         }
 
         $this->pendingPostHookContext = new PostOutputContextDto(
-            originalInput: $decision->getOriginalInput(),
+            originalInput : $decision->getOriginalInput(),
             renderedOutput: $renderedOutput,
         );
     }
@@ -332,7 +524,7 @@ class InteractiveCommand extends Command
         $ctx = $this->pendingPostHookContext;
         $this->pendingPostHookContext = null;
 
-        $extra = $this->postHook->afterRender($ctx);
+        $extra = $this->getPostHook()->afterRender($ctx);
         if ($extra === null || $extra === '') {
             return;
         }
@@ -369,19 +561,19 @@ class InteractiveCommand extends Command
      */
     private function applyStateDto(TuiStateDto $state): void
     {
-        $this->history = $state->getHistory();
-        $this->inputBuffer = $state->getInputBuffer();
-        $this->cursorOffset = $state->getCursorOffset();
+        $this->history              = $state->getHistory();
+        $this->inputBuffer          = $state->getInputBuffer();
+        $this->cursorOffset         = $state->getCursorOffset();
         $this->inputViewportTopLine = $state->getInputViewportTopLine();
-        $this->mouseModeEnabled = $state->isMouseModeEnabled();
-        $this->outputScroll = $state->getOutputScroll();
-        $this->focus = $state->getFocus();
-        $this->running = $state->isRunning();
-        $this->fullRedraw = $state->isFullRedraw();
-        $this->prevInputLines = $state->getPrevInputLines();
-        $this->prevStatusLine = $state->getPrevStatusLine();
-        $this->prevWidth = $state->getPrevWidth();
-        $this->prevHeight = $state->getPrevHeight();
+        $this->mouseModeEnabled     = $state->isMouseModeEnabled();
+        $this->outputScroll         = $state->getOutputScroll();
+        $this->focus                = $state->getFocus();
+        $this->running              = $state->isRunning();
+        $this->fullRedraw           = $state->isFullRedraw();
+        $this->prevInputLines       = $state->getPrevInputLines();
+        $this->prevStatusLine       = $state->getPrevStatusLine();
+        $this->prevWidth            = $state->getPrevWidth();
+        $this->prevHeight           = $state->getPrevHeight();
     }
 
     /**

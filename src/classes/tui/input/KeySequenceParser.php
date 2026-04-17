@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\modules\neuron\classes\command\input;
+namespace app\modules\neuron\classes\tui\input;
 
 use app\modules\neuron\classes\dto\tui\KeyEventDto;
 
@@ -10,7 +10,7 @@ use app\modules\neuron\classes\dto\tui\KeyEventDto;
  * Парсер клавиатурных последовательностей для TUI.
  *
  * Преобразует входной поток (символы UTF-8 и ESC-последовательности) в нормализованные события.
- * Класс отвечает только за преобразование «байты → событие», и не изменяет состояние приложения.
+ * Класс отвечает только за преобразование «байты → событие» и не изменяет состояние приложения.
  *
  * Примечания по терминалу:
  * - обычный текст приходит как UTF-8 символы;

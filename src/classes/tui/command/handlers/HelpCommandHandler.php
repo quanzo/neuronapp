@@ -26,11 +26,28 @@ use app\modules\neuron\interfaces\tui\command\TuiCommandHandlerInterface;
  */
 final class HelpCommandHandler implements TuiCommandHandlerInterface
 {
+    /**
+     * Возвращает имя команды (без префикса `/`).
+     *
+     * @return string
+     */
     public function getName(): string
     {
         return 'help';
     }
 
+    /**
+     * Формирует вывод справки по доступным командам.
+     *
+     * Результат возвращается как entry с блоками (panel/table/list/hints), чтобы рендер мог красиво
+     * форматировать данные.
+     *
+     * В диагностических целях поддерживается `NEURON_TUI_HELP_ASCII=1` — упрощённый ASCII-вариант текста.
+     *
+     * @param TuiCommandContextDto $ctx
+     * @param ParsedUserInputDto $input
+     * @return TuiCommandResultDto
+     */
     public function handle(TuiCommandContextDto $ctx, ParsedUserInputDto $input): TuiCommandResultDto
     {
         $asciiHelp = (string) (getenv('NEURON_TUI_HELP_ASCII') ?: '');

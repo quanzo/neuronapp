@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Tui;
 
-use app\modules\neuron\classes\command\render\TuiHistoryFormatter;
+use app\modules\neuron\classes\tui\render\TuiHistoryFormatter;
 use app\modules\neuron\classes\dto\tui\history\TuiHistoryDto;
 use app\modules\neuron\classes\dto\tui\history\TuiHistoryEntryDto;
 use app\modules\neuron\classes\dto\tui\view\TuiThemeDto;

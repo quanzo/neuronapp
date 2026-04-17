@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\modules\neuron\classes\command\render;
+namespace app\modules\neuron\classes\tui\render;
 
 use app\modules\neuron\classes\dto\tui\history\TuiHistoryDto;
 use app\modules\neuron\classes\dto\tui\history\TuiHistoryEntryDto;
@@ -526,6 +526,4 @@ final class TuiHistoryFormatter implements TuiHistoryFormatterInterface
         $joined = TuiTextHelper::trimToWidthWithEllipsis($joined, $w);
         return [$prefix . $theme->muted() . $joined . $theme->reset()];
     }
-
-    // withIndent() удалён: он мутировал DTO и приводил к накоплению indent между рендерами.
 }

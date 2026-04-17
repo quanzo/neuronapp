@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Tui;
 
-use app\modules\neuron\classes\command\hooks\DefaultTuiPostOutputHook;
+use app\modules\neuron\classes\tui\hooks\DefaultTuiPostOutputHook;
 use app\modules\neuron\classes\dto\tui\PostOutputContextDto;
 use PHPUnit\Framework\TestCase;
 

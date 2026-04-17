@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Tui;
 
-use app\modules\neuron\classes\command\render\TuiRenderer;
+use app\modules\neuron\classes\tui\render\TuiRenderer;
 use app\modules\neuron\classes\dto\tui\LayoutDto;
 use app\modules\neuron\classes\dto\tui\TerminalSizeDto;
 use app\modules\neuron\classes\dto\tui\TuiStateDto;

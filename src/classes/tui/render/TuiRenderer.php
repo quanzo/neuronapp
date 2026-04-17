@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace app\modules\neuron\classes\command\render;
+namespace app\modules\neuron\classes\tui\render;
 
 use app\modules\neuron\classes\dto\tui\LayoutDto;
 use app\modules\neuron\classes\dto\tui\TerminalSizeDto;
 use app\modules\neuron\classes\dto\tui\TuiStateDto;
+use app\modules\neuron\classes\dto\tui\view\TuiThemeDto;
 use app\modules\neuron\classes\status\CursorPositionStatus;
 use app\modules\neuron\classes\status\HistoryCountStatus;
 use app\modules\neuron\classes\status\ModeStatus;
 use app\modules\neuron\classes\status\MouseModeStatus;
 use app\modules\neuron\classes\status\StatusBar;
-use app\modules\neuron\classes\dto\tui\view\TuiThemeDto;
 use app\modules\neuron\helpers\TuiInputBufferHelper;
 use app\modules\neuron\helpers\TuiTextHelper;
 
@@ -230,9 +230,6 @@ final class TuiRenderer
      * @param TuiStateDto $state
      * @param LayoutDto $layout
      * @param int $width
-     * @param TuiStateDto $state
-     * @param LayoutDto   $layout
-     * @param int         $width
      * @return void
      */
     private function drawInputAreaFull(TuiStateDto $state, LayoutDto $layout, int $width): void
@@ -268,48 +265,50 @@ final class TuiRenderer
     }
 
     /**
-     * Рисует одну строку внутри области ввода (без рамок, только содержимое).
+     * Перерисовывает одну строку input-viewport (для partial render).
      *
      * @param TuiStateDto $state
-     * @param int         $y
-     * @param string      $content
-     * @param int         $width
+     * @param int $absY Абсолютная строка терминала (1-indexed)
+     * @param string $content Содержимое строки viewport (без рамок)
+     * @param int $width Ширина терминала (в колонках)
      * @return void
      */
-    private function drawInputLine(TuiStateDto $state, int $y, string $content, int $width): void
+    private function drawInputLine(TuiStateDto $state, int $absY, string $content, int $width): void
     {
         $color = $state->getFocus() === TuiStateDto::FOCUS_INPUT ? self::COLOR_GREEN : self::COLOR_GRAY;
         $reset = self::COLOR_RESET;
+
+        ['v' => $vline] = $this->getBorderChars();
         $innerWidth = max(0, $width - 3);
+
         $display = mb_strimwidth($content, 0, $innerWidth, '', 'UTF-8');
-        $line = $color . "│" . $reset
+        echo "\033[{$absY};1H\033[0m\033[2K" . $color . $vline . $reset
             . TuiTextHelper::padString($display, $innerWidth)
-            . $color . "│" . $reset;
-        echo "\033[{$y};1H" . $line;
+            . $color . $vline . $reset;
     }
 
     /**
-     * Обновляет statusBar, рисует строку статуса и возвращает её содержимое.
+     * Рендерит статусную строку и возвращает её контент (для кеширования в state).
      *
      * @param TuiStateDto $state
-     * @param LayoutDto   $layout
-     * @param int         $width
-     * @param StatusBar   $statusBar
+     * @param LayoutDto $layout
+     * @param int $width
+     * @param StatusBar $statusBar
      * @return string
      */
     private function buildAndRenderStatusLine(TuiStateDto $state, LayoutDto $layout, int $width, StatusBar $statusBar): string
     {
-        $statusLine = $this->buildStatusLineContent($state, $width, $statusBar);
-        $this->drawStatusLine($layout, $statusLine, $width);
-        return $statusLine;
+        $content = $this->buildStatusLineContent($state, $width, $statusBar);
+        $this->drawStatusLine($layout, $content, $width);
+        return $content;
     }
 
     /**
-     * Возвращает содержимое строки статуса (может содержать ANSI-коды).
+     * Собирает строку статуса из статусов (mode/mouse/cursor/history).
      *
      * @param TuiStateDto $state
-     * @param int         $width
-     * @param StatusBar   $statusBar
+     * @param int $width
+     * @param StatusBar $statusBar
      * @return string
      */
     private function buildStatusLineContent(TuiStateDto $state, int $width, StatusBar $statusBar): string
@@ -329,9 +328,13 @@ final class TuiRenderer
     /**
      * Рисует строку состояния.
      *
+     * Защита от артефактов:
+     * - не пишем в последний столбец, используем `safeWidth = width - 1`;
+     * - предварительно очищаем строку (ESC[2K]).
+     *
      * @param LayoutDto $layout
-     * @param string    $content
-     * @param int       $width
+     * @param string $content
+     * @param int $width
      * @return void
      */
     private function drawStatusLine(LayoutDto $layout, string $content, int $width): void
@@ -350,9 +353,12 @@ final class TuiRenderer
     /**
      * Устанавливает курсор в нужную позицию.
      *
+     * В input-фокусе курсор ставится в координаты viewport (3 строки).
+     * В output-фокусе курсор «прячется» на безопасную позицию в последней строке.
+     *
      * @param TuiStateDto $state
-     * @param LayoutDto   $layout
-     * @param int         $width
+     * @param LayoutDto $layout
+     * @param int $width
      * @return void
      */
     private function positionCursor(TuiStateDto $state, LayoutDto $layout, int $width): void
@@ -367,13 +373,8 @@ final class TuiRenderer
             return;
         }
 
-        $noStatus = (string) (getenv('NEURON_TUI_NO_STATUS') ?: '');
-        if ($noStatus === '1' || strtolower($noStatus) === 'true') {
-            echo "\033[{$layout->getStatusLine()};1H";
-            return;
-        }
-
+        $row = $layout->getStatusLine();
         $safeWidth = max(1, $width - 1);
-        echo "\033[{$layout->getStatusLine()};{$safeWidth}H";
+        echo "\033[{$row};{$safeWidth}H";
     }
 }

@@ -22,6 +22,18 @@ use app\modules\neuron\classes\dto\tui\command\ParsedUserInputDto;
  */
 final class UserInputParser
 {
+    /**
+     * Парсит «сырую» строку пользователя в DTO.
+     *
+     * Правила:
+     * - пустая строка → не команда;
+     * - строка без префикса `/` → не команда;
+     * - строка вида `/` или `/   ` → команда без имени (isCommand=true, commandName=null);
+     * - аргументы поддерживают кавычки: `"a b"` и `'a b'`.
+     *
+     * @param string $raw Исходный ввод пользователя (может быть многострочным, но команды обычно однострочные)
+     * @return ParsedUserInputDto
+     */
     public function parse(string $raw): ParsedUserInputDto
     {
         $trim = trim($raw);
@@ -50,6 +62,13 @@ final class UserInputParser
     }
 
     /**
+     * Разбивает строку аргументов на токены, учитывая кавычки.
+     *
+     * Поддерживается:
+     * - двойные кавычки с экранированием (`\"`), результат — `stripcslashes`;
+     * - одинарные кавычки без экранирования;
+     * - некавычечные токены, разделённые пробелами.
+     *
      * @return list<string>
      */
     private function splitArgs(string $s): array

@@ -14,14 +14,28 @@ use app\modules\neuron\interfaces\tui\command\TuiCommandHandlerInterface;
 
 /**
  * Handler команды `/exit`.
+ *
+ * Команда устанавливает флаг `exit=true` в результате, чтобы TUI завершила основной цикл.
  */
 final class ExitCommandHandler implements TuiCommandHandlerInterface
 {
+    /**
+     * Возвращает имя команды (без префикса `/`).
+     *
+     * @return string
+     */
     public function getName(): string
     {
         return 'exit';
     }
 
+    /**
+     * Запрашивает завершение работы TUI.
+     *
+     * @param TuiCommandContextDto $ctx
+     * @param ParsedUserInputDto $input
+     * @return TuiCommandResultDto
+     */
     public function handle(TuiCommandContextDto $ctx, ParsedUserInputDto $input): TuiCommandResultDto
     {
         $entry = TuiHistoryEntryDto::event('exit')

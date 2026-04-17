@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\modules\neuron\classes\command\hooks;
+namespace app\modules\neuron\classes\tui\hooks;
 
 use app\modules\neuron\classes\dto\tui\PostOutputContextDto;
 use app\modules\neuron\interfaces\tui\TuiPostOutputHookInterface;

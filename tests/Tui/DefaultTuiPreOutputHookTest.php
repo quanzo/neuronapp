@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Tui;
 
-use app\modules\neuron\classes\command\hooks\DefaultTuiPreOutputHook;
+use app\modules\neuron\classes\tui\hooks\DefaultTuiPreOutputHook;
 use PHPUnit\Framework\TestCase;
 
 /**

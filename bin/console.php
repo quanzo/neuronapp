@@ -11,6 +11,11 @@ use app\modules\neuron\classes\command\ClearAllSessionsCommand;
 use app\modules\neuron\classes\command\ClearSessionCommand;
 use app\modules\neuron\classes\command\OrchestrateCommand;
 use app\modules\neuron\classes\command\WikiCommand;
+use app\modules\neuron\classes\tui\command\handlers\ClearCommandHandler;
+use app\modules\neuron\classes\tui\command\handlers\ExitCommandHandler;
+use app\modules\neuron\classes\tui\command\handlers\HelpCommandHandler;
+use app\modules\neuron\classes\tui\command\handlers\WorkspaceCommandHandler;
+use app\modules\neuron\classes\tui\hooks\DefaultTuiPostOutputHook;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\console\TimedConsoleApplication;
 use app\modules\neuron\classes\dir\DirPriority;
@@ -95,7 +100,17 @@ try {
 
 // Регистрируем команды
 $app->add(new HelloCommand());
-$app->add(new InteractiveCommand());
+
+$interactive = (new InteractiveCommand())
+    ->setCommandName('interactive')
+    ->setDescriptionText('Интерактивный TUI (workspace)')
+    ->addHandler(new HelpCommandHandler())
+    ->addHandler(new WorkspaceCommandHandler())
+    ->addHandler(new ClearCommandHandler())
+    ->addHandler(new ExitCommandHandler())
+    ->setPostHook(new DefaultTuiPostOutputHook());
+
+$app->add($interactive);
 $app->add(new SimpleMessageCommand());
 $app->add(new TodolistCommand());
 $app->add(new WikiCommand());

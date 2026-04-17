@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\modules\neuron\classes\command\hooks;
+namespace app\modules\neuron\classes\tui\hooks;
 
 use app\modules\neuron\classes\dto\tui\TuiPreHookDecisionDto;
 use app\modules\neuron\classes\dto\tui\command\TuiCommandContextDto;
@@ -12,20 +12,20 @@ use app\modules\neuron\classes\dto\tui\view\blocks\NoticeBlockDto;
 use app\modules\neuron\classes\dto\tui\view\blocks\TextBlockDto;
 use app\modules\neuron\classes\tui\command\TuiCommandDispatcher;
 use app\modules\neuron\classes\tui\command\UserInputParser;
-use app\modules\neuron\classes\tui\command\handlers\ClearCommandHandler;
-use app\modules\neuron\classes\tui\command\handlers\ExitCommandHandler;
-use app\modules\neuron\classes\tui\command\handlers\HelpCommandHandler;
-use app\modules\neuron\classes\tui\command\handlers\WorkspaceCommandHandler;
 use app\modules\neuron\enums\tui\TuiNoticeKindEnum;
 use app\modules\neuron\interfaces\tui\TuiPreOutputHookInterface;
 
 /**
  * Pre-hook TUI для режима Workspace: парсер → dispatcher → handlers.
  *
+ * В отличие от «жёстко зашитого» варианта, набор handlers задаётся извне через dispatcher.
+ * Это позволяет на базе `InteractiveCommand` создавать разные TUI-команды с разной функциональностью.
+ *
  * Пример использования:
  *
  * ```php
- * $hook = new WorkspaceTuiPreOutputHook();
+ * $dispatcher = new TuiCommandDispatcher([$help, $ws, $clear, $exit]);
+ * $hook = new WorkspaceTuiPreOutputHook($dispatcher);
  * $decision = $hook->decide('/help');
  * ```
  */
@@ -34,17 +34,19 @@ final class WorkspaceTuiPreOutputHook implements TuiPreOutputHookInterface
     private UserInputParser $parser;
     private TuiCommandDispatcher $dispatcher;
 
-    public function __construct()
+    /**
+     * @param TuiCommandDispatcher $dispatcher Диспетчер с зарегистрированными handlers
+     * @param UserInputParser|null $parser Парсер пользовательского ввода (по умолчанию создаётся внутри)
+     */
+    public function __construct(TuiCommandDispatcher $dispatcher, ?UserInputParser $parser = null)
     {
-        $this->parser = new UserInputParser();
-        $this->dispatcher = new TuiCommandDispatcher([
-            new HelpCommandHandler(),
-            new WorkspaceCommandHandler(),
-            new ClearCommandHandler(),
-            new ExitCommandHandler(),
-        ]);
+        $this->dispatcher = $dispatcher;
+        $this->parser = $parser ?? new UserInputParser();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function decide(string $originalInput): TuiPreHookDecisionDto
     {
         $ctx = new TuiCommandContextDto((string) getcwd(), new TuiHistoryDto());

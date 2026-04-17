@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Tui;
 
-use app\modules\neuron\classes\command\input\KeySequenceParser;
-use app\modules\neuron\classes\command\input\Utf8CharReader;
+use app\modules\neuron\classes\tui\input\KeySequenceParser;
+use app\modules\neuron\classes\tui\input\Utf8CharReader;
 use app\modules\neuron\classes\dto\tui\KeyEventDto;
 use PHPUnit\Framework\TestCase;
 
@@ -15,7 +15,7 @@ use PHPUnit\Framework\TestCase;
  * KeySequenceParser — преобразует ввод из stdin (символы UTF‑8 и ESC‑последовательности)
  * в нормализованные события {@see KeyEventDto}.
  *
- * Тестируемая сущность: {@see \app\modules\neuron\classes\command\input\KeySequenceParser}
+ * Тестируемая сущность: {@see \app\modules\neuron\classes\tui\input\KeySequenceParser}
  */
 class KeySequenceParserTest extends TestCase
 {

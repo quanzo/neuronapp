@@ -1,6 +1,6 @@
 <?php
 
-namespace app\modules\neuron\classes\command\terminal;
+namespace app\modules\neuron\classes\tui\terminal;
 
 /**
  * Управляет режимами терминала для TUI.

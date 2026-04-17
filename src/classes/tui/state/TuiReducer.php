@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\modules\neuron\classes\command\state;
+namespace app\modules\neuron\classes\tui\state;
 
 use app\modules\neuron\classes\dto\tui\KeyEventDto;
 use app\modules\neuron\classes\dto\tui\LayoutDto;
@@ -304,7 +304,7 @@ final class TuiReducer
     /**
      * Вставляет текст из bracketed paste в позицию курсора.
      *
-     * В отличие от `applyText()`, строка может содержать `\n` и быть длинной.
+     * В отличие от `applyText()`, строка может содержать `\\n` и быть длинной.
      *
      * @param TuiStateDto $state
      * @param string $text

@@ -13,12 +13,12 @@
 
 ### Архитектура (компоненты)
 
-- **Terminal режимы**: `src/classes/command/terminal/TerminalModeManager.php`
+- **Terminal режимы**: `src/classes/tui/terminal/TerminalModeManager.php`
   - включает `stty -icanon -echo`, alt-buffer, скрывает курсор;
   - включает **Bracketed Paste Mode** (`ESC[?2004h`) для корректной многострочной вставки;
   - обязательно использовать через `try/finally`, чтобы терминал гарантированно восстановился.
 
-- **Ввод**: `src/classes/command/input/`
+- **Ввод**: `src/classes/tui/input/`
   - `Utf8CharReader` — читает один UTF‑8 символ из потока;
   - `KeySequenceParser` — превращает поток в события `KeyEventDto`:
     - стрелки, PageUp/PageDown, Tab, Enter, Backspace, Delete, Home/End, Ctrl+C, текст;
@@ -30,7 +30,7 @@
   - `TerminalSizeDto` — размеры терминала (width/height);
   - `KeyEventDto` — нормализованное событие клавиатуры.
 
-- **Обработка событий (reducer)**: `src/classes/command/state/TuiReducer.php`
+- **Обработка событий (reducer)**: `src/classes/tui/state/TuiReducer.php`
   - единственное место, где описаны правила изменения `TuiStateDto` по `KeyEventDto`;
   - важно: логика остановки по `Ctrl+C` обрабатывается до вставки текста.
 
@@ -41,7 +41,7 @@
 - **Rich-вывод (виджеты)**:
   - `src/interfaces/tui/view/TuiBlockInterface.php` — контракт блока;
   - `src/classes/dto/tui/view/blocks/*` — блоки: `Text/Heading/Panel/Table/List/Code/Notice/Divider/KeyHints`;
-  - `src/classes/command/render/TuiHistoryFormatter.php` — форматтер entries/blocks → плоские строки;
+  - `src/classes/tui/render/TuiHistoryFormatter.php` — форматтер entries/blocks → плоские строки;
   - `src/classes/dto/tui/view/TuiThemeDto.php` — ANSI-тема.
 
 - **Hooks вывода (pre/post)**:
@@ -49,10 +49,27 @@
   - `src/classes/dto/tui/TuiPreHookDecisionDto.php` — DTO решения pre-hook;
   - `src/interfaces/tui/TuiPostOutputHookInterface.php` — вызывается после рендера кадра, может дописать дополнительный многострочный вывод в history;
   - дефолтные реализации:
-    - `src/classes/command/hooks/WorkspaceTuiPreOutputHook.php` — собственная система команд (parser → dispatcher → handlers);
-    - `src/classes/command/hooks/DefaultTuiPostOutputHook.php` — возвращает `вывод + дата/время`.
+    - `src/classes/tui/hooks/WorkspaceTuiPreOutputHook.php` — собственная система команд (parser → dispatcher → handlers);
+    - `src/classes/tui/hooks/DefaultTuiPostOutputHook.php` — возвращает `вывод + дата/время`.
 
-- **Отрисовка**: `src/classes/command/render/TuiRenderer.php`
+### Wiring handlers (рекомендованный способ)
+
+Регистрируйте TUI handlers через `InteractiveCommand`, чтобы `bin/console.php` оставался минимальным, а команда сама владела набором доступных TUI-команд:
+
+```php
+$interactive = (new \app\modules\neuron\classes\command\InteractiveCommand())
+    ->setCommandName('interactive')
+    ->setDescriptionText('Интерактивный TUI (workspace)')
+    ->addHandler(new \app\modules\neuron\classes\tui\command\handlers\HelpCommandHandler())
+    ->addHandler(new \app\modules\neuron\classes\tui\command\handlers\WorkspaceCommandHandler())
+    ->addHandler(new \app\modules\neuron\classes\tui\command\handlers\ClearCommandHandler())
+    ->addHandler(new \app\modules\neuron\classes\tui\command\handlers\ExitCommandHandler())
+    ->setPostHook(new \app\modules\neuron\classes\tui\hooks\DefaultTuiPostOutputHook());
+
+$app->add($interactive);
+```
+
+- **Отрисовка**: `src/classes/tui/render/TuiRenderer.php`
   - full render (очистка и полная отрисовка рамок/контента/курсора);
   - partial render (обновление только изменившихся строк ввода и статус-бара);
   - для переносов/выравнивания использует `src/helpers/TuiTextHelper.php`.

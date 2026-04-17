@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Tui;
 
-use app\modules\neuron\classes\command\state\TuiReducer;
+use app\modules\neuron\classes\tui\state\TuiReducer;
 use app\modules\neuron\classes\dto\tui\KeyEventDto;
 use app\modules\neuron\classes\dto\tui\LayoutDto;
 use app\modules\neuron\classes\dto\tui\TuiStateDto;
@@ -18,7 +18,7 @@ use PHPUnit\Framework\TestCase;
  *
  * TuiReducer — применяет события клавиатуры к состоянию TUI (без IO).
  *
- * Тестируемая сущность: {@see \app\modules\neuron\classes\command\state\TuiReducer}
+ * Тестируемая сущность: {@see \app\modules\neuron\classes\tui\state\TuiReducer}
  */
 class TuiReducerTest extends TestCase
 {

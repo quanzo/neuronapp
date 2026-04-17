@@ -18,14 +18,38 @@ use app\modules\neuron\interfaces\tui\command\TuiCommandHandlerInterface;
 /**
  * Handler команды `/ws` (workspace).
  *
- * Подкоманды:\n+ * - `ls`\n+ */
+ * Подкоманды:
+ * - `ls` — показать содержимое текущей директории (ограниченный список).
+ *
+ * Пример использования:
+ *
+ * ```php
+ * $handler = new WorkspaceCommandHandler();
+ * $result = $handler->handle($ctx, $input);
+ * ```
+ */
 final class WorkspaceCommandHandler implements TuiCommandHandlerInterface
 {
+    /**
+     * Возвращает имя команды (без префикса `/`).
+     *
+     * @return string
+     */
     public function getName(): string
     {
         return 'ws';
     }
 
+    /**
+     * Обрабатывает workspace-команду.
+     *
+     * На текущем этапе поддерживается только подкоманда `ls`.
+     * Неизвестные подкоманды возвращают warning entry.
+     *
+     * @param TuiCommandContextDto $ctx
+     * @param ParsedUserInputDto $input
+     * @return TuiCommandResultDto
+     */
     public function handle(TuiCommandContextDto $ctx, ParsedUserInputDto $input): TuiCommandResultDto
     {
         $args = $input->getArgs();
