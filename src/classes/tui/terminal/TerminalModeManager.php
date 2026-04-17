@@ -159,7 +159,9 @@ class TerminalModeManager
      */
     private function enableNonCanonicalNoEcho(): void
     {
-        $this->prevStty = (string) shell_exec('stty -g 2>/dev/null');
+        $snapshot = (string) shell_exec('stty -g 2>/dev/null');
+        $snapshot = trim($snapshot);
+        $this->prevStty = $snapshot !== '' ? $snapshot : null;
         system('stty -icanon -echo');
     }
 
@@ -172,13 +174,18 @@ class TerminalModeManager
      */
     private function enableCanonicalEcho(): void
     {
-        if ($this->prevStty !== null && $this->prevStty !== '') {
-            system('stty ' . escapeshellarg($this->prevStty));
-            $this->prevStty = null;
-            return;
+        $snapshot = $this->prevStty;
+        $this->prevStty = null;
+
+        if ($snapshot !== null && $snapshot !== '') {
+            $exitCode = 0;
+            system('stty ' . escapeshellarg($snapshot) . ' 2>/dev/null', $exitCode);
+            if ($exitCode === 0) {
+                return;
+            }
         }
 
-        system('stty icanon echo');
+        system('stty icanon echo 2>/dev/null');
     }
 
     /**
