@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\interfaces\tui;
 
-use app\modules\neuron\classes\dto\tui\PreOutputDecisionDto;
+use app\modules\neuron\classes\dto\tui\TuiPreHookDecisionDto;
 
 /**
  * Контракт pre-hook для интерактивного TUI.
@@ -16,7 +16,7 @@ use app\modules\neuron\classes\dto\tui\PreOutputDecisionDto;
  *
  * ```php
  * $decision = $hook->decide($input);
- * if ($decision->getOutputText() !== null) { ... }
+ * foreach ($decision->getAppendEntries() as $entry) { ... }
  * ```
  */
 interface TuiPreOutputHookInterface
@@ -25,7 +25,7 @@ interface TuiPreOutputHookInterface
      * Принимает решение о выводе.
      *
      * @param string $originalInput Исходная введённая строка (может быть многострочной).
-     * @return PreOutputDecisionDto Решение: что выводить (или не выводить).
+     * @return TuiPreHookDecisionDto Решение: что добавить в историю/как управлять циклом.
      */
-    public function decide(string $originalInput): PreOutputDecisionDto;
+    public function decide(string $originalInput): TuiPreHookDecisionDto;
 }

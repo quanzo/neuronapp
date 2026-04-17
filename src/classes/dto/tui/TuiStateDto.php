@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tui;
 
+use app\modules\neuron\classes\dto\tui\history\TuiHistoryDto;
+
 /**
  * DTO состояния интерактивного TUI.
  *
@@ -18,7 +20,7 @@ namespace app\modules\neuron\classes\dto\tui;
  * ```php
  * $state = (new TuiStateDto())
  *     ->setFocus(TuiStateDto::FOCUS_INPUT)
- *     ->setInputLines(['', '', '']);
+ *     ->setInputBuffer('');
  * ```
  */
 final class TuiStateDto
@@ -26,14 +28,12 @@ final class TuiStateDto
     public const FOCUS_INPUT = 'input';
     public const FOCUS_OUTPUT = 'output';
 
-    /** @var string[] */
-    private array $history = [];
+    private TuiHistoryDto $history;
 
-    /** @var string[] */
-    private array $inputLines = ['', '', ''];
+    private string $inputBuffer = '';
+    private int $cursorOffset = 0;
+    private int $inputViewportTopLine = 0;
 
-    private int $cursorRow = 0;
-    private int $cursorCol = 0;
     private int $outputScroll = 0;
 
     /** @var string self::FOCUS_INPUT|self::FOCUS_OUTPUT */
@@ -41,6 +41,7 @@ final class TuiStateDto
 
     private bool $running = true;
     private bool $fullRedraw = true;
+    private bool $mouseModeEnabled = false;
 
     /** @var string[] */
     private array $prevInputLines = ['', '', ''];
@@ -51,86 +52,131 @@ final class TuiStateDto
     private int $prevHeight = 0;
 
     /**
-     * @return string[]
+     * Создаёт DTO состояния с пустой историей.
+     *
+     * История инициализируется внутри конструктора, чтобы состояние было валидным сразу после создания.
+     *
+     * @return void
      */
-    public function getHistory(): array
+    public function __construct()
+    {
+        $this->history = new TuiHistoryDto();
+    }
+
+    /**
+     * Возвращает историю сообщений/entries, отображаемую в области output.
+     *
+     * @return TuiHistoryDto
+     */
+    public function getHistory(): TuiHistoryDto
     {
         return $this->history;
     }
 
     /**
-     * @param string[] $history
+     * Устанавливает историю сообщений/entries.
+     *
+     * Важно: история — объект, который переиспользуется между рендерами; избегайте
+     * неожиданных мутаций DTO внутри форматтеров/рендера.
+     *
+     * @param TuiHistoryDto $history
      * @return self
      */
-    public function setHistory(array $history): self
+    public function setHistory(TuiHistoryDto $history): self
     {
         $this->history = $history;
         return $this;
     }
 
     /**
-     * Добавляет сообщение в историю.
+     * Текущий буфер ввода (может быть многострочным, содержит `\n`).
+     */
+    public function getInputBuffer(): string
+    {
+        return $this->inputBuffer;
+    }
+
+    /**
+     * Устанавливает буфер ввода.
      *
-     * @param string $message
+     * @param string $inputBuffer
      * @return self
      */
-    public function addHistoryMessage(string $message): self
+    public function setInputBuffer(string $inputBuffer): self
     {
-        $this->history[] = $message;
+        $this->inputBuffer = $inputBuffer;
         return $this;
     }
 
     /**
-     * @return string[]
+     * Позиция курсора в буфере ввода (смещение в «символах», не в байтах).
      */
-    public function getInputLines(): array
+    public function getCursorOffset(): int
     {
-        return $this->inputLines;
+        return $this->cursorOffset;
     }
 
     /**
-     * @param string[] $inputLines Ожидается массив из 3 строк.
+     * Устанавливает позицию курсора в буфере ввода.
+     *
+     * Значение нормализуется к неотрицательному.
+     *
+     * @param int $cursorOffset
      * @return self
      */
-    public function setInputLines(array $inputLines): self
+    public function setCursorOffset(int $cursorOffset): self
     {
-        $this->inputLines = $inputLines;
+        $this->cursorOffset = max(0, $cursorOffset);
         return $this;
     }
 
-    public function getCursorRow(): int
+    /**
+     * Верхняя строка viewport ввода (для отображения части многострочного буфера).
+     */
+    public function getInputViewportTopLine(): int
     {
-        return $this->cursorRow;
+        return $this->inputViewportTopLine;
     }
 
-    public function setCursorRow(int $cursorRow): self
+    /**
+     * Устанавливает верхнюю строку viewport ввода.
+     *
+     * @param int $inputViewportTopLine
+     * @return self
+     */
+    public function setInputViewportTopLine(int $inputViewportTopLine): self
     {
-        $this->cursorRow = $cursorRow;
+        $this->inputViewportTopLine = max(0, $inputViewportTopLine);
         return $this;
     }
 
-    public function getCursorCol(): int
-    {
-        return $this->cursorCol;
-    }
-
-    public function setCursorCol(int $cursorCol): self
-    {
-        $this->cursorCol = $cursorCol;
-        return $this;
-    }
-
+    /**
+     * Текущее смещение прокрутки области output (в строках истории).
+     */
     public function getOutputScroll(): int
     {
         return $this->outputScroll;
     }
 
+    /**
+     * Устанавливает смещение прокрутки output.
+     *
+     * Clamp до допустимого диапазона выполняется на уровне команды/рендера.
+     *
+     * @param int $outputScroll
+     * @return self
+     */
     public function setOutputScroll(int $outputScroll): self
     {
         $this->outputScroll = $outputScroll;
         return $this;
     }
 
+    /**
+     * Текущий фокус интерфейса: input или output.
+     *
+     * @return string self::FOCUS_INPUT|self::FOCUS_OUTPUT
+     */
     public function getFocus(): string
     {
         return $this->focus;
@@ -151,6 +197,12 @@ final class TuiStateDto
         return $this->running;
     }
 
+    /**
+     * Управляет флагом работы цикла TUI.
+     *
+     * @param bool $running
+     * @return self
+     */
     public function setRunning(bool $running): self
     {
         $this->running = $running;
@@ -162,13 +214,40 @@ final class TuiStateDto
         return $this->fullRedraw;
     }
 
+    /**
+     * Управляет флагом необходимости полной перерисовки.
+     *
+     * Используется, когда меняется output/фокус/скролл/режимы, влияющие на отрисовку.
+     *
+     * @param bool $fullRedraw
+     * @return self
+     */
     public function setFullRedraw(bool $fullRedraw): self
     {
         $this->fullRedraw = $fullRedraw;
         return $this;
     }
 
+    public function isMouseModeEnabled(): bool
+    {
+        return $this->mouseModeEnabled;
+    }
+
     /**
+     * Включает/выключает обработку mouse events (при активном reporting в терминале).
+     *
+     * @param bool $mouseModeEnabled
+     * @return self
+     */
+    public function setMouseModeEnabled(bool $mouseModeEnabled): self
+    {
+        $this->mouseModeEnabled = $mouseModeEnabled;
+        return $this;
+    }
+
+    /**
+     * Последние отрисованные строки viewport input (для partial render).
+     *
      * @return string[]
      */
     public function getPrevInputLines(): array
@@ -177,6 +256,8 @@ final class TuiStateDto
     }
 
     /**
+     * Устанавливает кеш предыдущих строк ввода (для partial render).
+     *
      * @param string[] $prevInputLines
      * @return self
      */
@@ -186,33 +267,60 @@ final class TuiStateDto
         return $this;
     }
 
+    /**
+     * Возвращает последнюю отрисованную строку статуса (для сравнения в partial render).
+     */
     public function getPrevStatusLine(): string
     {
         return $this->prevStatusLine;
     }
 
+    /**
+     * Устанавливает последнюю отрисованную строку статуса.
+     *
+     * @param string $prevStatusLine
+     * @return self
+     */
     public function setPrevStatusLine(string $prevStatusLine): self
     {
         $this->prevStatusLine = $prevStatusLine;
         return $this;
     }
 
+    /**
+     * Предыдущая ширина терминала (для детекта ресайза).
+     */
     public function getPrevWidth(): int
     {
         return $this->prevWidth;
     }
 
+    /**
+     * Устанавливает предыдущую ширину терминала.
+     *
+     * @param int $prevWidth
+     * @return self
+     */
     public function setPrevWidth(int $prevWidth): self
     {
         $this->prevWidth = $prevWidth;
         return $this;
     }
 
+    /**
+     * Предыдущая высота терминала (для детекта ресайза).
+     */
     public function getPrevHeight(): int
     {
         return $this->prevHeight;
     }
 
+    /**
+     * Устанавливает предыдущую высоту терминала.
+     *
+     * @param int $prevHeight
+     * @return self
+     */
     public function setPrevHeight(int $prevHeight): self
     {
         $this->prevHeight = $prevHeight;

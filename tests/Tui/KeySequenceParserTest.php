@@ -106,6 +106,76 @@ class KeySequenceParserTest extends TestCase
     }
 
     /**
+     * Bracketed paste (ESC[200~...ESC[201~) распознаётся как TYPE_PASTE и возвращает весь payload.
+     */
+    public function testReadsBracketedPaste(): void
+    {
+        $payload = "a\nb\nя";
+        $stdin = $this->streamFromString("\033[200~" . $payload . "\033[201~");
+        $parser = new KeySequenceParser(new Utf8CharReader());
+
+        $event = $parser->readEvent($stdin);
+        $this->assertSame(KeyEventDto::TYPE_PASTE, $event?->getType());
+        $this->assertSame($payload, $event?->getPasteText());
+    }
+
+    /**
+     * Delete (ESC[3~) распознаётся как TYPE_DELETE.
+     */
+    public function testReadsDeleteEscapeSequence(): void
+    {
+        $stdin = $this->streamFromString("\033[3~");
+        $parser = new KeySequenceParser(new Utf8CharReader());
+
+        $event = $parser->readEvent($stdin);
+        $this->assertSame(KeyEventDto::TYPE_DELETE, $event?->getType());
+    }
+
+    /**
+     * Home/End распознаются как TYPE_HOME/TYPE_END.
+     */
+    public function testReadsHomeAndEndEscapeSequences(): void
+    {
+        $parser = new KeySequenceParser(new Utf8CharReader());
+
+        $home = $parser->readEvent($this->streamFromString("\033[H"));
+        $this->assertSame(KeyEventDto::TYPE_HOME, $home?->getType());
+
+        $end = $parser->readEvent($this->streamFromString("\033[F"));
+        $this->assertSame(KeyEventDto::TYPE_END, $end?->getType());
+    }
+
+    /**
+     * F2 распознаётся как toggle mouse-mode (поддерживаем ESC O Q и ESC[12~).
+     */
+    public function testReadsF2ToggleMouseMode(): void
+    {
+        $parser = new KeySequenceParser(new Utf8CharReader());
+
+        $f2a = $parser->readEvent($this->streamFromString("\033OQ"));
+        $this->assertSame(KeyEventDto::TYPE_TOGGLE_MOUSE_MODE, $f2a?->getType());
+
+        $f2b = $parser->readEvent($this->streamFromString("\033[12~"));
+        $this->assertSame(KeyEventDto::TYPE_TOGGLE_MOUSE_MODE, $f2b?->getType());
+    }
+
+    /**
+     * X10 mouse event (ESC[M Cb Cx Cy) распознаётся как TYPE_MOUSE.
+     */
+    public function testReadsX10MouseEvent(): void
+    {
+        // button=0, x=10, y=5 => добавляем 32 по протоколу.
+        $stdin = $this->streamFromString("\033[M" . chr(32 + 0) . chr(32 + 10) . chr(32 + 5));
+        $parser = new KeySequenceParser(new Utf8CharReader());
+
+        $event = $parser->readEvent($stdin);
+        $this->assertSame(KeyEventDto::TYPE_MOUSE, $event?->getType());
+        $this->assertSame(0, $event?->getMouseButton());
+        $this->assertSame(10, $event?->getMouseX());
+        $this->assertSame(5, $event?->getMouseY());
+    }
+
+    /**
      * Неизвестная ESC-последовательность не даёт события (возвращается null).
      */
     public function testUnknownEscapeSequenceReturnsNull(): void

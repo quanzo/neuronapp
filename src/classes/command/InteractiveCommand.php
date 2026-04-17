@@ -7,14 +7,16 @@ use app\modules\neuron\classes\command\terminal\TerminalModeManager;
 use app\modules\neuron\classes\command\input\KeySequenceParser;
 use app\modules\neuron\classes\command\input\Utf8CharReader;
 use app\modules\neuron\classes\command\state\TuiReducer;
+use app\modules\neuron\classes\command\render\TuiHistoryFormatter;
 use app\modules\neuron\classes\command\render\TuiRenderer;
+use app\modules\neuron\classes\dto\tui\history\TuiHistoryDto;
 use app\modules\neuron\classes\dto\tui\KeyEventDto;
 use app\modules\neuron\classes\dto\tui\LayoutDto;
 use app\modules\neuron\classes\dto\tui\PostOutputContextDto;
-use app\modules\neuron\classes\dto\tui\PreOutputDecisionDto;
 use app\modules\neuron\classes\dto\tui\TerminalSizeDto;
 use app\modules\neuron\classes\dto\tui\TuiStateDto;
-use app\modules\neuron\helpers\TuiTextHelper;
+use app\modules\neuron\classes\dto\tui\TuiPreHookDecisionDto;
+use app\modules\neuron\classes\dto\tui\view\TuiThemeDto;
 use app\modules\neuron\interfaces\tui\TuiPostOutputHookInterface;
 use app\modules\neuron\interfaces\tui\TuiPreOutputHookInterface;
 use Symfony\Component\Console\Command\Command;
@@ -43,7 +45,7 @@ class InteractiveCommand extends Command
     private Terminal $terminal;
 
     /** @var array История отправленных сообщений */
-    private array $history = [];
+    private TuiHistoryDto $history;
 
     /**
      * Добавляет сообщение в историю.
@@ -52,17 +54,20 @@ class InteractiveCommand extends Command
      */
     protected function addMessage(string $message): void
     {
-        $this->history[] = $message;
+        $this->history->appendOutput($message);
     }
 
-    /** @var array Три строки поля ввода */
-    private array $inputLines = ['', '', ''];
+    /** @var string Буфер многострочного ввода */
+    private string $inputBuffer = '';
 
-    /** @var int Текущая строка в поле ввода (0, 1, 2) */
-    private int $cursorRow = 0;
+    /** @var int Позиция курсора в буфере (в символах) */
+    private int $cursorOffset = 0;
 
-    /** @var int Текущая позиция в строке (символов от начала) */
-    private int $cursorCol = 0;
+    /** @var int Верхняя строка viewport ввода (для отображения 3 строк) */
+    private int $inputViewportTopLine = 0;
+
+    /** @var bool Включён ли режим mouse reporting (выключен по умолчанию) */
+    private bool $mouseModeEnabled = false;
 
     /** @var int Смещение прокрутки области вывода (в строках) */
     private int $outputScroll = 0;
@@ -113,6 +118,7 @@ class InteractiveCommand extends Command
         setlocale(LC_ALL, 'en_US.UTF-8');
 
         $this->terminal = new Terminal();
+        $this->history = new TuiHistoryDto();
         $this->statusBar = new StatusBar();
         $this->prevWidth = $this->terminal->getWidth();
         $this->prevHeight = $this->terminal->getHeight();
@@ -128,7 +134,7 @@ class InteractiveCommand extends Command
         $terminalMode = new TerminalModeManager();
         $terminalMode->enter();
         try {
-            $this->runLoop();
+            $this->runLoop($terminalMode);
         } finally {
             $terminalMode->leave();
         }
@@ -147,7 +153,7 @@ class InteractiveCommand extends Command
     /**
      * Главный цикл обработки ввода и отрисовки.
      */
-    private function runLoop(): void
+    private function runLoop(TerminalModeManager $terminalMode): void
     {
         $stdin = fopen('php://stdin', 'r');
         stream_set_blocking($stdin, false);
@@ -163,6 +169,13 @@ class InteractiveCommand extends Command
         while ($this->running) {
             // Проверяем, не изменился ли размер терминала
             $this->checkResize();
+
+            // Синхронизируем mouse reporting с текущим состоянием (по умолчанию OFF).
+            if ($this->mouseModeEnabled) {
+                $terminalMode->enableMouseX10();
+            } else {
+                $terminalMode->disableMouseX10();
+            }
 
             // Выполняем перерисовку, если необходимо
             if ($this->fullRedraw) {
@@ -253,7 +266,8 @@ class InteractiveCommand extends Command
 
         // Clamp прокрутку после любых изменений.
         $this->terminal = new Terminal();
-        $this->outputScroll = min($this->outputScroll, $this->getMaxOutputScroll());
+        $maxScroll = $this->getMaxOutputScroll();
+        $this->outputScroll = min($this->outputScroll, $maxScroll);
     }
 
     /**
@@ -263,31 +277,44 @@ class InteractiveCommand extends Command
      */
     private function initHooks(): void
     {
-        $this->preHook = new \app\modules\neuron\classes\command\hooks\DefaultTuiPreOutputHook();
+        $this->preHook = new \app\modules\neuron\classes\command\hooks\WorkspaceTuiPreOutputHook();
         $this->postHook = new \app\modules\neuron\classes\command\hooks\DefaultTuiPostOutputHook();
     }
 
     /**
-     * Применяет решение pre-hook: добавляет текст в историю (или не добавляет).
+     * Применяет решение pre-hook: добавляет entries/управляет TUI.
      *
-     * @param PreOutputDecisionDto $decision
+     * @param TuiPreHookDecisionDto $decision
      * @return void
      */
-    private function applyPreHookDecision(PreOutputDecisionDto $decision): void
+    private function applyPreHookDecision(TuiPreHookDecisionDto $decision): void
     {
-        $outputText = $decision->getOutputText();
-        if ($outputText === null) {
-            return;
+        if ($decision->isClearHistory()) {
+            $this->history->clear();
         }
 
-        $this->history[] = $outputText;
+        $append = $decision->getAppendEntries();
+        foreach ($append as $entry) {
+            $this->history->append($entry);
+        }
+
+        if ($decision->isExit()) {
+            $this->running = false;
+        }
+
         $this->terminal = new Terminal();
         $this->outputScroll = $this->getMaxOutputScroll();
         $this->fullRedraw = true;
 
+        $renderedOutput = '';
+        if (!empty($append)) {
+            $last = end($append);
+            $renderedOutput = (string) ($last?->getPlainText() ?? '');
+        }
+
         $this->pendingPostHookContext = new PostOutputContextDto(
             originalInput: $decision->getOriginalInput(),
-            renderedOutput: $outputText,
+            renderedOutput: $renderedOutput,
         );
     }
 
@@ -310,7 +337,7 @@ class InteractiveCommand extends Command
             return;
         }
 
-        $this->history[] = $extra;
+        $this->history->appendOutput($extra);
         $this->terminal = new Terminal();
         $this->outputScroll = $this->getMaxOutputScroll();
         $this->fullRedraw = true;
@@ -323,9 +350,10 @@ class InteractiveCommand extends Command
     {
         return (new TuiStateDto())
             ->setHistory($this->history)
-            ->setInputLines($this->inputLines)
-            ->setCursorRow($this->cursorRow)
-            ->setCursorCol($this->cursorCol)
+            ->setInputBuffer($this->inputBuffer)
+            ->setCursorOffset($this->cursorOffset)
+            ->setInputViewportTopLine($this->inputViewportTopLine)
+            ->setMouseModeEnabled($this->mouseModeEnabled)
             ->setOutputScroll($this->outputScroll)
             ->setFocus($this->focus)
             ->setRunning($this->running)
@@ -342,9 +370,10 @@ class InteractiveCommand extends Command
     private function applyStateDto(TuiStateDto $state): void
     {
         $this->history = $state->getHistory();
-        $this->inputLines = $state->getInputLines();
-        $this->cursorRow = $state->getCursorRow();
-        $this->cursorCol = $state->getCursorCol();
+        $this->inputBuffer = $state->getInputBuffer();
+        $this->cursorOffset = $state->getCursorOffset();
+        $this->inputViewportTopLine = $state->getInputViewportTopLine();
+        $this->mouseModeEnabled = $state->isMouseModeEnabled();
         $this->outputScroll = $state->getOutputScroll();
         $this->focus = $state->getFocus();
         $this->running = $state->isRunning();
@@ -480,8 +509,10 @@ class InteractiveCommand extends Command
      */
     private function getMaxOutputScroll(): int
     {
-        $innerWidth = $this->terminal->getWidth() - 2;
-        $displayLines = TuiTextHelper::buildDisplayLines($this->history, $innerWidth);
+        // Должно совпадать с safe-width логикой TuiRenderer (не рисуем в последней колонке).
+        $innerWidth = $this->terminal->getWidth() - 3;
+        $formatter = new TuiHistoryFormatter();
+        $displayLines = $formatter->toDisplayLines($this->history, $innerWidth, new TuiThemeDto());
         $visibleLines = $this->getOutputContentLines();
         return max(0, count($displayLines) - $visibleLines);
     }

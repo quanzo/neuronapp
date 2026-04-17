@@ -5,3 +5,4 @@ testapp3/*
 testapp2/*
 *.phar
 *.code-workspace
+.cursor/*

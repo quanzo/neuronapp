@@ -20,9 +20,13 @@ namespace app\modules\neuron\classes\dto\tui;
 final class KeyEventDto
 {
     public const TYPE_TEXT = 'text';
+    public const TYPE_PASTE = 'paste';
     public const TYPE_TAB = 'tab';
     public const TYPE_ENTER = 'enter';
     public const TYPE_BACKSPACE = 'backspace';
+    public const TYPE_DELETE = 'delete';
+    public const TYPE_HOME = 'home';
+    public const TYPE_END = 'end';
     public const TYPE_CTRL_C = 'ctrl_c';
     public const TYPE_ARROW_UP = 'arrow_up';
     public const TYPE_ARROW_DOWN = 'arrow_down';
@@ -30,16 +34,27 @@ final class KeyEventDto
     public const TYPE_ARROW_RIGHT = 'arrow_right';
     public const TYPE_PAGE_UP = 'page_up';
     public const TYPE_PAGE_DOWN = 'page_down';
+    public const TYPE_TOGGLE_MOUSE_MODE = 'toggle_mouse_mode';
+    public const TYPE_MOUSE = 'mouse';
 
     private function __construct(
         private readonly string $type,
         private readonly ?string $text = null,
+        private readonly ?string $pasteText = null,
+        private readonly ?int $mouseButton = null,
+        private readonly ?int $mouseX = null,
+        private readonly ?int $mouseY = null,
     ) {
     }
 
     public static function text(string $text): self
     {
         return new self(self::TYPE_TEXT, $text);
+    }
+
+    public static function paste(string $text): self
+    {
+        return new self(self::TYPE_PASTE, null, $text);
     }
 
     public static function tab(): self
@@ -55,6 +70,21 @@ final class KeyEventDto
     public static function backspace(): self
     {
         return new self(self::TYPE_BACKSPACE);
+    }
+
+    public static function delete(): self
+    {
+        return new self(self::TYPE_DELETE);
+    }
+
+    public static function home(): self
+    {
+        return new self(self::TYPE_HOME);
+    }
+
+    public static function end(): self
+    {
+        return new self(self::TYPE_END);
     }
 
     public static function ctrlC(): self
@@ -92,6 +122,16 @@ final class KeyEventDto
         return new self(self::TYPE_PAGE_DOWN);
     }
 
+    public static function toggleMouseMode(): self
+    {
+        return new self(self::TYPE_TOGGLE_MOUSE_MODE);
+    }
+
+    public static function mouse(int $button, int $x, int $y): self
+    {
+        return new self(self::TYPE_MOUSE, null, null, $button, $x, $y);
+    }
+
     public function getType(): string
     {
         return $this->type;
@@ -105,5 +145,25 @@ final class KeyEventDto
     public function getText(): ?string
     {
         return $this->text;
+    }
+
+    public function getPasteText(): ?string
+    {
+        return $this->pasteText;
+    }
+
+    public function getMouseButton(): ?int
+    {
+        return $this->mouseButton;
+    }
+
+    public function getMouseX(): ?int
+    {
+        return $this->mouseX;
+    }
+
+    public function getMouseY(): ?int
+    {
+        return $this->mouseY;
     }
 }

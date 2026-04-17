@@ -13,18 +13,19 @@ use PHPUnit\Framework\TestCase;
 class DefaultTuiPreOutputHookTest extends TestCase
 {
     /**
-     * Пустая строка возвращается как есть.
+     * Пустая строка добавляется как output-entry (совместимость).
      */
     public function testEmptyStringIsReturnedAsIs(): void
     {
         $hook = new DefaultTuiPreOutputHook();
         $decision = $hook->decide('');
         $this->assertSame('', $decision->getOriginalInput());
-        $this->assertSame('', $decision->getOutputText());
+        $this->assertCount(1, $decision->getAppendEntries());
+        $this->assertSame('', $decision->getAppendEntries()[0]->getPlainText());
     }
 
     /**
-     * Многострочный ввод возвращается как есть.
+     * Многострочный ввод добавляется как output-entry без изменений.
      */
     public function testMultilineIsReturnedAsIs(): void
     {
@@ -32,6 +33,7 @@ class DefaultTuiPreOutputHookTest extends TestCase
         $input = "a\nb\nc";
         $decision = $hook->decide($input);
         $this->assertSame($input, $decision->getOriginalInput());
-        $this->assertSame($input, $decision->getOutputText());
+        $this->assertCount(1, $decision->getAppendEntries());
+        $this->assertSame($input, $decision->getAppendEntries()[0]->getPlainText());
     }
 }

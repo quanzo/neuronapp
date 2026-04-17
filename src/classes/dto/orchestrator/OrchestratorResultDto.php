@@ -40,7 +40,8 @@ final class OrchestratorResultDto implements IArrayable
      * @param ChatHistoryInterface $history
      * @return Message|null
      */
-    public function setMessage(ChatHistoryInterface $history): Message|null {
+    public function setMessage(ChatHistoryInterface $history): Message|null
+    {
         $this->resultMessage = ChatHistoryEditHelper::getLastMessage($history);
         if (!$this->resultMessage) {
             $this->resultMessage = null;
@@ -53,7 +54,8 @@ final class OrchestratorResultDto implements IArrayable
      *
      * @return Message|null
      */
-    public function getMessage(): Message|null {
+    public function getMessage(): Message|null
+    {
         return $this->resultMessage;
     }
 
