@@ -68,12 +68,14 @@ class AgentProducer extends AProducer
     {
         $config = ConfigurationAgent::makeFromFile($path, $this->getConfigurationApp());
 
-        if ($config instanceof ConfigurationAgent) {
-            $config->agentName = $name;
+        if (!$config instanceof ConfigurationAgent) {
+            return null;
+        }
 
-            if ($config->enableChatHistory === false) {
-                $config->resetChatHistory();
-            }
+        $config->agentName = $name;
+
+        if ($config->enableChatHistory === false) {
+            $config->resetChatHistory();
         }
 
         if (empty($config->logger)) {

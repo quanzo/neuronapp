@@ -1289,6 +1289,16 @@ class ConfigurationAgent implements IDependConfigApp
 
         $config = new self();
 
+        if (!array_key_exists('contextWindow', $cfg)) {
+            return null;
+        }
+
+        $contextWindow = (int) $cfg['contextWindow'];
+        if ($contextWindow <= 0) {
+            return null;
+        }
+        $config->contextWindow = $contextWindow;
+
         if (array_key_exists('agentName', $cfg)) {
             $config->agentName = $cfg['agentName'] === null ? null : (string) $cfg['agentName'];
         }
@@ -1299,10 +1309,6 @@ class ConfigurationAgent implements IDependConfigApp
 
         if (array_key_exists('enableChatHistory', $cfg)) {
             $config->enableChatHistory = (bool) $cfg['enableChatHistory'];
-        }
-
-        if (array_key_exists('contextWindow', $cfg)) {
-            $config->contextWindow = (int) $cfg['contextWindow'];
         }
 
         if (array_key_exists('history_id', $cfg)) {

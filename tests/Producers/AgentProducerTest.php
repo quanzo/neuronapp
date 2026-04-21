@@ -196,7 +196,7 @@ class AgentProducerTest extends TestCase
     {
         file_put_contents(
             $this->tmpDir . '/agents/cached.php',
-            '<?php return ["enableChatHistory" => false];'
+            '<?php return ["enableChatHistory" => false, "contextWindow" => 5000];'
         );
 
         $dp = new DirPriority([$this->tmpDir]);
@@ -247,7 +247,7 @@ class AgentProducerTest extends TestCase
     {
         file_put_contents(
             $this->tmpDir . '/agents/nohist.php',
-            '<?php return ["enableChatHistory" => false];'
+            '<?php return ["enableChatHistory" => false, "contextWindow" => 5000];'
         );
 
         $dp = new DirPriority([$this->tmpDir]);

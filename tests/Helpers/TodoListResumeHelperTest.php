@@ -39,6 +39,7 @@ final class TodoListResumeHelperTest extends TestCase
 
         $this->agentCfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
         ], $this->configApp);
     }
 

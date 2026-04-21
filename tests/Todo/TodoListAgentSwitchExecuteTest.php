@@ -89,7 +89,7 @@ final class TodoListAgentSwitchExecuteTest extends TestCase
     {
         $path = $this->tmpDir . '/agents/' . $agentName . '.php';
         $code = sprintf(
-            '<?php return ["enableChatHistory" => false, "provider" => new \\Tests\\Support\\SpyProvider(%s)];',
+            '<?php return ["enableChatHistory" => false, "contextWindow" => 50000, "provider" => new \\Tests\\Support\\SpyProvider(%s)];',
             var_export($label, true)
         );
         file_put_contents($path, $code);

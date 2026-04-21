@@ -192,7 +192,7 @@ final class TodoListSoftContinueExecuteTest extends TestCase
     private function writeAgent(string $agentName): void
     {
         $path = $this->tmpDir . '/agents/' . $agentName . '.php';
-        $code = '<?php return ["enableChatHistory" => true, "provider" => new \\Tests\\Support\\TodoGotoSpyProvider(), "tools" => [[\\app\\modules\\neuron\\tools\\TodoGotoTool::class, "make"]]];';
+        $code = '<?php return ["enableChatHistory" => true, "contextWindow" => 50000, "provider" => new \\Tests\\Support\\TodoGotoSpyProvider(), "tools" => [[\\app\\modules\\neuron\\tools\\TodoGotoTool::class, "make"]]];';
         file_put_contents($path, $code);
     }
 

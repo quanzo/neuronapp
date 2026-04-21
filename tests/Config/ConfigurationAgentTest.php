@@ -106,6 +106,27 @@ class ConfigurationAgentTest extends TestCase
         $this->assertNull(ConfigurationAgent::makeFromArray([], ConfigurationApp::getInstance()));
     }
 
+    public function testMakeFromArrayMissingContextWindowReturnsNull(): void
+    {
+        $this->assertNull(ConfigurationAgent::makeFromArray([
+            'enableChatHistory' => false,
+        ], ConfigurationApp::getInstance()));
+    }
+
+    public function testMakeFromArrayZeroContextWindowReturnsNull(): void
+    {
+        $this->assertNull(ConfigurationAgent::makeFromArray([
+            'contextWindow' => 0,
+        ], ConfigurationApp::getInstance()));
+    }
+
+    public function testMakeFromArrayNegativeContextWindowReturnsNull(): void
+    {
+        $this->assertNull(ConfigurationAgent::makeFromArray([
+            'contextWindow' => -1,
+        ], ConfigurationApp::getInstance()));
+    }
+
     /**
      * Минимальный набор настроек — объект создаётся с правильными значениями.
      */
@@ -164,6 +185,7 @@ class ConfigurationAgentTest extends TestCase
     public function testMakeFromArrayNullHistoryId(): void
     {
         $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 50000,
             'history_id' => null,
         ], ConfigurationApp::getInstance());
 
@@ -296,6 +318,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
             'provider' => new EchoProvider(),
         ], ConfigurationApp::getInstance());
 
@@ -379,6 +402,7 @@ JSONC;
     {
         $provider = new EchoProvider();
         $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 50000,
             'provider' => $provider,
         ], ConfigurationApp::getInstance());
 
@@ -391,6 +415,7 @@ JSONC;
     public function testGetProviderFromCallable(): void
     {
         $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 50000,
             'provider' => fn() => new EchoProvider(),
         ], ConfigurationApp::getInstance());
 
@@ -408,6 +433,7 @@ JSONC;
     public function testGetInstructionsString(): void
     {
         $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 50000,
             'instructions' => 'Be helpful',
         ], ConfigurationApp::getInstance());
 
@@ -420,6 +446,7 @@ JSONC;
     public function testGetInstructionsCallable(): void
     {
         $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 50000,
             'instructions' => fn() => 'Dynamic instructions',
         ], ConfigurationApp::getInstance());
 
@@ -433,6 +460,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
         ], ConfigurationApp::getInstance());
 
         $this->assertSame('', $cfg->getInstructions());
@@ -449,6 +477,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'tools' => [],
+            'contextWindow' => 50000,
         ], ConfigurationApp::getInstance());
 
         $this->assertSame([], $cfg->getTools());
@@ -462,6 +491,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'tools' => [],
+            'contextWindow' => 50000,
         ], ConfigurationApp::getInstance());
 
         $directTool = $this->createMock(ATool::class);
@@ -501,6 +531,7 @@ JSONC;
 
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
         ], $configApp);
 
         $cfg->getChatHistory();
@@ -521,6 +552,7 @@ JSONC;
 
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
         ], $configApp);
 
         $this->assertSame('my-session', $cfg->getSessionKey());
@@ -538,6 +570,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
         ], ConfigurationApp::getInstance());
 
         $history = $cfg->getChatHistory();
@@ -551,6 +584,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => true,
+            'contextWindow' => 50000,
         ], ConfigurationApp::getInstance());
 
         $history = $cfg->getChatHistory();
@@ -564,6 +598,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
         ], ConfigurationApp::getInstance());
 
         $first = $cfg->getChatHistory();
@@ -578,6 +613,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
         ], ConfigurationApp::getInstance());
 
         $custom = new InMemoryChatHistory(1000);
@@ -594,6 +630,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
         ], ConfigurationApp::getInstance());
 
         $cfg->getChatHistory();
@@ -611,6 +648,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
         ], ConfigurationApp::getInstance());
 
         $first = $cfg->getChatHistory();
@@ -631,6 +669,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
             'provider' => new EchoProvider(),
         ], ConfigurationApp::getInstance());
 
@@ -645,6 +684,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
         ], ConfigurationApp::getInstance());
 
         $cfg->embeddingProvider = $this->createMock(EmbeddingsProviderInterface::class);
@@ -661,6 +701,7 @@ JSONC;
     {
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
+            'contextWindow' => 50000,
             'provider' => new EchoProvider(),
         ], ConfigurationApp::getInstance());
 

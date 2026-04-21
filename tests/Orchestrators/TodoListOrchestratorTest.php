@@ -57,6 +57,7 @@ final class TodoListOrchestratorTest extends TestCase
             $this->tmpDir . '/agents/default.php',
             '<?php return [
                 "enableChatHistory" => true,
+                "contextWindow" => 50000,
                 "provider" => new \\Tests\\Support\\OrchestratorSpyProvider(),
                 "tools" => [[\\app\\modules\\neuron\\tools\\TodoCompletedTool::class, "make"]]
             ];'
