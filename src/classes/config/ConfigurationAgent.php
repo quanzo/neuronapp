@@ -227,8 +227,15 @@ class ConfigurationAgent implements IDependConfigApp
     {
         $params = $this->params;
 
-        if (!array_key_exists('contextWindow', $params)) {
-            $params['contextWindow'] = $this->contextWindow;
+        foreach ([
+            'contextWindow'  => fn() => $this->contextWindow,
+            'context_window' => fn() => $this->contextWindow,
+            'current_date'   => fn() => date('Y-m-d'),
+            'currentDate'    => fn() => date('Y-m-d'),
+        ] as $paramName => $func) {
+            if (!array_key_exists($paramName, $params)) {
+                $params[$paramName] = $func();
+            }
         }
 
         return $params;
