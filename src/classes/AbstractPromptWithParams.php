@@ -10,6 +10,7 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\PlaceholderHelper;
+use app\modules\neuron\interfaces\IArrayable;
 use app\modules\neuron\interfaces\IDependConfigApp;
 use app\modules\neuron\traits\DependConfigAppTrait;
 use RuntimeException;
@@ -226,20 +227,21 @@ abstract class AbstractPromptWithParams extends APromptComponent implements IDep
     /**
      * Формирует итоговый набор значений параметров с учётом описания params.
      *
-     * Приоритет значений:
-     *  1) $runtimeParams — значения, переданные при непосредственном вызове компонента;
-     *  2) $sessionParams — значения, переданные извне (например, из CLI/конфига сессии);
-     *  3) default из описания параметров (опция params).
+     * Алгоритм:
+     *  1) берём значения по умолчанию из описания параметров (опция params → поле default);
+     *  2) последовательно (слева направо) накладываем переданные наборы параметров.
      *
-     * Имена параметров должны соответствовать [a-zA-Z]+, как и плейсхолдеры
-     * в тексте компонента (например, $date, $branch, $user).
+     * Важно: порядок аргументов определяет приоритет. Чтобы сохранить логику "session → runtime",
+     * передавайте сначала сессионные параметры, а затем runtime (runtime перекроет session).
      *
-     * @param array<string,mixed>|null $runtimeParams  Значения, переданные при вызове компонента.
-     * @param array<string,mixed>|null $sessionParams  Сессионные значения (дата, ветка, пользователь и др.).
+     * Каждый аргумент должен быть массивом или объектом {@see IArrayable}; остальные значения
+     * игнорируются. Пустые массивы (и пустые результаты toArray) также игнорируются.
+     *
+     * @param mixed ...$params Наборы параметров (session, runtime и т.п.).
      *
      * @return array<string,mixed> Итоговый набор значений параметров.
      */
-    protected function buildEffectiveParams(?array $runtimeParams, ?array $sessionParams = null): array
+    protected function buildEffectiveParams(mixed ...$params): array
     {
         $effective = [];
 
@@ -253,14 +255,16 @@ abstract class AbstractPromptWithParams extends APromptComponent implements IDep
             }
         }
 
-        if ($sessionParams !== null) {
-            foreach ($sessionParams as $name => $value) {
-                $effective[(string) $name] = $value;
+        foreach ($params as $paramSet) {
+            if ($paramSet instanceof IArrayable) {
+                $paramSet = $paramSet->toArray();
             }
-        }
 
-        if ($runtimeParams !== null) {
-            foreach ($runtimeParams as $name => $value) {
+            if (!is_array($paramSet) || $paramSet === []) {
+                continue;
+            }
+
+            foreach ($paramSet as $name => $value) {
                 $effective[(string) $name] = $value;
             }
         }
