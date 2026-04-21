@@ -228,10 +228,12 @@ class ConfigurationAgent implements IDependConfigApp
         $params = $this->params;
 
         foreach ([
-            'contextWindow'  => fn() => $this->contextWindow,
-            'context_window' => fn() => $this->contextWindow,
-            'current_date'   => fn() => date('Y-m-d'),
-            'currentDate'    => fn() => date('Y-m-d'),
+            'contextWindow'      => fn() => $this->contextWindow,
+            'context_window'     => fn() => $this->contextWindow,
+            'current_date'       => fn() => date('Y-m-d'),
+            'currentDate'        => fn() => date('Y-m-d'),
+            'currentAgentName'   => fn() => $this->agentName,
+            'current_agent_name' => fn() => $this->agentName,
         ] as $paramName => $func) {
             if (!array_key_exists($paramName, $params)) {
                 $params[$paramName] = $func();
