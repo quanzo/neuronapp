@@ -142,6 +142,7 @@ class ConfigurationAgentTest extends TestCase
             'provider' => $provider,
             'instructions' => 'Test',
             'tools' => [],
+            'params' => ['project' => 'neuronapp', 'name' => 'Bob'],
             'toolMaxTries' => 3,
             'mcp' => [],
             'embeddingProvider' => null,
@@ -154,6 +155,7 @@ class ConfigurationAgentTest extends TestCase
         $this->assertSame('SomeClass', $cfg->reponseStructClass);
         $this->assertSame(3, $cfg->toolMaxTries);
         $this->assertSame(500, $cfg->embeddingChunkSize);
+        $this->assertSame(['project' => 'neuronapp', 'name' => 'Bob'], $cfg->params);
     }
 
     /**

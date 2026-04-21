@@ -203,6 +203,16 @@ class ConfigurationAgent implements IDependConfigApp
     public $tools = [];
 
     /**
+     * Параметры агента для подстановки в Skill/TodoList (agent-level defaults).
+     *
+     * Эти параметры автоматически подмешиваются при сборке effective params в компонентах,
+     * а runtime-значения должны перекрывать их.
+     *
+     * @var array<string, mixed>
+     */
+    public array $params = [];
+
+    /**
      * Список skills, которые должны быть подключены как tools для этого агента.
      *
      * Каждый элемент — имя навыка, резолвится через {@see ConfigurationApp::getSkill()}.
@@ -1318,6 +1328,19 @@ class ConfigurationAgent implements IDependConfigApp
 
         if (array_key_exists('tools', $cfg)) {
             $config->tools = $cfg['tools'];
+        }
+
+        if (array_key_exists('params', $cfg)) {
+            $rawParams = $cfg['params'];
+            if (is_array($rawParams)) {
+                $normalized = [];
+                foreach ($rawParams as $k => $v) {
+                    $normalized[(string) $k] = $v;
+                }
+                $config->params = $normalized;
+            } else {
+                $config->params = [];
+            }
         }
 
         if (array_key_exists('skills', $cfg)) {

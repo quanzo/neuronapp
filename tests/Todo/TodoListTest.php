@@ -6,6 +6,7 @@ namespace Tests\Todo;
 
 use app\modules\neuron\classes\todo\Todo;
 use app\modules\neuron\classes\todo\TodoList;
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\interfaces\ITodoList;
 use PHPUnit\Framework\TestCase;
 
@@ -27,6 +28,45 @@ use PHPUnit\Framework\TestCase;
  */
 class TodoListTest extends TestCase
 {
+    /**
+     * Приоритет значений: runtime > session > agent params > default.
+     *
+     * Проверяем только сборку effective params (без выполнения LLM-цикла).
+     */
+    public function testEffectiveParamsPrecedenceDefaultAgentSessionRuntime(): void
+    {
+        $input = "---\nparams: {\"name\": {\"type\": \"string\", \"default\": \"World\"}}\n---\n1. Hello \$name";
+
+        $list = new class ($input, 'mylist') extends TodoList {
+            public function buildEffectiveParamsForTest(mixed $sessionParams, ?array $runtimeParams): array
+            {
+                $agentCfg = $this->getConfigurationAgent();
+                return $this->buildEffectiveParams($agentCfg->params, $sessionParams, $runtimeParams);
+            }
+        };
+
+        $agentCfg = new ConfigurationAgent();
+        $agentCfg->params = ['name' => 'Bob'];
+        $list->setDefaultConfigurationAgent($agentCfg);
+
+        $defaultsOnly = $list->buildEffectiveParamsForTest(null, null);
+        $this->assertSame('Bob', $defaultsOnly['name'], 'agent params должны перекрывать default');
+
+        // Подставим name через session (любой IArrayable), чтобы проверить слой session.
+        $sessionName = new class implements \app\modules\neuron\interfaces\IArrayable {
+            public function toArray(): array
+            {
+                return ['name' => 'Carol'];
+            }
+        };
+
+        $withSession = $list->buildEffectiveParamsForTest($sessionName, null);
+        $this->assertSame('Carol', $withSession['name'], 'session должен перекрывать agent params');
+
+        $withRuntime = $list->buildEffectiveParamsForTest($sessionName, ['name' => 'Alice']);
+        $this->assertSame('Alice', $withRuntime['name'], 'runtime должен перекрывать session');
+    }
+
     /**
      * Класс TodoList реализует интерфейс ITodoList.
      */

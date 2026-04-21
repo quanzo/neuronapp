@@ -84,7 +84,15 @@ class Skill extends AbstractPromptWithParams implements ISkill
      */
     public function getSkill(array $params = []): string
     {
-        $effectiveParams = $this->buildEffectiveParams($params, null);
+        $agentParams = [];
+        try {
+            $agentCfg = $this->getConfigurationAgent();
+            $agentParams = $agentCfg->params ?? [];
+        } catch (\RuntimeException) {
+            // getSkill() должен уметь работать без привязанного агента: используем только defaults и runtime params.
+        }
+
+        $effectiveParams = $this->buildEffectiveParams($agentParams, $params);
 
         return PlaceholderHelper::renderWithParams($this->getBody(), $effectiveParams);
     }
@@ -204,7 +212,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
     ): Future {
         $agentCfg        = $this->getConfigurationAgent();
         $runId           = $this->generateRunId();
-        $effectiveParams = $this->buildEffectiveParams($params ?? [], null);
+        $effectiveParams = $this->buildEffectiveParams($agentCfg->params, $params ?? []);
         $baseSkillEvent  = $this->buildSkillEventDto($agentCfg, $runId)->setParams($effectiveParams);
         $baseRunEvent    = new RunEventDto();
         $baseRunEvent->setSessionKey($agentCfg->getSessionKey() ?? '')

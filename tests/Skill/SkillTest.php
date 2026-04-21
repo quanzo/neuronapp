@@ -151,6 +151,22 @@ class SkillTest extends TestCase
         $this->assertSame('Hello Alice', $result);
     }
 
+    /**
+     * Приоритет значений: runtime > agent params > default.
+     */
+    public function testGetSkillRuntimeOverridesAgentParamsOverridesDefault(): void
+    {
+        $input = "---\nparams: {\"name\": {\"type\": \"string\", \"default\": \"World\"}}\n---\nHello \$name";
+        $skill = new Skill($input, 'greet');
+
+        $agentCfg = new ConfigurationAgent();
+        $agentCfg->params = ['name' => 'Bob'];
+        $skill->setDefaultConfigurationAgent($agentCfg);
+
+        $this->assertSame('Hello Bob', $skill->getSkill(), 'agent params должны перекрывать default');
+        $this->assertSame('Hello Alice', $skill->getSkill(['name' => 'Alice']), 'runtime должен перекрывать agent params');
+    }
+
     // ══════════════════════════════════════════════════════════════
     //  Удаление комментариев из тела
     // ══════════════════════════════════════════════════════════════
