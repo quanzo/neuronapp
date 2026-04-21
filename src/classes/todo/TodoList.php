@@ -190,7 +190,7 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
             $currentTodoIndex = $normalizedStartFromTodoIndex;
             $skipTodoBodySend = $softContinue === true;
             $effectiveParams  = $this->buildEffectiveParams(
-                $agentCfg->params,
+                $agentCfg->getParams(),
                 $sessionParams,
                 $params
             );

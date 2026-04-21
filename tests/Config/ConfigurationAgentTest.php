@@ -176,7 +176,10 @@ class ConfigurationAgentTest extends TestCase
         $this->assertSame('SomeClass', $cfg->reponseStructClass);
         $this->assertSame(3, $cfg->toolMaxTries);
         $this->assertSame(500, $cfg->embeddingChunkSize);
-        $this->assertSame(['project' => 'neuronapp', 'name' => 'Bob'], $cfg->params);
+        $params = $cfg->getParams();
+        $this->assertSame('neuronapp', $params['project'] ?? null);
+        $this->assertSame('Bob', $params['name'] ?? null);
+        $this->assertSame(20000, $params['contextWindow'] ?? null);
     }
 
     /**

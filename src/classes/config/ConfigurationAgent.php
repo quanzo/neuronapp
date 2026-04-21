@@ -210,7 +210,29 @@ class ConfigurationAgent implements IDependConfigApp
      *
      * @var array<string, mixed>
      */
-    public array $params = [];
+    protected array $params = [];
+
+    /**
+     * Возвращает параметры агента для подстановки в Skill/TodoList.
+     *
+     * Геттер НЕ мутирует {@see self::$params}. Если параметр отсутствует в конфигурации,
+     * он будет добавлен в возвращаемый массив как computed-default.
+     *
+     * Сейчас автоматически добавляется:
+     * - contextWindow: размер контекстного окна агента.
+     *
+     * @return array<string, mixed>
+     */
+    public function getParams(): array
+    {
+        $params = $this->params;
+
+        if (!array_key_exists('contextWindow', $params)) {
+            $params['contextWindow'] = $this->contextWindow;
+        }
+
+        return $params;
+    }
 
     /**
      * Список skills, которые должны быть подключены как tools для этого агента.

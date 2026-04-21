@@ -6,6 +6,8 @@ namespace Tests\Skill;
 
 use Amp\Future;
 use app\modules\neuron\classes\config\ConfigurationAgent;
+use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\interfaces\ISkill;
@@ -32,16 +34,51 @@ use PHPUnit\Framework\TestCase;
  */
 class SkillTest extends TestCase
 {
+    private string $tmpDir;
+
     protected function setUp(): void
     {
         parent::setUp();
         EventBus::clear();
+
+        $this->tmpDir = sys_get_temp_dir() . '/neuronapp_skill_test_' . uniqid();
+        mkdir($this->tmpDir, 0777, true);
+        mkdir($this->tmpDir . '/.sessions', 0777, true);
+        mkdir($this->tmpDir . '/agents', 0777, true);
+        file_put_contents($this->tmpDir . '/config.jsonc', '{}');
+
+        $this->resetConfigurationAppSingleton();
+        ConfigurationApp::init(new DirPriority([$this->tmpDir]), 'config.jsonc');
     }
 
     protected function tearDown(): void
     {
         EventBus::clear();
+        $this->resetConfigurationAppSingleton();
+        $this->removeDir($this->tmpDir);
         parent::tearDown();
+    }
+
+    private function resetConfigurationAppSingleton(): void
+    {
+        $ref = new \ReflectionClass(ConfigurationApp::class);
+        $prop = $ref->getProperty('instance');
+        $prop->setValue(null, null);
+    }
+
+    private function removeDir(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+        foreach (scandir($dir) as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+            $path = $dir . '/' . $item;
+            is_dir($path) ? $this->removeDir($path) : unlink($path);
+        }
+        rmdir($dir);
     }
 
     /**
@@ -159,8 +196,12 @@ class SkillTest extends TestCase
         $input = "---\nparams: {\"name\": {\"type\": \"string\", \"default\": \"World\"}}\n---\nHello \$name";
         $skill = new Skill($input, 'greet');
 
-        $agentCfg = new ConfigurationAgent();
-        $agentCfg->params = ['name' => 'Bob'];
+        $agentCfg = ConfigurationAgent::makeFromArray([
+            'enableChatHistory' => false,
+            'contextWindow' => 50000,
+            'params' => ['name' => 'Bob'],
+        ], \app\modules\neuron\classes\config\ConfigurationApp::getInstance());
+        $this->assertInstanceOf(ConfigurationAgent::class, $agentCfg);
         $skill->setDefaultConfigurationAgent($agentCfg);
 
         $this->assertSame('Hello Bob', $skill->getSkill(), 'agent params должны перекрывать default');
