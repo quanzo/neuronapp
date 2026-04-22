@@ -11,6 +11,7 @@
 - управляет историей чата (`enableChatHistory`);
 - содержит системный промпт (`instructions`);
 - может подключать содержимое `AGENTS.md` к системному промпту (`useAgentsFile`);
+- может включать входную защиту (`safeInput`) и выходную защиту (`safeOutput`);
 - объявляет доступные инструменты (`tools`, `mcp`, RAG‑компоненты).
 
 Реализация: `src/classes/config/ConfigurationAgent.php`.
@@ -42,8 +43,18 @@
   - удаляет комментарии JSONC через `CommentsHelper::stripComments()`;
   - передаёт массив настроек в `makeFromArray()`;
 - `ConfigurationAgent::makeFromArray(array $cfg, ConfigurationApp $configApp): ?ConfigurationAgent`:
-  - заполняет свойства агента по известным ключам (`enableChatHistory`, `contextWindow`, `provider`, `instructions`, `tools`, `mcp`, `embeddingProvider`, `vectorStore` и т.д.);
+  - заполняет свойства агента по известным ключам (`enableChatHistory`, `contextWindow`, `provider`, `instructions`, `safeInput`, `safeOutput`, `tools`, `mcp`, `embeddingProvider`, `vectorStore` и т.д.);
   - устанавливает `ConfigurationApp` и `sessionKey` (через `configApp->getSessionKey()`).
+
+#### Safe I/O защита LLM
+
+Защита подключается через `ConfigurationApp` и применяется декоратором `SafeAIProviderDecorator`:
+
+- `safeInput: true` — входной текст очищается от невидимых/непечатных символов и проверяется на признаки prompt-injection/jailbreak;
+- `safeOutput: true` — выходной текст модели сканируется на утечки (например, `system prompt`, токены) и редактируется;
+- при редактировании output в лог пишется сигнал `llm.output.redacted`.
+
+Встроенные правила и расширение описаны в `docs/safe.md`.
 
 #### Подключение `AGENTS.md` к system prompt
 

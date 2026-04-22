@@ -83,6 +83,8 @@ Edge cases:
   - `instructions` — системный промпт (строка, `Stringable` или `callable`);
   - `useAgentsFile` — подключать ли содержимое `AGENTS.md` к системному промпту (по умолчанию `false`).
     Файл ищется через `ConfigurationApp->getDirPriority()->resolveFile('AGENTS.md')` и **добавляется в конец** системного промпта;
+  - `safeInput` — включать ли входную защиту сообщений к LLM (по умолчанию `true`);
+  - `safeOutput` — включать ли выходную защиту ответов LLM (по умолчанию `true`);
   - `params` — **agent-level параметры** (ассоциативный массив), которые автоматически подмешиваются в параметры `Skill`/`TodoList`, выполняемых этим агентом.
     Приоритет значений: defaults из `params` компонента < `ConfigurationAgent::params` < session params < runtime params (runtime всегда перекрывает agent params);
   - `tools` — базовый набор инструментов (`ToolInterface`/`ToolkitInterface` и пр.);
@@ -140,6 +142,13 @@ Edge cases:
 
 - `llm.inference.prepared` — что агент подготовил перед отправкой (`instructions`, tools summary);
 - `llm.request.payload` — что было сериализовано в payload к провайдеру (`system`, `messages`, `tools`).
+
+Если включены `safeInput`/`safeOutput`, провайдер дополнительно оборачивается в `SafeAIProviderDecorator`:
+
+- `safeInput = true` — текст user/developer/system сообщений очищается (`InputSafe`) и проверяется на признаки prompt-injection/jailbreak; при срабатывании блокируется исключением;
+- `safeOutput = true` — текст ответа LLM проверяется (`OutputSafe`), чувствительные фрагменты редактируются, а факт редактирования сигнализируется через лог `llm.output.redacted`.
+
+Подробное описание правил и расширения см. в `docs/safe.md`.
 
 ### Файлы агентов (`agents/*.php`, `agents/*.jsonc`)
 

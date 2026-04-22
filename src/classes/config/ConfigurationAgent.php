@@ -37,6 +37,10 @@ use app\modules\neuron\classes\dto\run\RunStateDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\logger\ContextualLogger;
 use app\modules\neuron\classes\neuron\providers\LoggingAIProviderDecorator;
+use app\modules\neuron\classes\safe\InputSafe;
+use app\modules\neuron\classes\safe\OutputSafe;
+use app\modules\neuron\classes\safe\SafeAIProviderDecorator;
+use app\modules\neuron\classes\safe\exceptions\InputSafetyViolationException;
 use app\modules\neuron\classes\neuron\history\FileFullChatHistory;
 use app\modules\neuron\classes\neuron\trimmers\CclCodeHistoryTrimmer;
 use app\modules\neuron\classes\neuron\trimmers\ConfigurationAgentHistoryHeadSummarizer;
@@ -179,6 +183,16 @@ class ConfigurationAgent implements IDependConfigApp
     public bool $useAgentsFile = false;
 
     /**
+     * Включает защиту входящих сообщений для LLM (санитизация + детекция атак).
+     */
+    public bool $safeInput = true;
+
+    /**
+     * Включает защиту исходящих сообщений LLM (редактирование утечек + сигнализация).
+     */
+    public bool $safeOutput = true;
+
+    /**
      * Не записывать шаги LLM этого агента в долговременную память `.mind`.
      *
      * Включается для конфигурации, используемой при исполнении Skill/TodoList с опцией
@@ -227,14 +241,16 @@ class ConfigurationAgent implements IDependConfigApp
     {
         $params = $this->params;
 
-        foreach ([
-            'contextWindow'      => fn() => $this->contextWindow,
-            'context_window'     => fn() => $this->contextWindow,
-            'current_date'       => fn() => date('Y-m-d'),
-            'currentDate'        => fn() => date('Y-m-d'),
-            'currentAgentName'   => fn() => $this->agentName,
-            'current_agent_name' => fn() => $this->agentName,
-        ] as $paramName => $func) {
+        foreach (
+            [
+                'contextWindow'      => fn() => $this->contextWindow,
+                'context_window'     => fn() => $this->contextWindow,
+                'current_date'       => fn() => date('Y-m-d'),
+                'currentDate'        => fn() => date('Y-m-d'),
+                'currentAgentName'   => fn() => $this->agentName,
+                'current_agent_name' => fn() => $this->agentName,
+            ] as $paramName => $func
+        ) {
             if (!array_key_exists($paramName, $params)) {
                 $params[$paramName] = $func();
             }
@@ -462,6 +478,12 @@ class ConfigurationAgent implements IDependConfigApp
         try {
             $response = $this->performAgentRequest($agent, $message);
         } catch (\Throwable $performError) {
+            if ($performError instanceof InputSafetyViolationException) {
+                $duration = $this->calculateDurationSeconds($start);
+                $this->triggerAgentMessageFailed($attachmentsCount, $isStructured, $message, $duration, $performError);
+                throw $performError;
+            }
+
             if (!($agent instanceof Agent) && !($agent instanceof RAG)) {
                 $duration = $this->calculateDurationSeconds($start);
                 $this->triggerAgentMessageFailed($attachmentsCount, $isStructured, $message, $duration, $performError);
@@ -794,43 +816,68 @@ class ConfigurationAgent implements IDependConfigApp
     public function getProvider(): AIProviderInterface
     {
         if ($this->provider instanceof AIProviderInterface) {
-            return $this->wrapProviderWithLogging($this->provider);
+            return $this->wrapProviderWithGuards($this->provider);
         }
         if (CallableWrapper::isCallable($this->provider)) {
             /** @var AIProviderInterface $provider */
             $provider = CallableWrapper::call($this->provider);
-            return $this->wrapProviderWithLogging($provider);
+            return $this->wrapProviderWithGuards($provider);
         }
 
         if ($this->_provider === null) {
             throw new RuntimeException('LLM provider is not configured.');
         }
 
-        return $this->wrapProviderWithLogging($this->_provider);
+        return $this->wrapProviderWithGuards($this->_provider);
     }
 
     /**
-     * Оборачивает провайдер декоратором логирования payload, если это включено в конфигурации.
+     * Возвращает сервис входной защиты.
+     */
+    public function getInputSafe(): InputSafe
+    {
+        $configApp = $this->getConfigurationApp() ?? ConfigurationApp::getInstance();
+        return $configApp->getInputSafe();
+    }
+
+    /**
+     * Возвращает сервис выходной защиты.
+     */
+    public function getOutputSafe(): OutputSafe
+    {
+        $configApp = $this->getConfigurationApp() ?? ConfigurationApp::getInstance();
+        return $configApp->getOutputSafe();
+    }
+
+    /**
+     * Оборачивает провайдер декораторами безопасности и логирования.
      *
      * @param AIProviderInterface $provider Базовый провайдер.
      *
      * @return AIProviderInterface
      */
-    private function wrapProviderWithLogging(AIProviderInterface $provider): AIProviderInterface
+    private function wrapProviderWithGuards(AIProviderInterface $provider): AIProviderInterface
     {
-        if (!$this->enableLlmPayloadLogging) {
-            return $provider;
+        $wrapped = $provider;
+
+        if ($this->enableLlmPayloadLogging && !($wrapped instanceof LoggingAIProviderDecorator)) {
+            $wrapped = new LoggingAIProviderDecorator(
+                $wrapped,
+                $this->getLoggerWithContext(),
+                $this->llmPayloadLogMode
+            );
         }
 
-        if ($provider instanceof LoggingAIProviderDecorator) {
-            return $provider;
+        if (($this->safeInput || $this->safeOutput) && !($wrapped instanceof SafeAIProviderDecorator)) {
+            $wrapped = new SafeAIProviderDecorator(
+                $wrapped,
+                $this->safeInput ? $this->getInputSafe() : null,
+                $this->safeOutput ? $this->getOutputSafe() : null,
+                $this->getLoggerWithContext()
+            );
         }
 
-        return new LoggingAIProviderDecorator(
-            $provider,
-            $this->getLoggerWithContext(),
-            $this->llmPayloadLogMode
-        );
+        return $wrapped;
     }
 
     /**
@@ -1297,6 +1344,8 @@ class ConfigurationAgent implements IDependConfigApp
      *  - reponseStructClass (string|null)
      *  - provider (array|callable)
      *  - instructions (string|Stringable|callable)
+     *  - safeInput (bool)
+     *  - safeOutput (bool)
      *  - tools (array|callable)
      *  - toolMaxTries (int)
      *  - enableLlmPayloadLogging (bool)
@@ -1361,6 +1410,14 @@ class ConfigurationAgent implements IDependConfigApp
 
         if (array_key_exists('useAgentsFile', $cfg)) {
             $config->useAgentsFile = (bool) $cfg['useAgentsFile'];
+        }
+
+        if (array_key_exists('safeInput', $cfg)) {
+            $config->safeInput = (bool) $cfg['safeInput'];
+        }
+
+        if (array_key_exists('safeOutput', $cfg)) {
+            $config->safeOutput = (bool) $cfg['safeOutput'];
         }
 
         if (array_key_exists('tools', $cfg)) {

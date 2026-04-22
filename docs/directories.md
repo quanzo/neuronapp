@@ -37,6 +37,18 @@ new DirPriority([APP_START_DIR, APP_WORK_DIR]);
 - служебные папки `.sessions`, `.logs`, `.store`, `.mind`;
 - файлы по @‑ссылкам в тексте skills/todos (см. `AttachmentHelper::buildContextAttachments()`).
 
+### Каталог инфраструктуры Safe
+
+Подсистема защиты LLM размещается в `src/classes/safe/` и поддиректориях:
+
+- `src/classes/safe/contracts` — интерфейсы правил sanitize/detect;
+- `src/classes/safe/rules/input` — правила очистки и блокировки входа;
+- `src/classes/safe/rules/output` — правила редактирования утечек в ответах;
+- `src/classes/safe/dto` — DTO результатов и нарушений;
+- `src/classes/safe/exceptions` — исключения блокировки небезопасных входов.
+
+Конфигурация создаёт экземпляры `InputSafe`/`OutputSafe` в `ConfigurationApp` и передаёт их в `ConfigurationAgent`.
+
 ### `ConfigurationApp` и расположение файлов
 
 Класс `ConfigurationApp` (`src/classes/config/ConfigurationApp.php`) использует `DirPriority` для:

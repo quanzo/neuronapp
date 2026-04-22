@@ -8,6 +8,15 @@ use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\producers\AgentProducer;
 use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\classes\producers\TodoListProducer;
+use app\modules\neuron\classes\safe\InputSafe;
+use app\modules\neuron\classes\safe\OutputSafe;
+use app\modules\neuron\classes\safe\rules\input\CollapseRepeatCharsInputRule;
+use app\modules\neuron\classes\safe\rules\input\MaxLengthInputRule;
+use app\modules\neuron\classes\safe\rules\input\NormalizeWhitespaceInputRule;
+use app\modules\neuron\classes\safe\rules\input\RegexInjectionInputRule;
+use app\modules\neuron\classes\safe\rules\input\RemoveInvisibleCharsInputRule;
+use app\modules\neuron\classes\safe\rules\input\TypoglycemiaInputRule;
+use app\modules\neuron\classes\safe\rules\output\RegexLeakOutputRule;
 use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\classes\todo\TodoList;
 use app\modules\neuron\classes\config\ConfigurationAgent;
@@ -81,6 +90,12 @@ class ConfigurationApp
 
     /** Хранилище результатов (лениво инициализируется). */
     private ?VarStorage $varStorage = null;
+
+    /** Сервис защиты входящих сообщений LLM (лениво инициализируется). */
+    private ?InputSafe $inputSafe = null;
+
+    /** Сервис защиты исходящих сообщений LLM (лениво инициализируется). */
+    private ?OutputSafe $outputSafe = null;
 
     /**
      * Базовый ключ сессии (временна́я часть без имени агента).
@@ -359,6 +374,109 @@ class ConfigurationApp
             $this->varStorage = new VarStorage($this->getStoreDir());
         }
         return $this->varStorage;
+    }
+
+    /**
+     * Возвращает сервис защиты входных сообщений LLM.
+     */
+    public function getInputSafe(): InputSafe
+    {
+        if ($this->inputSafe === null) {
+            $this->inputSafe = $this->buildDefaultInputSafe();
+        }
+
+        return $this->inputSafe;
+    }
+
+    /**
+     * Заменяет сервис защиты входных сообщений.
+     */
+    public function setInputSafe(InputSafe $inputSafe): self
+    {
+        $this->inputSafe = $inputSafe;
+        return $this;
+    }
+
+    /**
+     * Возвращает сервис защиты исходящих сообщений LLM.
+     */
+    public function getOutputSafe(): OutputSafe
+    {
+        if ($this->outputSafe === null) {
+            $this->outputSafe = $this->buildDefaultOutputSafe();
+        }
+
+        return $this->outputSafe;
+    }
+
+    /**
+     * Заменяет сервис защиты исходящих сообщений.
+     */
+    public function setOutputSafe(OutputSafe $outputSafe): self
+    {
+        $this->outputSafe = $outputSafe;
+        return $this;
+    }
+
+    /**
+     * Собирает дефолтный пайплайн InputSafe.
+     */
+    private function buildDefaultInputSafe(): InputSafe
+    {
+        $maxLength = (int) $this->get('safe.input.max_length', 20000);
+        if ($maxLength <= 0) {
+            $maxLength = 20000;
+        }
+
+        return new InputSafe(
+            [
+                new RemoveInvisibleCharsInputRule(),
+                new NormalizeWhitespaceInputRule(),
+                new CollapseRepeatCharsInputRule(5),
+                new MaxLengthInputRule($maxLength),
+            ],
+            [
+                new RegexInjectionInputRule(
+                    'instruction_override',
+                    'Input tries to override system instructions.',
+                    '/\b(ignore|disregard|forget)\b.{0,40}\b(previous|system|earlier)\b.{0,40}\b(instructions?|prompt)\b/iu'
+                ),
+                new RegexInjectionInputRule(
+                    'system_prompt_exfiltration',
+                    'Input requests hidden/system prompt disclosure.',
+                    '/\b(reveal|show|print|dump|leak|expose)\b.{0,40}\b(system prompt|hidden instructions?|internal instructions?)\b/iu'
+                ),
+                new RegexInjectionInputRule(
+                    'jailbreak_role_hijack',
+                    'Input contains role-hijack or jailbreak markers.',
+                    '/\b(developer mode|dan\b|do anything now|bypass safety|disable guardrails?|jailbreak)\b/iu'
+                ),
+                new TypoglycemiaInputRule(),
+            ]
+        );
+    }
+
+    /**
+     * Собирает дефолтный пайплайн OutputSafe.
+     */
+    private function buildDefaultOutputSafe(): OutputSafe
+    {
+        return new OutputSafe(
+            [
+                new RegexLeakOutputRule(
+                    'system_prompt_leak',
+                    'Output may disclose hidden/system prompt.',
+                    '/\b(system prompt|hidden instructions?|internal instructions?)\b.{0,200}/iu',
+                    '[REDACTED_SYSTEM_PROMPT_FRAGMENT]'
+                ),
+                new RegexLeakOutputRule(
+                    'api_key_leak',
+                    'Output may disclose API/token secret.',
+                    '/\b(sk-[a-z0-9]{16,}|api[_-]?key\s*[:=]\s*[a-z0-9_\-]{10,}|bearer\s+[a-z0-9\._\-]{20,})\b/iu',
+                    '[REDACTED_SECRET]'
+                ),
+            ]
+        );
     }
 
     private $_sessionSrv = null;
