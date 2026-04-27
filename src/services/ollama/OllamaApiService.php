@@ -7,6 +7,7 @@ use Amp\Http\Client\HttpClient;
 use Amp\Http\Client\HttpClientBuilder;
 use Amp\Http\Client\Request;
 use Amp\Future;
+use app\modules\neuron\traits\UserAgentTrait;
 
 /**
  * Сервис для работы с Ollama Web Search API
@@ -14,9 +15,13 @@ use Amp\Future;
  */
 class OllamaApiService
 {
+    use UserAgentTrait;
+    
     private HttpClient $httpClient;
     private string $baseUrl;
     private string $apiKey;
+
+    protected string $userAgent = 'Neuron-Ollama-Integration/1.0';
 
     public function __construct(
         string $baseUrl = 'https://ollama.com',
@@ -42,7 +47,7 @@ class OllamaApiService
             $request = new Request($url, 'POST');
             $request->setHeaders([
                 'Content-Type' => 'application/json',
-                'User-Agent' => 'Neuron-Ollama-Integration/1.0',
+                'User-Agent' => $this->getUserAgent(),
             ]);
 
             if (!empty($this->apiKey)) {
@@ -91,7 +96,7 @@ class OllamaApiService
             $request = new Request($apiUrl, 'POST');
             $request->setHeaders([
                 'Content-Type' => 'application/json',
-                'User-Agent' => 'Neuron-Ollama-Integration/1.0',
+                'User-Agent' => $this->getUserAgent(),
             ]);
 
             if (!empty($this->apiKey)) {

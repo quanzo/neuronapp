@@ -6,12 +6,17 @@ namespace app\modules\neuron\traits\tools\wiki;
 
 use Amp\Http\Client\HttpClient;
 use Amp\Http\Client\Request;
+use app\modules\neuron\traits\UserAgentTrait;
 
 /**
  * Трейт для асинхронной проверки ссылок на доступность.
  */
 trait LinkValidatorTrait
 {
+    use UserAgentTrait;
+
+    protected string $userAgent = 'WikipediaFullLoader/1.0';
+
     /**
      * Таймаут проверки ссылок в миллисекундах.
      *
@@ -36,7 +41,7 @@ trait LinkValidatorTrait
             $promises[$url] = \Amp\async(function () use ($url, $linkInfo, $httpClient) {
                 try {
                     $request = new Request($url, 'GET');
-                    $request->setHeader('User-Agent', 'WikipediaFullLoader/1.0');
+                    $request->setHeader('User-Agent', $this->getUserAgent());
                     $request->setTransferTimeout($this->linkValidationTimeout);
                     $request->setInactivityTimeout($this->linkValidationTimeout);
 

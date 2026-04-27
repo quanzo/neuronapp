@@ -11,6 +11,7 @@ use Amp\Http\Client\Request;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\enums\ContentSourceType;
 use app\modules\neuron\interfaces\ArticleSearcherInterface;
+use app\modules\neuron\traits\UserAgentTrait;
 
 /**
  * Абстрактный базовый класс для поисковиков статей.
@@ -18,6 +19,10 @@ use app\modules\neuron\interfaces\ArticleSearcherInterface;
  */
 abstract class ArticleSearcherAbstract implements ArticleSearcherInterface
 {
+    use UserAgentTrait;
+
+    protected string $userAgent = 'ArticleSearcher/1.0';
+
     /**
      * HTTP-клиент Amp для выполнения запросов
      * @var HttpClient
@@ -49,7 +54,7 @@ abstract class ArticleSearcherAbstract implements ArticleSearcherInterface
             }
 
             $request = new Request($url, $method);
-            $request->setHeader('User-Agent', 'ArticleSearcher/1.0');
+            $request->setHeader('User-Agent', $this->getUserAgent());
 
             $response = $this->httpClient->request($request);
             return $response->getBody()->buffer();

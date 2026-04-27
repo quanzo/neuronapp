@@ -12,6 +12,7 @@ use Amp\Http\Client\Request;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\enums\ContentSourceType;
 use app\modules\neuron\interfaces\ContentLoaderInterface;
+use app\modules\neuron\traits\UserAgentTrait;
 
 /**
  * Загрузчик для статей RuWiki (ruwiki.ru).
@@ -19,6 +20,10 @@ use app\modules\neuron\interfaces\ContentLoaderInterface;
  */
 class RuWikiLoader implements ContentLoaderInterface
 {
+    use UserAgentTrait;
+
+    protected string $userAgent = 'RuWikiLoader/1.0';
+
     /**
      * HTTP-клиент Amp для выполнения запросов
      * @var HttpClient
@@ -157,7 +162,7 @@ class RuWikiLoader implements ContentLoaderInterface
         ]);
 
         $request = new Request($apiUrl, 'GET');
-        $request->setHeader('User-Agent', 'RuWikiLoader/1.0');
+        $request->setHeader('User-Agent', $this->getUserAgent());
 
         try {
             $response = $this->httpClient->request($request);

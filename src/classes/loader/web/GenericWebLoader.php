@@ -12,6 +12,7 @@ use app\modules\neuron\classes\convert\Mdify;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\enums\ContentSourceType;
 use app\modules\neuron\interfaces\ContentLoaderInterface;
+use app\modules\neuron\traits\UserAgentTrait;
 use Html2Text\Html2Text;
 
 /**
@@ -24,6 +25,10 @@ use Html2Text\Html2Text;
  */
 class GenericWebLoader implements ContentLoaderInterface
 {
+    use UserAgentTrait;
+
+    protected string $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
+
     /**
      * HTTP-клиент Amp для выполнения запросов
      * @var HttpClient
@@ -124,7 +129,7 @@ class GenericWebLoader implements ContentLoaderInterface
 
         // Устанавливаем разумные заголовки для имитации браузера
         $request->setHeaders([
-            'User-Agent'                => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent'                => $this->getUserAgent(),
             'Accept'                    => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language'           => 'ru-Ru,ru,en-US,en;q=0.9',
             'Accept-Encoding'           => 'gzip, deflate',

@@ -15,6 +15,7 @@ use app\modules\neuron\interfaces\ContentLoaderInterface;
 use app\modules\neuron\traits\tools\wiki\HtmlToPlainTextConverterTrait;
 use app\modules\neuron\traits\tools\wiki\CoordinateExtractorTrait;
 use app\modules\neuron\traits\tools\wiki\LinkValidatorTrait;
+use app\modules\neuron\traits\UserAgentTrait;
 
 /**
  * Загрузчик для полных статей Wikipedia.
@@ -25,6 +26,8 @@ class WikipediaFullLoader implements ContentLoaderInterface
     use HtmlToPlainTextConverterTrait;
     use CoordinateExtractorTrait;
     use LinkValidatorTrait;
+
+    protected string $userAgent = 'WikipediaFullLoader/1.0';
 
     /**
      * HTTP-клиент Amp для выполнения запросов
@@ -254,7 +257,7 @@ class WikipediaFullLoader implements ContentLoaderInterface
         ]);
 
         $request = new Request($apiUrl, 'GET');
-        $request->setHeader('User-Agent', 'WikipediaFullLoader/1.0');
+        $request->setHeader('User-Agent', $this->getUserAgent());
 
         $response = $this->httpClient->request($request);
         $body = $response->getBody()->buffer();

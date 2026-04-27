@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\dto\tools;
 
+use app\modules\neuron\traits\UserAgentTrait;
 use InvalidArgumentException;
 
 /**
@@ -22,6 +23,8 @@ use InvalidArgumentException;
  */
 final class HttpFetchRequestHeadersDto
 {
+    use UserAgentTrait;
+
     /**
      * Ключ — нижний регистр имени заголовка; в значении — исходное имя и очищенное значение.
      *
