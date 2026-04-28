@@ -140,18 +140,6 @@ Source of truth:
 
 Подробности по каждому такому классу можно посмотреть в `src/classes/command`.
 
-#### Команда `interactive`
-
-Класс: `vendor/quanzo/tui/src/classes/command/InteractiveCommand.php` (`quanzo\tui\classes\command\InteractiveCommand`).
-
-**Назначение**: запустить интерактивный TUI (область вывода + многострочный ввод + статус-бар).
-
-Внутренняя архитектура и точки расширения описаны в `docs/tui.md`. Базовая реализация перенесена в пакет `quanzo/tui`.
-
-##### TUI находится в `vendor/quanzo/tui`
-
-Source of truth для реализации TUI — `vendor/quanzo/tui` (handlers/renderer/reducer/terminal modes/DTO).
-
 ### Команда `orchestrate`
 
 Класс: `OrchestrateCommand`.

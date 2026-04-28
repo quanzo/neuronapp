@@ -16,7 +16,7 @@ use app\modules\neuron\traits\UserAgentTrait;
 class OllamaApiService
 {
     use UserAgentTrait;
-    
+
     private HttpClient $httpClient;
     private string $baseUrl;
     private string $apiKey;

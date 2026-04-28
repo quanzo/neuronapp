@@ -6,7 +6,6 @@ namespace app\modules\neuron\classes\loader\wiki;
 
 use app\modules\neuron\helpers\JsonHelper;
 use Amp\Http\Client\Request;
-use app\modules\neuron\traits\UserAgentTrait;
 
 /**
  * Загрузчик для статей Wikipedia, использующий доступ к ревизиям.
@@ -14,10 +13,15 @@ use app\modules\neuron\traits\UserAgentTrait;
  */
 class WikipediaFullLoader2 extends WikipediaLoader
 {
-    use UserAgentTrait;
-    
-    protected string $userAgent = 'WikipediaFullLoader/1.0';
-    
+    /**
+     * Конструктор загрузчика полной статьи Wikipedia.
+     */
+    public function __construct()
+    {
+        parent::__construct();
+        $this->setUserAgent('WikipediaFullLoader/1.0');
+    }
+
     /**
      * Загружает полное содержимое статьи через MediaWiki API.
      * Использует действие "query" с prop=revisions для получения содержимого.

@@ -23,8 +23,6 @@ class WikipediaLoader implements ContentLoaderInterface
 {
     use UserAgentTrait;
 
-    protected string $userAgent = 'WikipediaLoader/1.0';
-
     /**
      * HTTP-клиент Amp для выполнения запросов
      * @var HttpClient
@@ -44,6 +42,7 @@ class WikipediaLoader implements ContentLoaderInterface
     {
         $this->httpClient = HttpClientBuilder::buildDefault();
         $this->sourceType = ContentSourceType::WIKIPEDIA;
+        $this->setUserAgent('WikipediaLoader/1.0');
     }
 
     /**

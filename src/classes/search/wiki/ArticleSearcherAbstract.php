@@ -21,8 +21,6 @@ abstract class ArticleSearcherAbstract implements ArticleSearcherInterface
 {
     use UserAgentTrait;
 
-    protected string $userAgent = 'ArticleSearcher/1.0';
-
     /**
      * HTTP-клиент Amp для выполнения запросов
      * @var HttpClient
@@ -35,6 +33,7 @@ abstract class ArticleSearcherAbstract implements ArticleSearcherInterface
     public function __construct()
     {
         $this->httpClient = HttpClientBuilder::buildDefault();
+        $this->setUserAgent('ArticleSearcher/1.0');
     }
 
     /**

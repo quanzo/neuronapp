@@ -15,8 +15,6 @@ trait LinkValidatorTrait
 {
     use UserAgentTrait;
 
-    protected string $userAgent = 'WikipediaFullLoader/1.0';
-
     /**
      * Таймаут проверки ссылок в миллисекундах.
      *
@@ -34,6 +32,8 @@ trait LinkValidatorTrait
      */
     protected function validateLinks(array $links, HttpClient $httpClient): array
     {
+        $this->setUserAgent('WikipediaFullLoader/1.0');
+
         // Создаем массив промисов для асинхронных запросов
         $promises = [];
 

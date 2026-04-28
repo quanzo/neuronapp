@@ -10,12 +10,6 @@ use app\modules\neuron\classes\command\ClearAllSessionsCommand;
 use app\modules\neuron\classes\command\ClearSessionCommand;
 use app\modules\neuron\classes\command\OrchestrateCommand;
 use app\modules\neuron\classes\command\WikiCommand;
-use quanzo\tui\classes\command\InteractiveCommand;
-use quanzo\tui\classes\tui\command\handlers\ClearCommandHandler;
-use quanzo\tui\classes\tui\command\handlers\ExitCommandHandler;
-use quanzo\tui\classes\tui\command\handlers\HelpCommandHandler;
-use quanzo\tui\classes\tui\command\handlers\WorkspaceCommandHandler;
-use quanzo\tui\classes\tui\hooks\DefaultTuiPostOutputHook;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\console\TimedConsoleApplication;
 use app\modules\neuron\classes\dir\DirPriority;
@@ -100,17 +94,6 @@ try {
 
 // Регистрируем команды
 $app->add(new HelloCommand());
-
-$interactive = (new InteractiveCommand())
-    ->setCommandName('interactive')
-    ->setDescriptionText('Интерактивный TUI (workspace)')
-    ->addHandler(new HelpCommandHandler())
-    ->addHandler(new WorkspaceCommandHandler())
-    ->addHandler(new ClearCommandHandler())
-    ->addHandler(new ExitCommandHandler())
-    ->setPostHook(new DefaultTuiPostOutputHook());
-
-$app->add($interactive);
 $app->add(new SimpleMessageCommand());
 $app->add(new TodolistCommand());
 $app->add(new WikiCommand());

@@ -9,7 +9,7 @@ use app\modules\neuron\classes\safe\dto\InputViolationDto;
 
 /**
  * Детектирует типогликимию для ключевых слов jailbreak/prompt-injection.
- * 
+ *
  * Typoglycemia — это когнитивное явление, при котором человек способен понимать текст, даже если внутри слов перемешаны буквы, но при этом первая и последняя буквы остаются на своих местах.
  */
 class TypoglycemiaInputRule implements InputDetectorRuleInterface

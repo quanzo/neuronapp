@@ -15,7 +15,6 @@ use app\modules\neuron\interfaces\ContentLoaderInterface;
 use app\modules\neuron\traits\tools\wiki\HtmlToPlainTextConverterTrait;
 use app\modules\neuron\traits\tools\wiki\CoordinateExtractorTrait;
 use app\modules\neuron\traits\tools\wiki\LinkValidatorTrait;
-use app\modules\neuron\traits\UserAgentTrait;
 
 /**
  * Загрузчик для полных статей RuWiki (ruwiki.ru).
@@ -26,8 +25,6 @@ class RuWikiFullLoader implements ContentLoaderInterface
     use HtmlToPlainTextConverterTrait;
     use CoordinateExtractorTrait;
     use LinkValidatorTrait;
-
-    protected string $userAgent = 'RuWikiFullLoader/1.0';
 
     /**
      * HTTP-клиент Amp для выполнения запросов
@@ -65,6 +62,7 @@ class RuWikiFullLoader implements ContentLoaderInterface
         $this->sourceType = ContentSourceType::RUWIKI;
         $this->collectLinks = $collectLinks;
         $this->collectCoordinates = $collectCoordinates;
+        $this->setUserAgent('RuWikiFullLoader/1.0');
     }
 
     /**
