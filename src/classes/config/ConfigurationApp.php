@@ -10,6 +10,8 @@ use app\modules\neuron\classes\producers\SkillProducer;
 use app\modules\neuron\classes\producers\TodoListProducer;
 use app\modules\neuron\classes\safe\InputSafe;
 use app\modules\neuron\classes\safe\OutputSafe;
+use app\modules\neuron\classes\safe\RuleFilter;
+use app\modules\neuron\classes\safe\enums\RuleSeverityEnum;
 use app\modules\neuron\classes\safe\rules\input\CollapseRepeatCharsInputRule;
 use app\modules\neuron\classes\safe\rules\input\MaxLengthInputRule;
 use app\modules\neuron\classes\safe\rules\input\NormalizeWhitespaceInputRule;
@@ -17,6 +19,7 @@ use app\modules\neuron\classes\safe\rules\input\RegexInjectionInputRule;
 use app\modules\neuron\classes\safe\rules\input\RemoveInvisibleCharsInputRule;
 use app\modules\neuron\classes\safe\rules\input\TypoglycemiaInputRule;
 use app\modules\neuron\classes\safe\rules\output\RegexLeakOutputRule;
+use app\modules\neuron\classes\safe\tools\DefaultBashToolPolicy;
 use app\modules\neuron\classes\skill\Skill;
 use app\modules\neuron\classes\todo\TodoList;
 use app\modules\neuron\classes\config\ConfigurationAgent;
@@ -420,63 +423,341 @@ class ConfigurationApp
 
     /**
      * Собирает дефолтный пайплайн InputSafe.
+     *
+     * @return InputSafe Сервис входной защиты с учётом `safe.input.*`.
      */
     private function buildDefaultInputSafe(): InputSafe
     {
+        // App-level флаг полностью выключает входной pipeline. Agent-level `safeInput=false`
+        // по-прежнему работает выше, в `ConfigurationAgent`, и не создаёт декоратор проверки для конкретного агента.
+        if (!OptionsHelper::toBool($this->get('safe.input.enabled', true))) {
+            return new InputSafe([], []);
+        }
+
+        // Ограничение длины — sanitize-правило, а не detector: оно не блокирует запрос,
+        // а обрезает чрезмерно большой payload до безопасного лимита контекстного окна.
         $maxLength = (int) $this->get('safe.input.max_length', 20000);
         if ($maxLength <= 0) {
             $maxLength = 20000;
         }
 
+        // Фильтр применяется и к sanitize-, и к detector-правилам, поэтому любое правило ниже
+        // можно отключить через `safe.input.disabled_rules` или всю группу через `disabled_groups`.
+        $filter = $this->makeRuleFilter('safe.input');
+
         return new InputSafe(
-            [
+            $filter->filter([
+                // ruleId: input.sanitize.invisible_chars; group: input.sanitize; severity: high.
+                // Убирает ASCII control, zero-width и bidi/BOM символы до отправки в LLM.
+                // Это первый слой защиты от Unicode-smuggling и невидимой обфускации prompt-injection.
                 new RemoveInvisibleCharsInputRule(),
+                // ruleId: input.sanitize.whitespace; group: input.sanitize; severity: medium.
+                // Нормализует пробелы и переносы, чтобы атаки вроде `ignore   previous`
+                // не обходили detector-правила простым раздуванием whitespace.
                 new NormalizeWhitespaceInputRule(),
+                // ruleId: input.sanitize.repeat_chars; group: input.sanitize; severity: medium.
+                // Схлопывает длинные повторы символов, которые часто используются как шум
+                // для jailbreak/BoN payload и ухудшают качество дальнейшей regex-детекции.
                 new CollapseRepeatCharsInputRule(5),
+                // ruleId: input.sanitize.max_length; group: input.sanitize; severity: medium.
+                // Обрезает слишком длинный вход. Это не security-block, а защита от stuffing
+                // и неконтролируемого расхода контекста; лимит настраивается `safe.input.max_length`.
                 new MaxLengthInputRule($maxLength),
-            ],
-            [
+            ]),
+            $filter->filter([
+                // ruleId: input.prompt.instruction_override; group: input.prompt_injection; severity: high.
+                // Блокирует прямые формулировки "ignore/disregard/forget previous/system instructions".
+                // False-positive риск низкий: пользовательский запрос редко легитимно требует игнорировать системные правила.
                 new RegexInjectionInputRule(
-                    'instruction_override',
+                    'input.prompt.instruction_override',
                     'Input tries to override system instructions.',
-                    '/\b(ignore|disregard|forget)\b.{0,40}\b(previous|system|earlier)\b.{0,40}\b(instructions?|prompt)\b/iu'
+                    '/\b(ignore|disregard|forget)\b.{0,40}\b(previous|system|earlier)\b.{0,40}\b(instructions?|prompt)\b/iu',
+                    'input.prompt_injection',
+                    RuleSeverityEnum::HIGH,
+                    'Low: direct override wording is rarely legitimate user data.'
                 ),
+                // ruleId: input.prompt.exfiltration; group: input.prompt_exfiltration; severity: high.
+                // Ловит прямые просьбы reveal/show/print/dump/leak/expose системный prompt
+                // или скрытые/internal instructions. Такие запросы не должны доходить до провайдера LLM.
                 new RegexInjectionInputRule(
-                    'system_prompt_exfiltration',
+                    'input.prompt.exfiltration',
                     'Input requests hidden/system prompt disclosure.',
-                    '/\b(reveal|show|print|dump|leak|expose)\b.{0,40}\b(system prompt|hidden instructions?|internal instructions?)\b/iu'
+                    '/\b(reveal|show|print|dump|leak|expose)\b.{0,40}\b(system prompt|hidden instructions?|internal instructions?)\b/iu',
+                    'input.prompt_exfiltration',
+                    RuleSeverityEnum::HIGH,
+                    'Low: direct system prompt extraction requests are unsafe.'
                 ),
+                // ruleId: input.prompt.jailbreak_role_hijack; group: input.jailbreak; severity: high.
+                // Блокирует известные jailbreak-маркеры: developer mode, DAN, do anything now,
+                // bypass safety, disable guardrails. Это короткие высокосигнальные индикаторы атаки.
                 new RegexInjectionInputRule(
-                    'jailbreak_role_hijack',
+                    'input.prompt.jailbreak_role_hijack',
                     'Input contains role-hijack or jailbreak markers.',
-                    '/\b(developer mode|dan\b|do anything now|bypass safety|disable guardrails?|jailbreak)\b/iu'
+                    '/\b(developer mode|dan\b|do anything now|bypass safety|disable guardrails?|jailbreak)\b/iu',
+                    'input.jailbreak',
+                    RuleSeverityEnum::HIGH,
+                    'Low: explicit jailbreak markers should not reach the model.'
                 ),
+                // ruleId: input.prompt.reset_ru; group: input.prompt_injection; severity: high.
+                // Русскоязычный аналог instruction reset: "забудь все инструкции/правила/промпт".
+                // Добавлен из opencode-policy как локализованное high-confidence правило.
+                new RegexInjectionInputRule(
+                    'input.prompt.reset_ru',
+                    'Input asks to forget Russian instructions/rules/prompt.',
+                    '/забудь\s+(все\s+)?(инструкции|правила|промпт)/iu',
+                    'input.prompt_injection',
+                    RuleSeverityEnum::HIGH,
+                    'Low: ordinary Russian requests rarely ask the model to forget rules.'
+                ),
+                // ruleId: input.prompt.fake_role_tag; group: input.fake_role_tag; severity: high.
+                // Блокирует поддельные role tags `[system]`, `[admin]`, `[developer]`, которыми
+                // атакующий пытается внедрить новый privileged-message в обычный user input.
+                // При работе над документацией prompt-форматов правило можно отключить по ruleId.
+                new RegexInjectionInputRule(
+                    'input.prompt.fake_role_tag',
+                    'Input contains fake system/admin/developer role tag.',
+                    '/\[(system|admin|developer)\]/iu',
+                    'input.fake_role_tag',
+                    RuleSeverityEnum::HIGH,
+                    'Medium: documentation can mention tags; disable for prompt-engineering docs.'
+                ),
+                // ruleId: input.prompt.new_instructions; group: input.prompt_injection; severity: high.
+                // Блокирует явный маркер нового блока инструкций `new instructions:`.
+                // Это частый способ разделить payload на "старые правила" и "новую policy".
+                new RegexInjectionInputRule(
+                    'input.prompt.new_instructions',
+                    'Input attempts to inject a new instruction block.',
+                    '/\bnew\s+instructions?\s*:/iu',
+                    'input.prompt_injection',
+                    RuleSeverityEnum::HIGH,
+                    'Low: this phrase is a common direct prompt-injection marker.'
+                ),
+                // ruleId: input.prompt.override_reset; group: input.prompt_injection; severity: high.
+                // Расширяет reset/override покрытие: override your/all/previous,
+                // disregard your/all/previous, reset to default/factory/original.
+                // Это не low-confidence roleplay, а прямое управление поведением модели.
+                new RegexInjectionInputRule(
+                    'input.prompt.override_reset',
+                    'Input tries to override, disregard or reset current behavior.',
+                    '/\b(override\s+(your|all|previous)|disregard\s+(your|all|previous)|reset\s+(to|your)\s+(default|factory|original))\b/iu',
+                    'input.prompt_injection',
+                    RuleSeverityEnum::HIGH,
+                    'Low: direct behavior reset requests should be blocked before LLM.'
+                ),
+                // ruleId: input.prompt.exfiltration_extended; group: input.prompt_exfiltration; severity: high.
+                // Расширяет prompt-extraction: reveal/show me your/the system|prompt|instructions.
+                // Паттерн намеренно узкий, чтобы не блокировать обычные вопросы о документации.
+                new RegexInjectionInputRule(
+                    'input.prompt.exfiltration_extended',
+                    'Input asks to reveal/show system, prompt or instructions.',
+                    '/\b(reveal|show)\s+(me\s+)?(your|the)\s+(system|prompt|instructions)\b/iu',
+                    'input.prompt_exfiltration',
+                    RuleSeverityEnum::HIGH,
+                    'Low: direct extraction requests should not reach the model.'
+                ),
+                // ruleId: input.obfuscation.decode_exec; group: input.obfuscation; severity: high.
+                // Блокирует связку "decode/decrypt ... execute/run/eval" на английском и русском.
+                // Такая связка обычно означает попытку спрятать исполняемые инструкции в encoded payload.
+                // Для задач аудита payload правило можно отключить по группе `input.obfuscation`.
+                new RegexInjectionInputRule(
+                    'input.obfuscation.decode_exec',
+                    'Input combines decode/decrypt with execute/run/eval.',
+                    '/\b(decode|decrypt|декодируй|раскодируй|расшифруй)\b.*\b(execute|run|eval|выполни|запусти|исполни)\b/iu',
+                    'input.obfuscation',
+                    RuleSeverityEnum::HIGH,
+                    'Medium: some security analysis tasks discuss this pattern; disable when auditing payloads.'
+                ),
+                // ruleId: input.obfuscation.base64_exec_payload; group: input.obfuscation; severity: high.
+                // Ищет длинный base64-like фрагмент рядом с run/exec/выполни/запусти.
+                // Сам base64 не блокируется: правило срабатывает только рядом с просьбой выполнить payload,
+                // чтобы снизить false-positive на логах, тестовых данных и harmless encoded examples.
+                new RegexInjectionInputRule(
+                    'input.obfuscation.base64_exec_payload',
+                    'Input contains long base64-like payload near run/exec request.',
+                    '/((выполни|запусти|run|exec).*[A-Za-z0-9+\/]{40,}={0,2}|[A-Za-z0-9+\/]{40,}={0,2}.*(выполни|запусти|run|exec))/iu',
+                    'input.obfuscation',
+                    RuleSeverityEnum::HIGH,
+                    'Medium: logs and encoded samples can be legitimate in security work.'
+                ),
+                // ruleId: input.obfuscation.base64_known_secrets; group: input.obfuscation; severity: high.
+                // Блокирует известные base64-литералы для `import os`, `os.environ`,
+                // `/proc/self/environ`, `/run/secrets`. Это high-confidence индикаторы попытки
+                // получить окружение или секреты через скрытую инструкцию.
+                new RegexInjectionInputRule(
+                    'input.obfuscation.base64_known_secrets',
+                    'Input contains known base64 literals for OS/env/secret access.',
+                    '/(aW1wb3J0IG9z|b3MuZW52aXJvbg|L3Byb2Mvc2VsZi9lbnZpcm9u|L3J1bi9zZWNyZXRz)/u',
+                    'input.obfuscation',
+                    RuleSeverityEnum::HIGH,
+                    'Low: these literals encode high-risk secret/environment access patterns.'
+                ),
+                // ruleId: input.low_confidence.roleplay; group: input.low_confidence; severity: low.
+                // Ловит `pretend you are`, `act as`, `you are now`, но группа отключена по умолчанию
+                // в `makeRuleFilter()`: эти фразы часто нужны в нормальных задачах. Правило оставлено
+                // как opt-in для более строгих окружений или будущих составных detector-политик.
+                new RegexInjectionInputRule(
+                    'input.low_confidence.roleplay',
+                    'Input contains low-confidence roleplay override wording.',
+                    '/\b(pretend\s+(you\s+)?(are|to\s+be)|act\s+as\s+(if|a|an)|you\s+are\s+now\s+(a|an|in))\b/iu',
+                    'input.low_confidence',
+                    RuleSeverityEnum::LOW,
+                    'High: roleplay phrasing is common in legitimate prompts; group is disabled by default.'
+                ),
+                // ruleId: input.obfuscation.typoglycemia; group: input.obfuscation; severity: medium.
+                // Ловит перестановку внутренних букв в опасных словах (`ignroe`, `bpyass` и т.п.).
+                // Правило полезно против простой текстовой обфускации, но имеет medium severity из-за
+                // возможных случайных опечаток в одиночных словах.
                 new TypoglycemiaInputRule(),
-            ]
+            ])
         );
     }
 
     /**
      * Собирает дефолтный пайплайн OutputSafe.
+     *
+     * @return OutputSafe Сервис выходной защиты с учётом `safe.output.*`.
      */
     private function buildDefaultOutputSafe(): OutputSafe
     {
+        // App-level флаг выключает только состав output-правил. Agent-level `safeOutput=false`
+        // дополнительно позволяет конкретному агенту не подключать output sanitize-декоратор.
+        if (!OptionsHelper::toBool($this->get('safe.output.enabled', true))) {
+            return new OutputSafe([]);
+        }
+
+        // Все output-правила ниже работают в гибридном режиме: они редактируют найденный фрагмент,
+        // возвращают DTO нарушения, а `SafeAIProviderDecorator` логирует событие `llm.output.redacted`.
+        $filter = $this->makeRuleFilter('safe.output');
+
         return new OutputSafe(
-            [
+            $filter->filter([
+                // ruleId: output.prompt.system_prompt_leak; group: output.prompt_leakage; severity: high.
+                // Редактирует фразы, похожие на раскрытие system prompt / hidden/internal instructions.
+                // Замена сохраняет ответ, но убирает потенциально чувствительный фрагмент.
                 new RegexLeakOutputRule(
-                    'system_prompt_leak',
+                    'output.prompt.system_prompt_leak',
                     'Output may disclose hidden/system prompt.',
                     '/\b(system prompt|hidden instructions?|internal instructions?)\b.{0,200}/iu',
-                    '[REDACTED_SYSTEM_PROMPT_FRAGMENT]'
+                    '[REDACTED_SYSTEM_PROMPT_FRAGMENT]',
+                    'output.prompt_leakage',
+                    RuleSeverityEnum::HIGH,
+                    'Medium: explanatory text about prompts can be redacted.'
                 ),
+                // ruleId: output.secret.api_key; group: output.secrets; severity: high.
+                // Редактирует token-like строки: `sk-...`, `api_key=...`, `Bearer ...`.
+                // Паттерн намеренно требует минимальную длину значения, чтобы не скрывать короткие примеры.
                 new RegexLeakOutputRule(
-                    'api_key_leak',
+                    'output.secret.api_key',
                     'Output may disclose API/token secret.',
                     '/\b(sk-[a-z0-9]{16,}|api[_-]?key\s*[:=]\s*[a-z0-9_\-]{10,}|bearer\s+[a-z0-9\._\-]{20,})\b/iu',
-                    '[REDACTED_SECRET]'
+                    '[REDACTED_SECRET]',
+                    'output.secrets',
+                    RuleSeverityEnum::HIGH,
+                    'Low: key/token-like strings should not be returned to users.'
                 ),
-            ]
+                // ruleId: output.secret.env_assignment; group: output.secrets; severity: high.
+                // Редактирует env-like присваивания для KEY/TOKEN/SECRET/PASSWORD/PASS/CREDENTIAL.
+                // Это защищает от ситуаций, когда LLM цитирует `.env` или shell output с секретами.
+                // False-positive возможен на учебных fake-примерах, поэтому правило отключается по ruleId.
+                new RegexLeakOutputRule(
+                    'output.secret.env_assignment',
+                    'Output may disclose env-like secret assignment.',
+                    '/\b(KEY|TOKEN|SECRET|PASSWORD|PASS|CREDENTIAL)[A-Z0-9_]*\s*=\s*[^\s"\']{6,}/iu',
+                    '[REDACTED_SECRET]',
+                    'output.secrets',
+                    RuleSeverityEnum::HIGH,
+                    'Medium: examples can use fake KEY=VALUE; tests should use placeholders.'
+                ),
+                // ruleId: output.secret.sensitive_paths; group: output.secrets; severity: high.
+                // Редактирует пути к источникам секретов: `/proc/self/environ`, `/run/secrets`, `.env`.
+                // Даже если значение секрета не раскрыто, подсказка к такому пути может направить
+                // следующий tool-вызов к утечке.
+                new RegexLeakOutputRule(
+                    'output.secret.sensitive_paths',
+                    'Output may disclose sensitive environment/secret path.',
+                    '/(\/proc\/self\/environ|\/run\/secrets|\.env\b)/iu',
+                    '[REDACTED_SENSITIVE_PATH]',
+                    'output.secrets',
+                    RuleSeverityEnum::HIGH,
+                    'Low: these paths should not be surfaced in model answers.'
+                ),
+                // ruleId: output.prompt.policy_leak; group: output.prompt_leakage; severity: high.
+                // Редактирует признаки раскрытия developer/system instructions, hidden/internal policy.
+                // Правило дополняет system_prompt_leak и покрывает современные multi-policy LLM setups.
+                new RegexLeakOutputRule(
+                    'output.prompt.policy_leak',
+                    'Output may disclose internal policy or developer instructions.',
+                    '/\b(system instructions?|developer instructions?|hidden policy|internal policy)\b.{0,200}/iu',
+                    '[REDACTED_INTERNAL_POLICY_FRAGMENT]',
+                    'output.prompt_leakage',
+                    RuleSeverityEnum::HIGH,
+                    'Medium: documentation about policies can be redacted.'
+                ),
+            ])
         );
+    }
+
+    /**
+     * Возвращает дефолтные blockedPatterns для `BashTool` с учётом `safe.tools.bash.*`.
+     *
+     * @return list<string> Regex-паттерны, которые должны быть добавлены к blockedPatterns.
+     */
+    public function getBashToolBlockedPatterns(): array
+    {
+        if (!OptionsHelper::toBool($this->get('safe.tools.bash.enabled', true))) {
+            return [];
+        }
+
+        $rules = $this->makeRuleFilter('safe.tools.bash')->filter(DefaultBashToolPolicy::rules());
+
+        return DefaultBashToolPolicy::patterns($rules);
+    }
+
+    /**
+     * Создаёт фильтр правил из конфигурационного префикса.
+     *
+     * @param string $prefix Префикс конфигурации, например `safe.input`.
+     *
+     * @return RuleFilter Фильтр с disabled_rules и disabled_groups.
+     */
+    private function makeRuleFilter(string $prefix): RuleFilter
+    {
+        $defaultDisabledGroups = $prefix === 'safe.input' ? ['input.low_confidence'] : [];
+
+        return new RuleFilter(
+            $this->getStringListConfig($prefix . '.disabled_rules'),
+            $this->getStringListConfig($prefix . '.disabled_groups', $defaultDisabledGroups)
+        );
+    }
+
+    /**
+     * Читает список строк из config.jsonc и отбрасывает пустые/нестроковые значения.
+     *
+     * @param string       $key     Ключ конфигурации с массивом строк.
+     * @param list<string> $default Значение по умолчанию.
+     *
+     * @return list<string> Нормализованный список строк.
+     */
+    private function getStringListConfig(string $key, array $default = []): array
+    {
+        $raw = $this->get($key, $default);
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($raw as $value) {
+            if (!is_scalar($value)) {
+                continue;
+            }
+
+            $value = trim((string) $value);
+            if ($value !== '') {
+                $result[] = $value;
+            }
+        }
+
+        return array_values(array_unique($result));
     }
 
     private $_sessionSrv = null;

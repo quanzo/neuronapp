@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Tools;
 
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\tools\BashTool;
 use PHPUnit\Framework\TestCase;
 
@@ -167,6 +168,27 @@ final class BashToolTest extends TestCase
 
         $this->assertSame(-1, $data['exitCode']);
         $this->assertStringContainsString('заблокирована', $data['stderr']);
+    }
+
+    /**
+     * Проверяет, что setAgentCfg() не добавляет Safe blockedPatterns без ConfigurationApp.
+     *
+     * Команда `cat .env` должна выполняться, потому что агент не содержит configApp,
+     * а значит BashTool не должен брать singleton и не должен дополнять blockedPatterns.
+     *
+     * @return void
+     */
+    public function testSetAgentCfgDoesNotInjectSafePatternsWithoutConfigurationApp(): void
+    {
+        file_put_contents($this->tempDir . '/.env', 'TOKEN=fake');
+
+        $tool = new BashTool(workingDirectory: $this->tempDir);
+        $tool->setAgentCfg(new ConfigurationAgent());
+        $json = $tool->__invoke('cat .env');
+        $data = json_decode($json, true);
+
+        $this->assertSame(0, $data['exitCode']);
+        $this->assertStringContainsString('TOKEN=fake', $data['stdout']);
     }
 
     /**

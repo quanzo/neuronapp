@@ -12,16 +12,31 @@ use app\modules\neuron\classes\safe\dto\OutputSafeResultDto;
  *
  * Стратегия: гибридная — опасные фрагменты редактируются, нарушения возвращаются
  * вызывающему коду для сигнализации (лог/метрика/событие).
+ *
+ * Пример:
+ * ```php
+ * $result = $outputSafe->sanitize($assistantText);
+ * if ($result->hasViolations()) {
+ *     $logger->warning('llm.output.redacted', $result->toArray());
+ * }
+ * ```
  */
 class OutputSafe
 {
     /**
+     * Правила, которые проверяют и редактируют ответ LLM.
+     *
      * @var list<OutputDetectorRuleInterface>
      */
     private array $detectorRules = [];
 
     /**
      * @param list<OutputDetectorRuleInterface> $detectorRules Набор правил проверки.
+     *
+     * Пример:
+     * ```php
+     * $safe = new OutputSafe([$outputRule]);
+     * ```
      */
     public function __construct(array $detectorRules = [])
     {
@@ -32,6 +47,8 @@ class OutputSafe
      * Полностью заменяет набор правил проверки.
      *
      * @param list<OutputDetectorRuleInterface> $rules Правила проверки.
+     *
+     * @return self Текущий экземпляр для fluent-цепочки.
      */
     public function setDetectorRules(array $rules): self
     {
@@ -44,6 +61,10 @@ class OutputSafe
 
     /**
      * Добавляет одно правило проверки.
+     *
+     * @param OutputDetectorRuleInterface $rule Правило проверки/редактирования.
+     *
+     * @return self Текущий экземпляр для fluent-цепочки.
      */
     public function addDetectorRule(OutputDetectorRuleInterface $rule): self
     {

@@ -14,15 +14,24 @@ use app\modules\neuron\classes\safe\exceptions\InputSafetyViolationException;
  * Этапы:
  * 1. Санитизация текста.
  * 2. Детекция признаков prompt-injection/jailbreak.
+ *
+ * Пример:
+ * ```php
+ * $safeText = $inputSafe->sanitizeAndAssert($userText);
+ * ```
  */
 class InputSafe
 {
     /**
+     * Правила, которые изменяют входной текст без блокировки запроса.
+     *
      * @var list<InputSanitizerRuleInterface>
      */
     private array $sanitizerRules = [];
 
     /**
+     * Правила, которые анализируют очищенный текст и могут заблокировать запрос.
+     *
      * @var list<InputDetectorRuleInterface>
      */
     private array $detectorRules = [];
@@ -30,6 +39,11 @@ class InputSafe
     /**
      * @param list<InputSanitizerRuleInterface> $sanitizerRules Набор правил санитизации.
      * @param list<InputDetectorRuleInterface>  $detectorRules Набор правил детекции.
+     *
+     * Пример:
+     * ```php
+     * $safe = new InputSafe([$sanitizeRule], [$detectRule]);
+     * ```
      */
     public function __construct(array $sanitizerRules = [], array $detectorRules = [])
     {
@@ -41,6 +55,8 @@ class InputSafe
      * Полностью заменяет набор правил санитизации.
      *
      * @param list<InputSanitizerRuleInterface> $rules Правила санитизации.
+     *
+     * @return self Текущий экземпляр для fluent-цепочки.
      */
     public function setSanitizerRules(array $rules): self
     {
@@ -53,6 +69,10 @@ class InputSafe
 
     /**
      * Добавляет одно правило санитизации.
+     *
+     * @param InputSanitizerRuleInterface $rule Правило очистки входного текста.
+     *
+     * @return self Текущий экземпляр для fluent-цепочки.
      */
     public function addSanitizerRule(InputSanitizerRuleInterface $rule): self
     {
@@ -64,6 +84,8 @@ class InputSafe
      * Полностью заменяет набор правил детекции.
      *
      * @param list<InputDetectorRuleInterface> $rules Правила детекции.
+     *
+     * @return self Текущий экземпляр для fluent-цепочки.
      */
     public function setDetectorRules(array $rules): self
     {
@@ -76,6 +98,10 @@ class InputSafe
 
     /**
      * Добавляет одно правило детекции.
+     *
+     * @param InputDetectorRuleInterface $rule Правило блокирующей проверки.
+     *
+     * @return self Текущий экземпляр для fluent-цепочки.
      */
     public function addDetectorRule(InputDetectorRuleInterface $rule): self
     {

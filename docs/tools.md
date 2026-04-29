@@ -69,6 +69,37 @@ ToolRegistry::registerAlias('my_tool_v2', 'my_tool');
 
 Конкретное поведение каждого инструмента реализовано в соответствующем классе, опираясь на интерфейсы NeuronAI (`ToolInterface`, `ProviderToolInterface`, `ToolkitInterface`).
 
+### BashTool Safe-политики
+
+`BashTool` сохраняет свои обычные `allowedPatterns/blockedPatterns`, но после привязки к агенту через `setAgentCfg()` дополнительно получает дефолтные high-confidence блокировки из `safe.tools.bash`.
+
+Конфигурация:
+
+```jsonc
+{
+  "safe": {
+    "tools": {
+      "bash": {
+        "enabled": true,
+        "disabled_rules": ["tool.secrets.dotenv"],
+        "disabled_groups": ["tool.obfuscation"]
+      }
+    }
+  }
+}
+```
+
+Группы дефолтных правил:
+
+- `tool.secrets` — `.env`, `/proc/self/environ`, `/run/secrets`;
+- `tool.exfiltration` — `curl`/`wget` upload/POST;
+- `tool.reverse_shell` — `/dev/tcp`, `bash -i`, `nc -e/-c`;
+- `tool.resource_abuse` — fork-bomb и huge `fallocate`;
+- `tool.obfuscation` — `$IFS`, backticks, `$()`;
+- `tool.workspace_escape` — `cd ..`.
+
+Эти правила намеренно не смешиваются с `InputSafe`: они проверяют shell-команду инструмента, а не пользовательский prompt.
+
 ### `web_fetch` / `http_fetch`: единый WebFetchTool с режимами
 
 В проекте используется **один** класс инструмента: `app\modules\neuron\tools\WebFetchTool` (`src/tools/WebFetchTool.php`).

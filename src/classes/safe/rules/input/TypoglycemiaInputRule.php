@@ -6,11 +6,21 @@ namespace app\modules\neuron\classes\safe\rules\input;
 
 use app\modules\neuron\classes\safe\contracts\InputDetectorRuleInterface;
 use app\modules\neuron\classes\safe\dto\InputViolationDto;
+use app\modules\neuron\classes\safe\dto\RuleMetadataDto;
+use app\modules\neuron\classes\safe\enums\RuleSeverityEnum;
 
 /**
  * Детектирует типогликимию для ключевых слов jailbreak/prompt-injection.
  *
  * Typoglycemia — это когнитивное явление, при котором человек способен понимать текст, даже если внутри слов перемешаны буквы, но при этом первая и последняя буквы остаются на своих местах.
+ *
+ * RuleId: `input.obfuscation.typoglycemia`.
+ * Group: `input.obfuscation`.
+ * Severity: `medium`.
+ * Нарушение: ключевые слова вроде `ignore`, `bypass`, `override`,
+ * `reveal` записаны с переставленными внутренними буквами.
+ * False-positive риск: средний; редкие опечатки в одиночных словах могут
+ * совпасть с опасными терминами.
  */
 class TypoglycemiaInputRule implements InputDetectorRuleInterface
 {
@@ -28,6 +38,21 @@ class TypoglycemiaInputRule implements InputDetectorRuleInterface
         'developer',
     ])
     {
+    }
+
+    /**
+     * Возвращает метаданные правила обфускации.
+     *
+     * @return RuleMetadataDto Описание правила для фильтрации и документации.
+     */
+    public function getMetadata(): RuleMetadataDto
+    {
+        return (new RuleMetadataDto())
+            ->setRuleId('input.obfuscation.typoglycemia')
+            ->setGroup('input.obfuscation')
+            ->setSeverity(RuleSeverityEnum::MEDIUM)
+            ->setDescription('Detects typoglycemia variants of common jailbreak keywords.')
+            ->setFalsePositiveRisk('Medium: a typo in a dangerous keyword may be intentional or accidental.');
     }
 
     /**

@@ -9,7 +9,7 @@ use app\modules\neuron\classes\safe\dto\InputViolationDto;
 /**
  * Контракт правила детекции опасных входных инструкций для LLM.
  */
-interface InputDetectorRuleInterface
+interface InputDetectorRuleInterface extends SafeRuleInterface
 {
     /**
      * Проверяет текст на наличие признаков атаки/манипуляции.

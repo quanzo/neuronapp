@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\tools;
 
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\classes\dto\tools\BashResultDto;
 use app\modules\neuron\tools\ATool;
@@ -11,6 +12,7 @@ use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
 use function array_merge;
+use function array_values;
 use function count;
 use function fclose;
 use function fread;
@@ -117,6 +119,36 @@ class BashTool extends ATool
         $this->allowedPatterns = $allowedPatterns;
         $this->blockedPatterns = $blockedPatterns;
         $this->env = $env;
+    }
+
+    /**
+     * Привязывает инструмент к агенту и добавляет дефолтные Safe-политики BashTool.
+     *
+     * Правила из `safe.tools.bash.*` дополняют уже переданные `blockedPatterns`
+     * только когда агент явно содержит `ConfigurationApp`.
+     * Существующие allow/deny настройки инструмента сохраняются: сначала остаются
+     * пользовательские blockedPatterns, затем добавляются high-confidence правила
+     * защиты от утечек, reverse shell и resource abuse.
+     *
+     * @param ConfigurationAgent $agentCfg Конфигурация агента текущей сессии.
+     *
+     * @return static Текущий инструмент для fluent-цепочки.
+     */
+    public function setAgentCfg(ConfigurationAgent $agentCfg): static
+    {
+        parent::setAgentCfg($agentCfg);
+
+        $configApp = $agentCfg->getConfigurationApp();
+        if ($configApp === null) {
+            return $this;
+        }
+
+        $this->blockedPatterns = array_values(array_unique(array_merge(
+            $this->blockedPatterns,
+            $configApp->getBashToolBlockedPatterns()
+        )));
+
+        return $this;
     }
 
     /**

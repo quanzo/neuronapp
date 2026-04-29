@@ -7,7 +7,7 @@ namespace app\modules\neuron\classes\safe\contracts;
 /**
  * Контракт правила очистки входного текста перед отправкой в LLM.
  */
-interface InputSanitizerRuleInterface
+interface InputSanitizerRuleInterface extends SafeRuleInterface
 {
     /**
      * Возвращает очищенную версию входного текста.

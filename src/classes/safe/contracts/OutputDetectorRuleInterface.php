@@ -9,7 +9,7 @@ use app\modules\neuron\classes\safe\dto\OutputRuleResultDto;
 /**
  * Контракт правила проверки и редактирования выходного текста LLM.
  */
-interface OutputDetectorRuleInterface
+interface OutputDetectorRuleInterface extends SafeRuleInterface
 {
     /**
      * Применяет правило к выходному тексту.

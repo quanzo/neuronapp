@@ -148,6 +148,34 @@ Edge cases:
 - `safeInput = true` — текст user/developer/system сообщений очищается (`InputSafe`) и проверяется на признаки prompt-injection/jailbreak; при срабатывании блокируется исключением;
 - `safeOutput = true` — текст ответа LLM проверяется (`OutputSafe`), чувствительные фрагменты редактируются, а факт редактирования сигнализируется через лог `llm.output.redacted`.
 
+Состав правил управляется app-level разделом `safe` в `config.jsonc`:
+
+```jsonc
+{
+  "safe": {
+    "input": {
+      "enabled": true,
+      "disabled_rules": ["input.prompt.reset_ru"],
+      "disabled_groups": ["input.low_confidence"]
+    },
+    "output": {
+      "enabled": true,
+      "disabled_rules": [],
+      "disabled_groups": []
+    },
+    "tools": {
+      "bash": {
+        "enabled": true,
+        "disabled_rules": [],
+        "disabled_groups": []
+      }
+    }
+  }
+}
+```
+
+`disabled_rules` отключает конкретный `ruleId`, а `disabled_groups` отключает группу правил. Agent-level `safeInput=false` или `safeOutput=false` полностью перекрывает app-level pipeline для конкретного агента.
+
 Подробное описание правил и расширения см. в `docs/safe.md`.
 
 ### Файлы агентов (`agents/*.php`, `agents/*.jsonc`)
