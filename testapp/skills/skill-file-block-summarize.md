@@ -3,7 +3,7 @@ description: Краткое содержание фрагмента (чанка)
 params: {"startLine":{"type":"integer","description":"Начальная строка чанка текста (0-based)","required":true},"path":{"type":"string","description":"Путь к файлу, в котором проводим поиск","required":true}}
 tools: chunk_view, chunk_size
 pure_context: true
-agent: agent-main
+agent: agent--brain
 ---
 
 Ты должен прочитать один чанк из файла `$path`, начиная со строки `$startLine` и размером `50000` символов. Если возвращается пустой чанк или ошибка, то ты достиг окончания файла и больше читать не нужно. 

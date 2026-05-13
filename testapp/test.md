@@ -18,3 +18,5 @@ php /var/www/neuronapp/bin/testconsole orchestrate --agent agent-main --init loa
 
 php /var/www/neuronapp/bin/testconsole todolist --agent agent-main --todolist load-book/complex
 
+php /var/www/neuronapp/bin/testconsole todolist --agent agent--pinky --todolist test-search
+

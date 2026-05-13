@@ -1,7 +1,9 @@
 <?php
 
 /**
- * Пример конфигурации пустого агента 
+ * Пример конфигурации пустого агента
+ * 
+ * Просто зеркалит ввод
  */
 
 use app\modules\neuron\helpers\CallableWrapper;
@@ -20,6 +22,7 @@ return [
         'class' => EchoProvider::class,
     ],
 
+    // здесь инструкция игнорируется
     'instructions' => [
         CallableWrapper::class,
         'createObject',
@@ -35,22 +38,5 @@ return [
         ],
         'output' => ['Представь анализ и рекомендации.'],
     ],
-
-    /**/
-    'mcp' => [
-        [
-            // Context7
-            CallableWrapper::class,
-            'createObject',
-            'class'   => McpConnector::class,
-            'config' => [
-                'url'     => 'https://mcp.context7.com/mcp',
-                'async'   => false,
-                'timeout' => 10,
-                //"headers" => ["CONTEXT7_API_KEY" => "ctx7sk-7010e527-1111-4d81-983e-1111111"],
-            ]
-        ]
-    ],
-
     'tools' => [],
 ];

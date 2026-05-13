@@ -3,6 +3,7 @@
 $contextInfo = empty($contextWindow) ? '' : <<<TEXT
 Your context is limited to $contextWindow tokens. Avoid verbatim repetition of large inputs. Summarize, compress intermediate notes, and keep only what is needed to complete the task.
 TEXT;
+
 $rulesToolCalling = include '_tool-calling-rules.php';
 
 return <<<TEXT

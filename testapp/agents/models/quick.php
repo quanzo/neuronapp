@@ -1,19 +1,12 @@
 <?php
 
 /**
- * Пример конфигурации агента
+ * Быстрая модель: делает
  */
 
 use app\modules\neuron\helpers\CallableWrapper;
-use app\modules\neuron\tools\GlobTool;
-use app\modules\neuron\tools\VarGetTool;
-use app\modules\neuron\tools\VarListTool;
-use app\modules\neuron\tools\VarPadTool;
-use app\modules\neuron\tools\VarSetTool;
-use app\modules\neuron\tools\ViewTool;
-use NeuronAI\Providers\Ollama\Ollama;
-use NeuronAI\Agent\SystemPrompt;
 use NeuronAI\HttpClient\GuzzleHttpClient;
+use NeuronAI\Providers\OpenAILike;
 
 $homeDir = getenv('HOME');
 
@@ -21,9 +14,10 @@ if ($homeDir === false || $homeDir === '') {
     $homeDir = $_SERVER['HOME'] ?? '';
 }
 
-$url           = 'http://localhost:11434/api';
-$contextWindow = 8192 * 4 * 2 * 2;
-$prompt        = include (__DIR__ . '/../prompts/system/base.php');
+$url           = 'http://localhost:11521/v1';
+$model         = 'quick';
+$contextWindow = 32768;
+$key           = 'sk-my-very-secret-agent-key';
 
 $ar = [
     'enableChatHistory' => true,
@@ -34,13 +28,15 @@ $ar = [
     'provider' => [
         CallableWrapper::class,
         'createObject',
-        'class'      => Ollama::class,
-        'url'        => $url,
+        /**/
+        'class'      => OpenAILike::class,
+        'key'        => $key,
+        'baseUri'    => $url,
         'httpClient' => [
             CallableWrapper::class,
             'createObject',
             'class'          => GuzzleHttpClient::class,
-            'timeout'        => 150.0,
+            'timeout'        => 75.0,
             'connectTimeout' => 10.0,
         ],
         'parameters' => [
@@ -74,34 +70,11 @@ $ar = [
 
                 // Размер контекстного окна — количество токенов, которые модель «помнит» из предыдущего диалога
                 'num_ctx'        => $contextWindow,
-                //'think'          => false,
+                'think'          => false,
                 'stream'         => false,
             ],
         ],
-        'model' => 'qwen3.5:9b',
-        //'model' => 'qwen3.5:cloud',
-        //'model' => 'gemma4:e4b',
-    ],
-
-    'instructions' => [
-        CallableWrapper::class,
-        'createObject',
-        'class'      => SystemPrompt::class,
-        'background' => [
-            $prompt
-        ],
-    ],
-
-    'tools' => [
-        [VarGetTool::class, 'make'],
-        [VarSetTool::class, 'make'],
-        [VarListTool::class, 'make'],
-        [VarPadTool::class, 'make'],
-    ],
-
-    'skills' => [
-        'skill-file-block-summarize',
-        'skill-text-finder'
+        'model' => $model,
     ],
 ];
 return $ar;
