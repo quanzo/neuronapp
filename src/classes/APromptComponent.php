@@ -9,6 +9,7 @@ use app\modules\neuron\classes\producers\AgentProducer;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\helpers\JsonHelper;
+use app\modules\neuron\helpers\PromptOptionsParseHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 
 /**
@@ -105,7 +106,9 @@ abstract class APromptComponent
      * Разбирает строки блока опций в ассоциативный массив.
      *
      * Каждая непустая строка вида "name: value" интерпретируется как опция.
-     * Значение при необходимости декодируется как JSON.
+     * Значение при необходимости декодируется как JSON; объект/массив могут
+     * продолжаться на следующих строках (pretty-print), пока не получится
+     * валидный JSON или не встретится следующая опция.
      *
      * @param string[] $lines Строки блока опций.
      *
@@ -114,9 +117,10 @@ abstract class APromptComponent
     protected function parseOptions(array $lines): array
     {
         $options = [];
+        $lineCount = count($lines);
 
-        foreach ($lines as $line) {
-            $trimmed = trim($line);
+        for ($i = 0; $i < $lineCount; $i++) {
+            $trimmed = trim($lines[$i]);
 
             if ($trimmed === '') {
                 continue;
@@ -135,8 +139,18 @@ abstract class APromptComponent
                 continue;
             }
 
-            $value = $this->decodeOptionValue($rawValue);
+            $valueSource = $rawValue;
+            if (PromptOptionsParseHelper::shouldTryMultilineJsonContinuation($rawValue)) {
+                [$combined, $extraLinesConsumed] = PromptOptionsParseHelper::accumulateMultilineJsonValue(
+                    $lines,
+                    $i,
+                    $rawValue
+                );
+                $valueSource = $combined;
+                $i += $extraLinesConsumed;
+            }
 
+            $value = $this->decodeOptionValue($valueSource);
             $options[$name] = $value;
         }
 

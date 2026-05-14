@@ -17,7 +17,8 @@ if ($homeDir === false || $homeDir === '') {
 $url           = 'http://localhost:11521/v1';
 $model         = 'quick';
 $contextWindow = 32768;
-$key           = 'sk-my-very-secret-agent-key';
+$key           = 'sk-qwertyuiop';
+//$key           = 'sk-qwertyuiop33333333';
 
 $ar = [
     'enableChatHistory' => true,

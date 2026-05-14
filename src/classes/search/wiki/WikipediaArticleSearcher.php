@@ -12,6 +12,8 @@ use app\modules\neuron\classes\loader\wiki\WikipediaLoader;
 use app\modules\neuron\enums\ContentSourceType;
 use app\modules\neuron\interfaces\ContentLoaderInterface;
 
+use function Amp\delay;
+
 /**
  * Поисковик статей для Wikipedia.
  * Использует Wikipedia REST API для поиска и загружает полный контент статей.
@@ -89,12 +91,33 @@ class WikipediaArticleSearcher extends ArticleSearcherAbstract
         $baseUrl = $this->sourceType->getBaseUrl($this->language);
         $apiUrl = $baseUrl . '/w/rest.php/v1/search/page';
 
-        $body = $this->makeRequest('GET', $apiUrl, [
-            'q' => $query,
-            'limit' => $limit,
-        ])->await();
+        $attempt = 0;
+        $maxAttempts = 5;
+        do {
+            $repeate = false;
+            $body = $this->makeRequest('GET', $apiUrl, [
+                'q'     => $query,
+                'limit' => $limit,
+                'offset' => $offset
+            ])->await();
+            if (stripos($body, 'too many requests')) {
+                // напоролись на ограничение кол-ва запросов
+                $repeate = true;
+                delay($attempt * 2 + 1);
+                $attempt++;
+                if ($attempt >= $maxAttempts) {
+                    // попытки закончились
+                    $repeate = false;
+                }
+            }
+        } while ($repeate);
 
-        return JsonHelper::decodeAssociative($body);
+        $res = JsonHelper::decodeAssociative($body);
+        if (!$res) {
+            // не получилось интрепретировать
+            return [];
+        }
+        return $res;
     }
 
     /**

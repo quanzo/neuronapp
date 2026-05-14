@@ -765,8 +765,8 @@ class ConfigurationAgent implements IDependConfigApp
                     $this->getSessionKey(),
                     $this->contextWindow,
                     '_',
-                    '-' . (string)time() . '_' . rand(1, 999) . '_.chat',
-                    new HistoryTrimmer(new TokenCounter())
+                    '-' . (string)time() . '_' . rand(1, 999) . '_.chat'
+                    //, new HistoryTrimmer(new TokenCounter())
                 );
             }
         }

@@ -124,6 +124,36 @@ class SkillTest extends TestCase
     }
 
     /**
+     * Многострочный pretty JSON в опции params склеивается и декодируется в массив.
+     */
+    public function testPrettyMultilineParamsOptionParsesToArray(): void
+    {
+        $input = <<<'SKILL'
+-----
+description: "Поиск в Википедии"
+params: {
+  "query": {
+    "type": "string",
+    "description": "Запрос к поиску",
+    "required": true
+  }
+}
+tools: wiki_search
+pure_context: true
+-----
+Сформируй запрос: $query.
+SKILL;
+        $skill = new Skill($input, 'search-wiki');
+        $params = $skill->getOptions()['params'] ?? null;
+        $this->assertIsArray($params);
+        $this->assertArrayHasKey('query', $params);
+        $this->assertSame('string', $params['query']['type']);
+        $this->assertTrue($params['query']['required']);
+        $this->assertSame('wiki_search', $skill->getOptions()['tools']);
+        $this->assertSame('Сформируй запрос: cats.', $skill->getSkill(['query' => 'cats']));
+    }
+
+    /**
      * getName() возвращает имя, переданное в конструктор (может включать путь).
      */
     public function testGetName(): void
