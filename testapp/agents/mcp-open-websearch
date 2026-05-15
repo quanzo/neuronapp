@@ -20,4 +20,4 @@ if [ -n "$PID" ]; then
 fi
 
 # echo "🚀 Запускаем open-websearch на порту $PORT..."
-PORT=$PORT DEFAULT_SEARCH_ENGINE=duckduckgo ALLOWED_SEARCH_ENGINES=duckduckgo,exa,baidu,bing,csdn,brave npx -y open-websearch --port $PORT
+PORT=$PORT DEFAULT_SEARCH_ENGINE=duckduckgo ALLOWED_SEARCH_ENGINES=duckduckgo,exa,baidu,bing,csdn,brave npx -y open-websearch

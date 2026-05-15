@@ -310,6 +310,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
                         && $messages[$i]->getContent()
                     ) {
                         $lastMessage = $messages[$i];
+                        break;
                     }
                 }
                 if (empty($lastMessage)) {
