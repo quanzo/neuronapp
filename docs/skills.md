@@ -97,8 +97,12 @@ skills: helper/prepare_context, helper/summarize
 ### Опции `agent` и `pure_context`
 
 - **`agent`** — имя агента‑исполнителя (см. `docs/config.md` и `docs/agents.md`). Если не указан, используется агент, переданный извне, либо установленный как `default` в приложении.
+- **`think` / `thinking`** — переключатель режима размышлений для запуска skill. Ключи являются синонимами, при одновременном наличии приоритет у `think`.
+  - `1`/`true` включает размышления;
+  - `0`/`false` отключает размышления;
+  - значение применяется к **клону агента skill**, исходная конфигурация агента не мутируется.
 - **`pure_context`** — управляет использованием истории чата:
-  - по умолчанию (`Skill::getDefaultPureContext()` возвращает `false`) навык выполняется с клоном `ChatHistoryCloneMode::COPY_CONTEXT` (изолированная копия истории, см. `Skill::execute()`);
+  - по умолчанию (`Skill::getDefaultPureContext()` возвращает `false`) навык выполняется с клоном `ChatHistoryCloneMode::COPY_CONTEXT_EXCLUDE_LAST` (изолированная копия истории без последнего сообщения — вызова tool на этот skill, см. `Skill::execute()`);
   - при `pure_context: 1` или `true` используется клон `ChatHistoryCloneMode::RESET_EMPTY` (см. `AbstractPromptWithParams::isPureContext()` и `Skill::execute()`);
   - при `pure_context: true` на клоне агента включается `ConfigurationAgent::setExcludeLongTermMind(true)` — переписка этого запуска **не записывается** в `.mind` (`LongTermMindSubscriber`, см. `docs/mind.md`).
 

@@ -27,9 +27,16 @@ final class SpyProvider implements AIProviderInterface
     /**
      * Список вызовов chat/stream/structured.
      *
-     * @var list<array{label: string, content: string}>
+     * @var list<array{label: string, content: string, think: bool|null}>
      */
     public static array $calls = [];
+
+    /**
+     * Параметры провайдера, которые могут динамически меняться (например, через setThink()).
+     *
+     * @var array<string, mixed>
+     */
+    protected array $parameters = [];
 
     public static function reset(): void
     {
@@ -73,7 +80,7 @@ final class SpyProvider implements AIProviderInterface
     public function chat(Message ...$messages): Message
     {
         $content = $this->extractLastUserContent($messages);
-        self::recordCallIfNotInternal($this->label, $content);
+        self::recordCallIfNotInternal($this->label, $content, $this->resolveThinkState());
 
         return new AssistantMessage($content);
     }
@@ -81,7 +88,7 @@ final class SpyProvider implements AIProviderInterface
     public function stream(Message ...$messages): Generator
     {
         $content = $this->extractLastUserContent($messages);
-        self::recordCallIfNotInternal($this->label, $content);
+        self::recordCallIfNotInternal($this->label, $content, $this->resolveThinkState());
 
         $messageId = spl_object_hash($this);
         yield new TextChunk($messageId, $content);
@@ -93,7 +100,7 @@ final class SpyProvider implements AIProviderInterface
     {
         $array = is_array($messages) ? $messages : [$messages];
         $content = $this->extractLastUserContent($array);
-        self::recordCallIfNotInternal($this->label, $content);
+        self::recordCallIfNotInternal($this->label, $content, $this->resolveThinkState());
 
         return new AssistantMessage($content);
     }
@@ -119,12 +126,31 @@ final class SpyProvider implements AIProviderInterface
     }
 
     /**
+     * Возвращает текущий think-флаг из параметров провайдера.
+     */
+    private function resolveThinkState(): ?bool
+    {
+        $options = $this->parameters['options'] ?? null;
+        if (is_array($options) && array_key_exists('think', $options)) {
+            return (bool) $options['think'];
+        }
+
+        $chatTemplateKwargs = $this->parameters['chat_template_kwargs'] ?? null;
+        if (is_array($chatTemplateKwargs) && array_key_exists('enable_thinking', $chatTemplateKwargs)) {
+            return (bool) $chatTemplateKwargs['enable_thinking'];
+        }
+
+        return null;
+    }
+
+    /**
      * Не логируем служебные реплики LlmCycleHelper (проверка статуса / повтор итога), чтобы тесты видели только тексты todo.
      *
      * @param string $label Метка провайдера.
      * @param string $content Текст последнего user-сообщения.
+     * @param bool|null $think Текущий think-флаг провайдера.
      */
-    private static function recordCallIfNotInternal(string $label, string $content): void
+    private static function recordCallIfNotInternal(string $label, string $content, ?bool $think): void
     {
         if (
             $content === LlmCycleHelper::MSG_CHECK_WORK
@@ -134,6 +160,6 @@ final class SpyProvider implements AIProviderInterface
             return;
         }
 
-        self::$calls[] = ['label' => $label, 'content' => $content];
+        self::$calls[] = ['label' => $label, 'content' => $content, 'think' => $think];
     }
 }

@@ -76,6 +76,22 @@ class TodoListTest extends TestCase
     }
 
     /**
+     * Создаёт базовую конфигурацию агента для тестов think-переопределений.
+     */
+    private function makeAgentCfgWithThink(bool $think): ConfigurationAgent
+    {
+        $agentCfg = ConfigurationAgent::makeFromArray([
+            'enableChatHistory' => false,
+            'contextWindow' => 50000,
+            'thinking' => $think,
+        ], ConfigurationApp::getInstance());
+
+        $this->assertInstanceOf(ConfigurationAgent::class, $agentCfg);
+
+        return $agentCfg;
+    }
+
+    /**
      * Приоритет значений: runtime > session > agent params > default.
      *
      * Проверяем только сборку effective params (без выполнения LLM-цикла).
@@ -422,6 +438,44 @@ class TodoListTest extends TestCase
         $input = "---\nagent: test\n---\n1. Task";
         $list = new TodoList($input);
         $this->assertFalse($list->isPureContext());
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  think/thinking — опции режима размышлений
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * Опция thinking в шапке TodoList включает think для клонов агента списка.
+     */
+    public function testGetConfigurationAgentAppliesThinkingAliasForTodoList(): void
+    {
+        $input = "---\nthinking: true\n---\n1. Task";
+        $list = new TodoList($input, 'mylist');
+
+        $baseCfg = $this->makeAgentCfgWithThink(false);
+        $list->setDefaultConfigurationAgent($baseCfg);
+
+        $resolvedCfg = $list->getConfigurationAgent();
+
+        $this->assertTrue($resolvedCfg->isThink());
+        $this->assertFalse($baseCfg->isThink(), 'Базовый агент не должен мутироваться.');
+    }
+
+    /**
+     * Если одновременно заданы think и thinking, приоритет у think.
+     */
+    public function testGetConfigurationAgentThinkHasPriorityOverThinkingForTodoList(): void
+    {
+        $input = "---\nthink: 0\nthinking: 1\n---\n1. Task";
+        $list = new TodoList($input, 'mylist');
+
+        $baseCfg = $this->makeAgentCfgWithThink(true);
+        $list->setDefaultConfigurationAgent($baseCfg);
+
+        $resolvedCfg = $list->getConfigurationAgent();
+
+        $this->assertFalse($resolvedCfg->isThink());
+        $this->assertTrue($baseCfg->isThink(), 'Базовый агент не должен мутироваться.');
     }
 
     // ══════════════════════════════════════════════════════════════

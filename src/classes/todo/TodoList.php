@@ -214,6 +214,8 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                             $r = $resolvedAgent->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY); // агент с пустой историей
                             $r->setChatHistory($sessionCfg->getChatHistory()); // передаем ему историю текущего контекста исполнения
                             $r->tools       = $sessionCfg->getTools(); // и инструменты
+                            // Режим think из шапки TodoList должен сохраняться и при переключении @@agent(...).
+                            $r->setThink($sessionCfg->isThink());
                             if ($sessionCfg->isExcludeLongTermMind()) {
                                 $r->setExcludeLongTermMind(true);
                             }

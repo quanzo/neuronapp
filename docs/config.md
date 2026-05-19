@@ -79,6 +79,8 @@ Edge cases:
   - `agentName` — имя агента (совпадает с именем файла конфигурации без расширения);
   - `enableChatHistory` — использовать ли файловую историю (`FileFullChatHistory`) или `InMemoryChatHistory`;
   - `contextWindow` — размер контекстного окна LLM;
+  - `thinking` — включает режим размышлений (think) для совместимых моделей; при `true` в provider-параметры
+    автоматически добавляются `chat_template_kwargs.enable_thinking=true`, `options.think=true` и budget-поля;
   - `provider` — конфигурация провайдера (`AIProviderInterface` или `callable`);
   - `instructions` — системный промпт (строка, `Stringable` или `callable`);
   - `useAgentsFile` — подключать ли содержимое `AGENTS.md` к системному промпту (по умолчанию `false`).
@@ -133,10 +135,43 @@ Edge cases:
 - клоны для отдельных запусков:
   - `cloneForSession(ChatHistoryCloneMode $mode)` — создаёт клон с:
     - сброшенным агентом (`_agent = null`);
-    - новой in‑memory историей (пустой или с копией контекста);
+    - новой историей (пустой, полная копия или копия без последнего сообщения);
     - тем же `sessionKey`.
+  - режимы `ChatHistoryCloneMode`:
+    - `RESET_EMPTY` — пустая история клона;
+    - `COPY_CONTEXT` — все сообщения из текущей истории;
+    - `COPY_CONTEXT_EXCLUDE_LAST` — как `COPY_CONTEXT`, но без последнего сообщения (Skill-as-tool).
 
 Экземпляры агентов создаются производителем `AgentProducer` и используются консольными командами, skills и todolist.
+
+#### Режим think и бюджет размышлений
+
+Для `ConfigurationAgent` доступны:
+
+- `isThink(): bool` — текущий статус think-режима;
+- `setThink(bool $think): self` — fluent-переключатель think-режима.
+
+Компоненты `Skill` и `TodoList` могут временно переопределять think через опции шапки
+`think`/`thinking` (приоритет у `think`). Переопределение применяется к clone-сессии
+компонента и не изменяет исходный объект конфигурации агента.
+
+`setThink()` работает в runtime: обновляет think-настройки у уже созданного provider
+и синхронизирует провайдер в уже созданном agent. Поэтому повторный вызов
+`getProvider()` всегда возвращает экземпляр с актуальным состоянием think.
+
+При `thinking=true` бюджет размышлений вычисляется по формуле:
+
+- `thinkingBudget = max(1, intdiv(contextWindow, 32))`
+
+Этот бюджет автоматически прокидывается в provider-конфиг:
+
+- `parameters.chat_template_kwargs.enable_thinking = true`
+- `parameters.chat_template_kwargs.thinking_token_budget = thinkingBudget`
+- `parameters.chat_template_kwargs.thinking_budget = thinkingBudget`
+- `parameters.options.think = true`
+
+При `thinking=false` флаг `enable_thinking`/`options.think` выставляется в `false`,
+а budget-поля удаляются из `chat_template_kwargs`.
 
 При включённом `enableLlmPayloadLogging` провайдер автоматически оборачивается в `LoggingAIProviderDecorator`, а узел чата заменяется на `LoggingChatNode`, поэтому в обычный файловый лог попадают события:
 

@@ -82,6 +82,22 @@ class SkillTest extends TestCase
     }
 
     /**
+     * Создаёт базовую конфигурацию агента для тестов переопределения think.
+     */
+    private function makeAgentCfgWithThink(bool $think): ConfigurationAgent
+    {
+        $agentCfg = ConfigurationAgent::makeFromArray([
+            'enableChatHistory' => false,
+            'contextWindow' => 50000,
+            'thinking' => $think,
+        ], ConfigurationApp::getInstance());
+
+        $this->assertInstanceOf(ConfigurationAgent::class, $agentCfg);
+
+        return $agentCfg;
+    }
+
+    /**
      * Класс Skill реализует интерфейс ISkill.
      */
     public function testImplementsInterface(): void
@@ -402,6 +418,52 @@ SKILL;
         $input = "---\npure_context: yes\n---\nBody";
         $skill = new Skill($input, 'myskill');
         $this->assertFalse($skill->isPureContext());
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  think/thinking — опции режима размышлений
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * Опции think/thinking применяются к клону агента skill, не изменяя базовый агент.
+     */
+    public function testGetConfigurationAgentResolvesThinkAliasesWithPriority(): void
+    {
+        foreach ($this->thinkOptionResolutionProvider() as $caseName => [$input, $baseThink, $expectedThink]) {
+            $skill = new Skill($input, 'myskill');
+            $baseCfg = $this->makeAgentCfgWithThink($baseThink);
+            $skill->setDefaultConfigurationAgent($baseCfg);
+
+            $resolvedCfg = $skill->getConfigurationAgent();
+
+            $this->assertNotSame($baseCfg, $resolvedCfg, 'Case: ' . $caseName);
+            $this->assertSame($expectedThink, $resolvedCfg->isThink(), 'Case: ' . $caseName);
+            $this->assertSame($baseThink, $baseCfg->isThink(), 'Base cfg mutated. Case: ' . $caseName);
+        }
+    }
+
+    /**
+     * Наборы входов для проверки алиасов think/thinking и приоритета ключа think.
+     *
+     * @return array<string, array{0:string,1:bool,2:bool}>
+     */
+    public function thinkOptionResolutionProvider(): array
+    {
+        return [
+            'no option keeps false base' => ['Body', false, false],
+            'no option keeps true base' => ['Body', true, true],
+            'thinking true int' => ["---\nthinking: 1\n---\nBody", false, true],
+            'thinking false int' => ["---\nthinking: 0\n---\nBody", true, false],
+            'thinking true string' => ["---\nthinking: true\n---\nBody", false, true],
+            'thinking false string' => ["---\nthinking: false\n---\nBody", true, false],
+            'think true int' => ["---\nthink: 1\n---\nBody", false, true],
+            'think false int' => ["---\nthink: 0\n---\nBody", true, false],
+            'think true string' => ["---\nthink: true\n---\nBody", false, true],
+            'think false string' => ["---\nthink: false\n---\nBody", true, false],
+            'think invalid string coerces to false' => ["---\nthink: yes\n---\nBody", true, false],
+            'priority think over thinking false wins' => ["---\nthink: 0\nthinking: 1\n---\nBody", true, false],
+            'priority think over thinking true wins' => ["---\nthink: true\nthinking: false\n---\nBody", false, true],
+        ];
     }
 
     // ══════════════════════════════════════════════════════════════

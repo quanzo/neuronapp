@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Базовая модель: думает
+ * Базовая модель: умеет рассуждать
  */
 
 use app\modules\neuron\helpers\CallableWrapper;
@@ -23,6 +23,7 @@ $key           = 'sk-qwertyuiop';
 $ar = [
     'enableChatHistory' => true,
     'contextWindow'     => $contextWindow,
+    'thinking'          => true,
     'toolMaxTries'      => 75,
     'llmPayloadLogMode' => 'summary',
 
@@ -37,13 +38,13 @@ $ar = [
             CallableWrapper::class,
             'createObject',
             'class'          => GuzzleHttpClient::class,
-            'timeout'        => 75.0,
+            'timeout'        => 150.0,
             'connectTimeout' => 10.0,
         ],
         'parameters' => [
-            'options' => [
+            //'options' => [
                 // Управляет «креативностью». Чем выше значение, тем более случайными и разнообразными будут ответы. Низкие значения делают модель более сфокусированной и детерминированной
-                'temperature'    => 0.3,
+                'temperature'    => 0.7,
 
                 // Также известен как Nucleus Sampling. Ограничивает выбор токенов теми, чья совокупная вероятность не превышает top_p. Высокое значение (например, 0.95) даёт большее разнообразие, низкое (0.5) — более консервативные ответы
                 'top_p'          => 0.95,
@@ -65,15 +66,15 @@ $ar = [
 
                 // То же самое, что и max_tokens — максимальное число токенов для генерации
                 //'num_predict' => -1,
+                'max_tokens' => round($contextWindow/4, 0),
 
                 // Массив строк, при появлении которых генерация немедленно остановится.
                 //'stop' => [],
 
                 // Размер контекстного окна — количество токенов, которые модель «помнит» из предыдущего диалога
                 'num_ctx'        => $contextWindow,
-                //'think'          => false,
                 'stream'         => false,
-            ],
+            //],
         ],
         'model' => $model,
     ],

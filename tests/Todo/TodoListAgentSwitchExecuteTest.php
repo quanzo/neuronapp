@@ -130,6 +130,20 @@ final class TodoListAgentSwitchExecuteTest extends TestCase
     }
 
     /**
+     * Опция think в шапке TodoList применяется и к переключённому @@agent, и к базовому агенту.
+     */
+    public function testExecuteThinkOptionAppliedToSwitchedAndBaseAgents(): void
+    {
+        $input = "---\nthink: true\n---\n1. @@agent(\"agent-coder\") Hello\n2. World";
+        $list = $this->makeTodoList($input);
+
+        $list->execute(MessageRole::USER)->await();
+
+        $this->assertSame(['agent-coder', 'default'], array_column(SpyProvider::$calls, 'label'));
+        $this->assertSame([true, true], array_column(SpyProvider::$calls, 'think'));
+    }
+
+    /**
      * Команда @@agent(...) вырезается из текста перед отправкой в LLM.
      */
     public function testExecuteStripsAgentCmdSignatureFromSentText(): void

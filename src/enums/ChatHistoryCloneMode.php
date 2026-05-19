@@ -27,4 +27,12 @@ enum ChatHistoryCloneMode: string
      * перенос выполняется через публичный интерфейс {@see \NeuronAI\Chat\History\ChatHistoryInterface}.
      */
     case COPY_CONTEXT = 'copy_context';
+
+    /**
+     * Как {@see self::COPY_CONTEXT}, но без последнего сообщения исходной истории.
+     *
+     * Используется при исполнении Skill как LLM-tool: последнее сообщение — вызов
+     * инструмента на этот skill, его не следует переносить во внутренний контекст.
+     */
+    case COPY_CONTEXT_EXCLUDE_LAST = 'copy_context_exclude_last';
 }

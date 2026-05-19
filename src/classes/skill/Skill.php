@@ -254,7 +254,7 @@ class Skill extends AbstractPromptWithParams implements ISkill
 
             $sessionCfg_0 = $this->isPureContext()
                 ? $agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY) // здесь агент без истории сообщений
-                : $agentCfg->cloneForSession(ChatHistoryCloneMode::COPY_CONTEXT); // здесь агент с копией, которая не влияет на сессию
+                : $agentCfg->cloneForSession(ChatHistoryCloneMode::COPY_CONTEXT_EXCLUDE_LAST); // копия без ToolCallMessage на этот skill
 
             if ($this->isPureContext()) {
                 $sessionCfg_0->setExcludeLongTermMind(true);

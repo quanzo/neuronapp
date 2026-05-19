@@ -85,6 +85,10 @@ abstract class AbstractPromptWithParams extends APromptComponent implements IDep
      * по этому имени через ConfigurationApp. В противном случае возвращается
      * агент, переданный в аргументе метода.
      *
+     * Если в опциях компонента задана think-настройка (`think` или `thinking`),
+     * она применяется к возвращаемому клону агента. При одновременном наличии
+     * обоих ключей приоритет у `think`.
+     *
      * @param ConfigurationAgent|null $agentCfg Агент по умолчанию, если имя агента в опциях не задано.
      *
      * @return ConfigurationAgent Конфигурация агента для исполнения компонента.
@@ -138,7 +142,39 @@ abstract class AbstractPromptWithParams extends APromptComponent implements IDep
         /**
          * !Важно! Skill и TodoList могут настраивать агент по своим настройкам. Если объект агента будет один для всех, то настройки будут повторяться и накапливаться между сессиями.
          */
-        return clone $agentCfg;
+        $resolvedAgentCfg = clone $agentCfg;
+
+        $componentThink = $this->resolveComponentThinkOption();
+        if ($componentThink !== null) {
+            $resolvedAgentCfg->setThink($componentThink);
+        }
+
+        return $resolvedAgentCfg;
+    }
+
+    /**
+     * Возвращает think-настройку компонента с учётом алиасов.
+     *
+     * Поддерживаются два синонима: `think` и `thinking`.
+     * Приоритет у `think`, `thinking` используется как fallback.
+     *
+     * @return bool|null
+     * - bool: think явно задан в опциях компонента;
+     * - null: think-опция отсутствует, нужно оставить конфиг агента без изменений.
+     */
+    protected function resolveComponentThinkOption(): ?bool
+    {
+        $options = $this->getOptions();
+
+        if (array_key_exists('think', $options)) {
+            return OptionsHelper::toBool($options['think']);
+        }
+
+        if (array_key_exists('thinking', $options)) {
+            return OptionsHelper::toBool($options['thinking']);
+        }
+
+        return null;
     }
 
     /**

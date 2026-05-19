@@ -11,13 +11,18 @@ use app\modules\neuron\classes\neuron\providers\EchoProvider;
 use app\modules\neuron\classes\safe\SafeAIProviderDecorator;
 use app\modules\neuron\classes\safe\exceptions\InputSafetyViolationException;
 use app\modules\neuron\classes\neuron\history\FileFullChatHistory;
+use app\modules\neuron\helpers\CallableWrapper;
+use app\modules\neuron\helpers\ChatHistoryEditHelper;
 use app\modules\neuron\classes\neuron\RAG;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\tools\ATool;
 use NeuronAI\Chat\History\InMemoryChatHistory;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
+use NeuronAI\Chat\Messages\AssistantMessage;
+use NeuronAI\Chat\Messages\UserMessage;
 use NeuronAI\MCP\McpConnector;
+use NeuronAI\Providers\OpenAILike;
 use NeuronAI\RAG\Embeddings\EmbeddingsProviderInterface;
 use NeuronAI\RAG\VectorStore\VectorStoreInterface;
 use NeuronAI\Providers\AIProviderInterface;
@@ -98,6 +103,46 @@ class ConfigurationAgentTest extends TestCase
         rmdir($dir);
     }
 
+    /**
+     * Читает provider parameters, разворачивая декораторы через getInner().
+     *
+     * @return array<string, mixed>
+     */
+    private function getProviderParameters(AIProviderInterface $provider): array
+    {
+        $target = $provider;
+        $visited = [];
+
+        while (method_exists($target, 'getInner')) {
+            $id = spl_object_id($target);
+            if (isset($visited[$id])) {
+                break;
+            }
+            $visited[$id] = true;
+
+            $inner = $target->getInner();
+            if (!($inner instanceof AIProviderInterface)) {
+                break;
+            }
+
+            $target = $inner;
+        }
+
+        $reflection = new \ReflectionClass($target);
+        while ($reflection !== false) {
+            if ($reflection->hasProperty('parameters')) {
+                $property = $reflection->getProperty('parameters');
+                $property->setAccessible(true);
+                $value = $property->getValue($target);
+                return is_array($value) ? $value : [];
+            }
+
+            $reflection = $reflection->getParentClass();
+        }
+
+        return [];
+    }
+
     // ══════════════════════════════════════════════════════════════
     //  makeFromArray
     // ══════════════════════════════════════════════════════════════
@@ -162,6 +207,7 @@ class ConfigurationAgentTest extends TestCase
         $cfg = ConfigurationAgent::makeFromArray([
             'enableChatHistory' => false,
             'contextWindow' => 20000,
+            'thinking' => true,
             'history_id' => 5,
             'reponseStructClass' => 'SomeClass',
             'provider' => $provider,
@@ -176,6 +222,7 @@ class ConfigurationAgentTest extends TestCase
         ], ConfigurationApp::getInstance());
 
         $this->assertSame(20000, $cfg->contextWindow);
+        $this->assertTrue($cfg->isThink());
         $this->assertSame(5, $cfg->history_id);
         $this->assertSame('SomeClass', $cfg->reponseStructClass);
         $this->assertSame(3, $cfg->toolMaxTries);
@@ -212,6 +259,147 @@ class ConfigurationAgentTest extends TestCase
 
         $this->assertFalse($cfg->safeInput);
         $this->assertFalse($cfg->safeOutput);
+    }
+
+    /**
+     * Поле thinking читается из массива конфигурации и включает think-режим.
+     */
+    public function testMakeFromArrayReadsThinkingFlag(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 50000,
+            'thinking' => true,
+        ], ConfigurationApp::getInstance());
+
+        $this->assertTrue($cfg->isThink());
+    }
+
+    /**
+     * setThink() работает во fluent-стиле и изменяет флаг think-режима.
+     */
+    public function testSetThinkIsFluentAndMutatesFlag(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 50000,
+            'thinking' => false,
+        ], ConfigurationApp::getInstance());
+
+        $result = $cfg->setThink(true);
+        $this->assertSame($cfg, $result);
+        $this->assertTrue($cfg->isThink());
+
+        $cfg->setThink(false);
+        $this->assertFalse($cfg->isThink());
+    }
+
+    /**
+     * Think-настройки автоматически прокидываются в provider-конфиг при включённом thinking.
+     */
+    public function testApplyThinkingToProviderCallableConfigWhenEnabled(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+            'thinking' => true,
+        ], ConfigurationApp::getInstance());
+
+        $providerConfig = [
+            CallableWrapper::class,
+            'createObject',
+            'class' => EchoProvider::class,
+            'parameters' => [
+                'temperature' => 0.7,
+                'options' => [
+                    'num_ctx' => 32768,
+                ],
+            ],
+        ];
+
+        $method = new \ReflectionMethod(ConfigurationAgent::class, 'applyThinkingToProviderCallableConfig');
+        $method->setAccessible(true);
+        $normalized = $method->invoke($cfg, $providerConfig);
+
+        $this->assertTrue($normalized['parameters']['chat_template_kwargs']['enable_thinking']);
+        $this->assertSame(1024, $normalized['parameters']['chat_template_kwargs']['thinking_token_budget']);
+        $this->assertSame(1024, $normalized['parameters']['chat_template_kwargs']['thinking_budget']);
+        $this->assertTrue($normalized['parameters']['options']['think']);
+        $this->assertSame(32768, $normalized['parameters']['options']['num_ctx']);
+    }
+
+    /**
+     * При отключенном thinking флаги и бюджет размышлений приводятся к off-состоянию.
+     */
+    public function testApplyThinkingToProviderCallableConfigWhenDisabled(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+            'thinking' => false,
+        ], ConfigurationApp::getInstance());
+
+        $providerConfig = [
+            CallableWrapper::class,
+            'createObject',
+            'class' => EchoProvider::class,
+            'parameters' => [
+                'chat_template_kwargs' => [
+                    'enable_thinking' => true,
+                    'thinking_token_budget' => 777,
+                    'thinking_budget' => 888,
+                ],
+            ],
+        ];
+
+        $method = new \ReflectionMethod(ConfigurationAgent::class, 'applyThinkingToProviderCallableConfig');
+        $method->setAccessible(true);
+        $normalized = $method->invoke($cfg, $providerConfig);
+
+        $this->assertFalse($normalized['parameters']['chat_template_kwargs']['enable_thinking']);
+        $this->assertArrayNotHasKey('thinking_token_budget', $normalized['parameters']['chat_template_kwargs']);
+        $this->assertArrayNotHasKey('thinking_budget', $normalized['parameters']['chat_template_kwargs']);
+        $this->assertFalse($normalized['parameters']['options']['think']);
+    }
+
+    /**
+     * Бюджет размышлений считается как 1/32 от contextWindow с защитой от нулей и отрицательных значений.
+     */
+    public function testResolveThinkingBudget(): void
+    {
+        foreach ($this->thinkingBudgetProvider() as $caseName => [$contextWindow, $expected]) {
+            $cfg = ConfigurationAgent::makeFromArray([
+                'contextWindow' => 50000,
+            ], ConfigurationApp::getInstance());
+            $cfg->contextWindow = $contextWindow;
+
+            $method = new \ReflectionMethod(ConfigurationAgent::class, 'resolveThinkingBudget');
+            $method->setAccessible(true);
+            $actual = $method->invoke($cfg);
+
+            $this->assertSame($expected, $actual, 'Budget case failed: ' . $caseName);
+        }
+    }
+
+    /**
+     * Наборы данных для проверки формулы бюджета размышлений.
+     *
+     * @return array<string, array{0:int,1:int}>
+     */
+    public function thinkingBudgetProvider(): array
+    {
+        return [
+            // некорректные и граничные значения
+            'negative context' => [-10, 1],
+            'zero context' => [0, 1],
+            'single token context' => [1, 1],
+            'one below divisor' => [31, 1],
+            'exact divisor' => [32, 1],
+            'one above divisor' => [33, 1],
+            // обычные рабочие кейсы
+            'small power of two' => [64, 2],
+            'medium context' => [128, 4],
+            'one thousand tokens' => [1024, 32],
+            'project default style value' => [50000, 1562],
+            'base model context' => [131072, 4096],
+            'large context' => [262144, 8192],
+        ];
     }
 
     /**
@@ -471,6 +659,29 @@ JSONC;
         $this->assertNotSame($originalHistory, $cloneHistory);
     }
 
+    /**
+     * cloneForSession(COPY_CONTEXT_EXCLUDE_LAST) копирует историю без последнего сообщения.
+     */
+    public function testCloneForSessionCopyContextExcludeLastOmitsLastMessage(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'enableChatHistory' => true,
+            'contextWindow' => 1000,
+        ], ConfigurationApp::getInstance());
+
+        $history = $cfg->getChatHistory();
+        $history->addMessage(new UserMessage('first'));
+        $history->addMessage(new AssistantMessage('second'));
+        $history->addMessage(new UserMessage('third'));
+
+        $clone = $cfg->cloneForSession(ChatHistoryCloneMode::COPY_CONTEXT_EXCLUDE_LAST);
+        $cloneMessages = ChatHistoryEditHelper::getMessages($clone->getChatHistory());
+
+        $this->assertCount(2, $cloneMessages);
+        $this->assertSame('first', (string) $cloneMessages[0]->getContent());
+        $this->assertSame('second', (string) $cloneMessages[1]->getContent());
+    }
+
     // ══════════════════════════════════════════════════════════════
     //  getProvider — получение LLM-провайдера
     // ══════════════════════════════════════════════════════════════
@@ -504,6 +715,115 @@ JSONC;
         $result = $cfg->getProvider();
         $this->assertInstanceOf(SafeAIProviderDecorator::class, $result);
         $this->assertInstanceOf(EchoProvider::class, $result->getInner());
+    }
+
+    /**
+     * setThink() обновляет параметры уже созданного provider-объекта.
+     */
+    public function testSetThinkUpdatesExistingProviderInstanceInRuntime(): void
+    {
+        $provider = new OpenAILike(
+            baseUri: 'http://localhost:11521/v1',
+            key: 'sk-test',
+            model: 'base',
+            parameters: ['options' => ['num_ctx' => 32768]]
+        );
+
+        $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+            'thinking' => true,
+            'safeInput' => false,
+            'safeOutput' => false,
+            'provider' => $provider,
+        ], ConfigurationApp::getInstance());
+
+        $resolvedOn = $cfg->getProvider();
+        $this->assertSame($provider, $resolvedOn);
+        $paramsOn = $this->getProviderParameters($resolvedOn);
+        $this->assertTrue($paramsOn['chat_template_kwargs']['enable_thinking'] ?? false);
+        $this->assertSame(1024, $paramsOn['chat_template_kwargs']['thinking_token_budget'] ?? null);
+        $this->assertSame(1024, $paramsOn['chat_template_kwargs']['thinking_budget'] ?? null);
+        $this->assertTrue($paramsOn['options']['think'] ?? false);
+
+        $cfg->setThink(false);
+        $resolvedOff = $cfg->getProvider();
+        $this->assertSame($provider, $resolvedOff);
+        $paramsOff = $this->getProviderParameters($resolvedOff);
+        $this->assertFalse($paramsOff['chat_template_kwargs']['enable_thinking'] ?? true);
+        $this->assertArrayNotHasKey('thinking_token_budget', $paramsOff['chat_template_kwargs']);
+        $this->assertArrayNotHasKey('thinking_budget', $paramsOff['chat_template_kwargs']);
+        $this->assertFalse($paramsOff['options']['think'] ?? true);
+    }
+
+    /**
+     * setThink() меняет настройки уже созданного provider из callable-конфига без пересоздания.
+     */
+    public function testSetThinkUpdatesCallableProviderInstanceInRuntime(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+            'thinking' => true,
+            'safeInput' => false,
+            'safeOutput' => false,
+            'provider' => [
+                CallableWrapper::class,
+                'createObject',
+                'class' => OpenAILike::class,
+                'baseUri' => 'http://localhost:11521/v1',
+                'key' => 'sk-test',
+                'model' => 'base',
+                'parameters' => ['options' => ['num_ctx' => 32768]],
+            ],
+        ], ConfigurationApp::getInstance());
+
+        $first = $cfg->getProvider();
+        $this->assertInstanceOf(OpenAILike::class, $first);
+        $paramsOn = $this->getProviderParameters($first);
+        $this->assertTrue($paramsOn['chat_template_kwargs']['enable_thinking'] ?? false);
+        $this->assertTrue($paramsOn['options']['think'] ?? false);
+
+        $cfg->setThink(false);
+        $second = $cfg->getProvider();
+        $this->assertSame($first, $second);
+        $paramsOff = $this->getProviderParameters($second);
+        $this->assertFalse($paramsOff['chat_template_kwargs']['enable_thinking'] ?? true);
+        $this->assertArrayNotHasKey('thinking_token_budget', $paramsOff['chat_template_kwargs']);
+        $this->assertArrayNotHasKey('thinking_budget', $paramsOff['chat_template_kwargs']);
+        $this->assertFalse($paramsOff['options']['think'] ?? true);
+    }
+
+    /**
+     * Для уже созданного агента resolveProvider() возвращает провайдер с актуальным think после setThink().
+     */
+    public function testSetThinkUpdatesAlreadyResolvedAgentProviderInRuntime(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+            'thinking' => true,
+            'safeInput' => false,
+            'safeOutput' => false,
+            'provider' => [
+                CallableWrapper::class,
+                'createObject',
+                'class' => OpenAILike::class,
+                'baseUri' => 'http://localhost:11521/v1',
+                'key' => 'sk-test',
+                'model' => 'base',
+                'parameters' => ['options' => ['num_ctx' => 32768]],
+            ],
+        ], ConfigurationApp::getInstance());
+
+        $agent = $cfg->getAgent();
+        $agentProviderOn = $agent->resolveProvider();
+        $paramsOn = $this->getProviderParameters($agentProviderOn);
+        $this->assertTrue($paramsOn['chat_template_kwargs']['enable_thinking'] ?? false);
+
+        $cfg->setThink(false);
+        $agentProviderOff = $agent->resolveProvider();
+        $this->assertSame($agentProviderOn, $agentProviderOff);
+        $paramsOff = $this->getProviderParameters($agentProviderOff);
+        $this->assertFalse($paramsOff['chat_template_kwargs']['enable_thinking'] ?? true);
+        $this->assertFalse($paramsOff['options']['think'] ?? true);
     }
 
     // ══════════════════════════════════════════════════════════════

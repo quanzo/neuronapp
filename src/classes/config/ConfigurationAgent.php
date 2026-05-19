@@ -109,6 +109,14 @@ class ConfigurationAgent implements IDependConfigApp
     public $contextWindow = 50000;
 
     /**
+     * Включает или выключает режим размышлений (think) для модели.
+     *
+     * При включении в параметры провайдера автоматически добавляется бюджет
+     * размышлений, вычисляемый как 1/32 от {@see self::$contextWindow}.
+     */
+    public bool $thinking = false;
+
+    /**
      * Этот параметр переключает диалог модуля на определенную историю сообщений.
      * Иначе берется просто последняя история.
      * ! Использовать осторожно ибо в ChatHistory нет проверки на модуль/доступ пользователя. Так сделано специально, чтобы была возможность "прыгать" по чатам
@@ -744,7 +752,9 @@ class ConfigurationAgent implements IDependConfigApp
      * основного состояния агента. Поведение истории чата управляется режимом клонирования:
      * - {@see ChatHistoryCloneMode::RESET_EMPTY} — создать новую пустую {@see InMemoryChatHistory};
      * - {@see ChatHistoryCloneMode::COPY_CONTEXT} — создать новую {@see InMemoryChatHistory} и
-     *   перенести в неё все сообщения из текущей истории (файловой или in-memory).
+     *   перенести в неё все сообщения из текущей истории (файловой или in-memory);
+     * - {@see ChatHistoryCloneMode::COPY_CONTEXT_EXCLUDE_LAST} — как COPY_CONTEXT, но без последнего
+     *   сообщения (для Skill-as-tool, когда хвост — ToolCallMessage на вызываемый skill).
      *
      * @param ChatHistoryCloneMode $mode Режим клонирования истории чата.
      *
@@ -775,10 +785,12 @@ class ConfigurationAgent implements IDependConfigApp
             $targetHistory = new InMemoryChatHistory($this->contextWindow);
         }
 
-        if ($mode === ChatHistoryCloneMode::COPY_CONTEXT) {
-            $sourceHistory = $this->_chatHistory ?? $this->getChatHistory();
-            ChatHistoryCopyHelper::copy($sourceHistory, $targetHistory);
-        }
+        $sourceHistory = $this->_chatHistory ?? $this->getChatHistory();
+        match ($mode) {
+            ChatHistoryCloneMode::COPY_CONTEXT              => ChatHistoryCopyHelper::copy($sourceHistory, $targetHistory),
+            ChatHistoryCloneMode::COPY_CONTEXT_EXCLUDE_LAST => ChatHistoryCopyHelper::copy($sourceHistory, $targetHistory, 1),
+            ChatHistoryCloneMode::RESET_EMPTY => null,
+        };
 
         $clone->setChatHistory($targetHistory);
         $clone->excludeLongTermMind = false;
@@ -805,6 +817,31 @@ class ConfigurationAgent implements IDependConfigApp
         return $this;
     }
 
+    /**
+     * Возвращает состояние режима размышлений (think).
+     */
+    public function isThink(): bool
+    {
+        return $this->thinking;
+    }
+
+    /**
+     * Включает или выключает режим размышлений (think).
+     *
+     * @param bool $think true — включить think; false — выключить think.
+     */
+    public function setThink(bool $think): self
+    {
+        $this->thinking = $think;
+        $this->applyThinkingToExistingProviders();
+
+        if ($this->_agent !== null) {
+            $this->syncAgentProviderThinking();
+        }
+
+        return $this;
+    }
+
     //-----------------------------------------
 
     /**
@@ -816,18 +853,29 @@ class ConfigurationAgent implements IDependConfigApp
     public function getProvider(): AIProviderInterface
     {
         if ($this->provider instanceof AIProviderInterface) {
+            $this->applyThinkingToProviderInstance($this->provider);
             return $this->wrapProviderWithGuards($this->provider);
         }
         if (CallableWrapper::isCallable($this->provider)) {
-            /** @var AIProviderInterface $provider */
-            $provider = CallableWrapper::call($this->provider);
-            return $this->wrapProviderWithGuards($provider);
+            if ($this->_provider === null) {
+                $providerConfig = $this->provider;
+                if (is_array($providerConfig)) {
+                    $providerConfig = $this->applyThinkingToProviderCallableConfig($providerConfig);
+                }
+                /** @var AIProviderInterface $provider */
+                $provider = CallableWrapper::call($providerConfig);
+                $this->_provider = $provider;
+            }
+
+            $this->applyThinkingToProviderInstance($this->_provider);
+            return $this->wrapProviderWithGuards($this->_provider);
         }
 
         if ($this->_provider === null) {
             throw new RuntimeException('LLM provider is not configured.');
         }
 
+        $this->applyThinkingToProviderInstance($this->_provider);
         return $this->wrapProviderWithGuards($this->_provider);
     }
 
@@ -878,6 +926,188 @@ class ConfigurationAgent implements IDependConfigApp
         }
 
         return $wrapped;
+    }
+
+    /**
+     * Добавляет think-параметры в callable-конфиг провайдера.
+     *
+     * @param array<mixed> $providerConfig Конфиг провайдера в формате CallableWrapper.
+     *
+     * @return array<mixed>
+     */
+    private function applyThinkingToProviderCallableConfig(array $providerConfig): array
+    {
+        $parameters = [];
+        if (array_key_exists('parameters', $providerConfig) && is_array($providerConfig['parameters'])) {
+            $parameters = $providerConfig['parameters'];
+        }
+
+        $providerConfig['parameters'] = $this->applyThinkingToParameters($parameters);
+
+        return $providerConfig;
+    }
+
+    /**
+     * Применяет think-параметры к already-created провайдерам.
+     */
+    private function applyThinkingToExistingProviders(): void
+    {
+        if ($this->provider instanceof AIProviderInterface) {
+            $this->applyThinkingToProviderInstance($this->provider);
+        }
+
+        if ($this->_provider !== null) {
+            $this->applyThinkingToProviderInstance($this->_provider);
+        }
+    }
+
+    /**
+     * Синхронизирует текущий think-режим с уже созданным агентом.
+     */
+    private function syncAgentProviderThinking(): void
+    {
+        if ($this->_agent === null) {
+            return;
+        }
+
+        $provider = $this->_agent->resolveProvider();
+        $this->applyThinkingToProviderInstance($provider);
+        $this->_agent->setAiProvider($provider);
+    }
+
+    /**
+     * Применяет think-параметры к instance-провайдеру (включая inner provider у декораторов).
+     */
+    private function applyThinkingToProviderInstance(AIProviderInterface $provider): void
+    {
+        $targetProvider = $this->unwrapProviderDecorators($provider);
+        $parameters = $this->readProviderParameters($targetProvider);
+        if ($parameters === null) {
+            return;
+        }
+
+        $this->writeProviderParameters(
+            $targetProvider,
+            $this->applyThinkingToParameters($parameters)
+        );
+    }
+
+    /**
+     * Разворачивает декораторы до базового провайдера.
+     */
+    private function unwrapProviderDecorators(AIProviderInterface $provider): AIProviderInterface
+    {
+        $current = $provider;
+        $visited = [];
+
+        while (method_exists($current, 'getInner')) {
+            $objectId = spl_object_id($current);
+            if (isset($visited[$objectId])) {
+                break;
+            }
+            $visited[$objectId] = true;
+
+            $inner = $current->getInner();
+            if (!($inner instanceof AIProviderInterface)) {
+                break;
+            }
+
+            $current = $inner;
+        }
+
+        return $current;
+    }
+
+    /**
+     * Читает provider parameters через reflection.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function readProviderParameters(AIProviderInterface $provider): ?array
+    {
+        $property = $this->resolveProviderParametersProperty($provider);
+        if ($property === null) {
+            return null;
+        }
+
+        $value = $property->getValue($provider);
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * Записывает provider parameters через reflection.
+     *
+     * @param array<string, mixed> $parameters
+     */
+    private function writeProviderParameters(AIProviderInterface $provider, array $parameters): void
+    {
+        $property = $this->resolveProviderParametersProperty($provider);
+        if ($property === null) {
+            return;
+        }
+
+        $property->setValue($provider, $parameters);
+    }
+
+    /**
+     * Находит свойство parameters у провайдера.
+     */
+    private function resolveProviderParametersProperty(AIProviderInterface $provider): ?\ReflectionProperty
+    {
+        $reflection = new \ReflectionClass($provider);
+        while ($reflection !== false) {
+            if ($reflection->hasProperty('parameters')) {
+                $property = $reflection->getProperty('parameters');
+                $property->setAccessible(true);
+                return $property;
+            }
+            $reflection = $reflection->getParentClass();
+        }
+
+        return null;
+    }
+
+    /**
+     * Применяет текущую think-конфигурацию к набору параметров провайдера.
+     *
+     * @param array<string, mixed> $parameters
+     *
+     * @return array<string, mixed>
+     */
+    private function applyThinkingToParameters(array $parameters): array
+    {
+        $chatTemplateKwargs = [];
+        if (array_key_exists('chat_template_kwargs', $parameters) && is_array($parameters['chat_template_kwargs'])) {
+            $chatTemplateKwargs = $parameters['chat_template_kwargs'];
+        }
+        $chatTemplateKwargs['enable_thinking'] = $this->isThink();
+
+        if ($this->isThink()) {
+            $thinkingBudget = $this->resolveThinkingBudget();
+            $chatTemplateKwargs['thinking_token_budget'] = $thinkingBudget;
+            $chatTemplateKwargs['thinking_budget'] = $thinkingBudget;
+        } else {
+            unset($chatTemplateKwargs['thinking_token_budget'], $chatTemplateKwargs['thinking_budget']);
+        }
+        $parameters['chat_template_kwargs'] = $chatTemplateKwargs;
+
+        $options = [];
+        if (array_key_exists('options', $parameters) && is_array($parameters['options'])) {
+            $options = $parameters['options'];
+        }
+        $options['think'] = $this->isThink();
+        $parameters['options'] = $options;
+
+        return $parameters;
+    }
+
+    /**
+     * Возвращает бюджет размышлений как 1/32 от контекстного окна.
+     */
+    private function resolveThinkingBudget(): int
+    {
+        $contextWindow = max(1, (int) $this->contextWindow);
+        return max(1, intdiv($contextWindow, 32));
     }
 
     /**
@@ -1340,6 +1570,7 @@ class ConfigurationAgent implements IDependConfigApp
      * Пример ожидаемой структуры массива:
      *  - enableChatHistory (bool)
      *  - contextWindow (int)
+     *  - thinking (bool)
      *  - history_id (int|null)
      *  - reponseStructClass (string|null)
      *  - provider (array|callable)
@@ -1389,6 +1620,10 @@ class ConfigurationAgent implements IDependConfigApp
 
         if (array_key_exists('enableChatHistory', $cfg)) {
             $config->enableChatHistory = (bool) $cfg['enableChatHistory'];
+        }
+
+        if (array_key_exists('thinking', $cfg)) {
+            $config->thinking = (bool) $cfg['thinking'];
         }
 
         if (array_key_exists('history_id', $cfg)) {

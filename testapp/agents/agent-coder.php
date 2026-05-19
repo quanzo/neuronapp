@@ -74,41 +74,41 @@ $ar['tools'] = [
 
     [
         CallableWrapper::class,
-        'createObject',
-        'class'  => ShellToolFactory::class,
-        'method' => 'createReadonlyBashCmdTool',
-        'args'   => [
-            'git status --short --branch',
-            dirname(__DIR__, 2),
-            'git_status_short',
-            'Получает краткий статус git-репозитория (ветка и изменённые файлы).',
-        ],
+        'call',
+        'call' => [
+            ShellToolFactory::class,
+            'createReadonlyBashCmdTool',
+            'commandTemplate'  => 'git status --short --branch',
+            'workingDirectory' => dirname(__DIR__, 2),
+            'name'             => 'git_status_short',
+            'description'      => 'Получает краткий статус git-репозитория (ветка и изменённые файлы).'
+        ]
     ],
 
     [
         CallableWrapper::class,
-        'createObject',
-        'class'  => ShellToolFactory::class,
-        'method' => 'createReadonlyBashCmdTool',
-        'args'   => [
-            'composer show --no-interaction --no-ansi',
-            dirname(__DIR__, 2),
-            'composer_show',
-            'Краткий обзор установленных composer-зависимостей.',
-        ],
+        'call',
+        'call' => [
+            ShellToolFactory::class,
+            'createReadonlyBashCmdTool',
+            'commandTemplate'  => 'composer show --no-interaction --no-ansi',
+            'workingDirectory' => dirname(__DIR__, 2),
+            'name'             => 'composer_show',
+            'description'      => 'Краткий обзор установленных composer-зависимостей.'
+        ]
     ],
 
     [
         CallableWrapper::class,
-        'createObject',
-        'class'  => ShellToolFactory::class,
-        'method' => 'createReadonlyBashCmdTool',
-        'args'   => [
-            'php -v',
-            dirname(__DIR__, 2),
-            'php_version',
-            'Выводит версию PHP, используемую в среде исполнения.',
-        ],
+        'call',
+        'call' => [
+            ShellToolFactory::class,
+            'createReadonlyBashCmdTool',
+            'commandTemplate'  => 'php -v',
+            'workingDirectory' => dirname(__DIR__, 2),
+            'name'             => 'php_version',
+            'description'      => 'Выводит версию PHP, используемую в среде исполнения.'
+        ]
     ],
 ];
 
