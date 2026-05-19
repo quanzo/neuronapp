@@ -195,14 +195,22 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                 $params
             );
             while ($currentTodoIndex < $todoCount) {
-                $todoIndex      = $currentTodoIndex;
-                $todo           = $todos[$todoIndex];
-                $todoTextRaw    = $todo->getTodo($effectiveParams);
-                $todoTextToSend = $todoTextRaw;
-                $todoSessionCfg = $sessionCfg;  // агент конкретно этой todo
+                $todoIndex         = $currentTodoIndex;
+                $todo              = $todos[$todoIndex];
+                $switchToAgentDto  = null;
+                $thinkingOverride  = null;
+                $todoSessionCfg    = $sessionCfg;  // агент конкретно этой todo
 
                 if ($todo instanceof Todo) {
                     $switchToAgentDto = $todo->getSwitchToAgent();
+                    $thinkingOverride = $todo->getThinkingOverride();
+                }
+
+                $todoTextRaw                  = $todo->getTodo($effectiveParams);
+                $todoTextToSend               = $todoTextRaw;
+                $sessionThinkBeforeOverride   = null;
+
+                if ($todo instanceof Todo) {
                     if ($switchToAgentDto) {
                         /**
                          * В пункте списка Todo задан агент через @@agent - его надо найти и использовать при исполнении этого $todo
@@ -236,6 +244,13 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                                     ->setReason('agent_not_found_use_default')
                             );
                         }
+                    }
+
+                    if ($thinkingOverride !== null) {
+                        if ($todoSessionCfg === $sessionCfg) {
+                            $sessionThinkBeforeOverride = $sessionCfg->isThink();
+                        }
+                        $todoSessionCfg->setThink($thinkingOverride);
                     }
                 }
 
@@ -309,6 +324,10 @@ class TodoList extends AbstractPromptWithParams implements ITodoList
                         $runErrDto
                     );
                     throw $e;
+                } finally {
+                    if ($sessionThinkBeforeOverride !== null) {
+                        $sessionCfg->setThink($sessionThinkBeforeOverride);
+                    }
                 }
 
                 if ($runStateDto) {

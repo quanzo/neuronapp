@@ -152,8 +152,8 @@ final class TodoListAgentSwitchExecuteTest extends TestCase
 
         $list->execute(MessageRole::USER)->await();
 
-        $this->assertStringContainsString('@@agent', SpyProvider::$calls[0]['content']);
-        $this->assertSame('@@agent("agent-coder") Hello', SpyProvider::$calls[0]['content']);
+        $this->assertStringNotContainsString('@@agent', SpyProvider::$calls[0]['content']);
+        $this->assertSame('Hello', SpyProvider::$calls[0]['content']);
     }
 
     /**
@@ -198,7 +198,7 @@ final class TodoListAgentSwitchExecuteTest extends TestCase
         $list->execute(MessageRole::USER)->await();
 
         $this->assertSame(['agent-coder', 'default'], array_column(SpyProvider::$calls, 'label'));
-        $this->assertStringContainsString('@@agent', SpyProvider::$calls[0]['content']);
+        $this->assertStringNotContainsString('@@agent', SpyProvider::$calls[0]['content']);
     }
 
     /**

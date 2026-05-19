@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\classes\todo;
 
 use app\modules\neuron\classes\dto\cmd\AgentCmdDto;
+use app\modules\neuron\classes\dto\cmd\ThinkingCmdDto;
 use app\modules\neuron\interfaces\ITodo;
 use app\modules\neuron\helpers\PlaceholderHelper;
 use app\modules\neuron\classes\dto\cmd\CmdDto;
@@ -29,6 +30,16 @@ class Todo implements ITodo
      * @var AgentCmdDto|null|false
      */
     private AgentCmdDto|null|false $agentDto = null;
+
+    /**
+     * Флаг: команды @@think / @@thinking уже разобраны из текста.
+     */
+    private bool $thinkingResolved = false;
+
+    /**
+     * Переопределение think после разбора (null — наследовать сессию).
+     */
+    private ?bool $thinkingOverrideValue = null;
 
     /**
      * Создает экземпляр задания с указанным текстом.
@@ -110,5 +121,45 @@ class Todo implements ITodo
             }
         }
         return $this->agentDto ? $this->agentDto : null;
+    }
+
+    /**
+     * Возвращает переопределение think из @@think / @@thinking в тексте задания.
+     *
+     * При первом вызове извлекает команды, удаляет их сигнатуры из {@see Todo::$text}
+     * и кэширует результат. Если команд несколько, используется последняя по порядку
+     * в тексте. Некорректная команда не задаёт override (null — наследовать сессию).
+     *
+     * @return bool|null true/false — явное переопределение; null — не задано в тексте todo.
+     */
+    public function getThinkingOverride(): ?bool
+    {
+        if (!$this->thinkingResolved) {
+            $body = $this->text;
+            $cmds = FileContextHelper::extractCmdFromBody($body);
+            $lastOverride = null;
+            $hasThinkCmd = false;
+
+            foreach ($cmds as $cmd) {
+                if (!$cmd instanceof ThinkingCmdDto) {
+                    continue;
+                }
+                $hasThinkCmd = true;
+                $body = $cmd->replaceSignatureInText($body, '');
+                $resolved = $cmd->resolveEnabled();
+                if ($resolved !== null) {
+                    $lastOverride = $resolved;
+                }
+            }
+
+            if ($hasThinkCmd) {
+                $this->text = $body;
+            }
+
+            $this->thinkingOverrideValue = $lastOverride;
+            $this->thinkingResolved = true;
+        }
+
+        return $this->thinkingOverrideValue;
     }
 }

@@ -7,6 +7,8 @@ namespace Tests\Dto;
 use app\modules\neuron\classes\dto\cmd\AgentCmdDto;
 use app\modules\neuron\classes\dto\cmd\CmdDto;
 use app\modules\neuron\classes\dto\cmd\FuncCmdDto;
+use app\modules\neuron\classes\dto\cmd\ThinkCmdDto;
+use app\modules\neuron\classes\dto\cmd\ThinkingCmdDto;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -193,5 +195,55 @@ TXT;
         $resultMany = CmdDto::replaceAllInText($bodyManyParams);
 
         $this->assertSame("Префикс  середина  суффикс ", $resultMany);
+    }
+
+    /**
+     * Наборы входов для проверки команд @@thinking и @@think.
+     *
+     * @return array<string, array{string, class-string, ?bool}>
+     */
+    public static function thinkingCommandProvider(): array
+    {
+        return [
+            'thinking without args' => ['@@thinking', ThinkingCmdDto::class, true],
+            'thinking empty parens' => ['@@thinking()', ThinkingCmdDto::class, true],
+            'thinking true bool' => ['@@thinking(true)', ThinkingCmdDto::class, true],
+            'thinking false bool' => ['@@thinking(false)', ThinkingCmdDto::class, false],
+            'thinking int one' => ['@@thinking(1)', ThinkingCmdDto::class, true],
+            'thinking int zero' => ['@@thinking(0)', ThinkingCmdDto::class, false],
+            'thinking string true' => ['@@thinking("true")', ThinkingCmdDto::class, true],
+            'thinking string false' => ['@@thinking("false")', ThinkingCmdDto::class, false],
+            'think without args' => ['@@think', ThinkCmdDto::class, true],
+            'think false' => ['@@think(false)', ThinkCmdDto::class, false],
+            'thinking invalid string' => ['@@thinking("maybe")', ThinkingCmdDto::class, null],
+            'thinking two args uses first' => ['@@thinking(true, false)', ThinkingCmdDto::class, true],
+            'thinking with spaces' => ['  @@thinking ( true )  ', ThinkingCmdDto::class, true],
+        ];
+    }
+
+    /**
+     * Команды @@thinking и @@think разбираются в специализированные DTO с ожидаемым resolveEnabled().
+     */
+    public function testParsesThinkingAndThinkCommands(): void
+    {
+        foreach (self::thinkingCommandProvider() as $caseName => [$command, $expectedClass, $expectedEnabled]) {
+            $dto = CmdDto::fromString($command);
+
+            $this->assertInstanceOf(
+                $expectedClass,
+                $dto,
+                'Failed class for case: ' . $caseName,
+            );
+            $this->assertInstanceOf(
+                ThinkingCmdDto::class,
+                $dto,
+                'Failed ThinkingCmdDto base for case: ' . $caseName,
+            );
+            $this->assertSame(
+                $expectedEnabled,
+                $dto->resolveEnabled(),
+                'Failed resolveEnabled for case: ' . $caseName,
+            );
+        }
     }
 }

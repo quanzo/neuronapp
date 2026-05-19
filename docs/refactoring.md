@@ -41,6 +41,11 @@
 - в traits (`LoggerAwareTrait`, `LoggerAwareContextualTrait`, `DependConfigAppTrait`, `HasNeedSkillsTrait`, `AttachesSkillToolsTrait`);
 - в хелперы (`AttachmentHelper`, `FileContextHelper`, `PlaceholderHelper`, `MarkdownHelper`, `OptionsHelper`, `ChatHistoryTruncateHelper`, `ChatHistoryRollbackHelper`, `ShellToolFactory`, `ToolRegistry`, `SessionKeyHelper`, `StorageFileHelper`, `TodoCompletedStatusHelper`, `TodoListResumeHelper`).
 
+`OptionsHelper` (`src/helpers/OptionsHelper.php`):
+
+- `toBool()` — приведение опций компонентов (think/thinking и др.) к boolean;
+- `parseScalar()` / `unescapeString()` / `formatScalar()` — разбор и каноническое форматирование скалярных литералов в аргументах `@@`-команд (используется в `CmdDto`).
+
 Это упрощает сопровождение и уменьшает связность между доменными классами.
 
 ### Нормализация списков строк
