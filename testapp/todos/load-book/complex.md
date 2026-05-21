@@ -1,5 +1,4 @@
 ---
-agent: agent-main
 pure_context: false
 skills: skill-file-block-summarize
 ---
