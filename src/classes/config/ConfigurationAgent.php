@@ -793,7 +793,6 @@ class ConfigurationAgent implements IDependConfigApp
         };
 
         $clone->setChatHistory($targetHistory);
-        $clone->excludeLongTermMind = false;
 
         return $clone;
     }

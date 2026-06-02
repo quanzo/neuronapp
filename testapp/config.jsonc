@@ -8,5 +8,20 @@
     "enabled": true,
     // Максимальный общий размер всех подключённых файлов в байтах (1 MiB по умолчанию в AttachmentHelper)
     "max_total_size": 1048576
+  },
+
+  // Долговременная память сообщений (.mind), per-session layout
+  "mind": {
+    // Включить запись завершённых шагов LLM в .mind (LongTermMindSubscriber)
+    "collect": true,
+    // LLM-суммаризация сессий для индекса sessions.md
+    "session_summary": {
+      // Агент из testapp/agents/my_summarizer_agent.php
+      "agent": "my_summarizer_agent",
+      // Максимальная длина summary в одной строке индекса (символы UTF-8)
+      "max_summary_chars": 300,
+      // Доля контекстного окна агента-суммаризатора под транскрипт сессии (0.0–1.0)
+      "transcript_ratio": 0.25
+    }
   }
 }

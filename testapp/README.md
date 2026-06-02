@@ -5,7 +5,7 @@
 
 ## Структура
 
-- `config.jsonc` — базовая конфигурация приложения (userId, настройки context_files).
+- `config.jsonc` — базовая конфигурация приложения (userId, `context_files`, настройки `mind`).
 - `agents/`
   - `agent-dev-coder.php` — агент‑программист, умеет смотреть/искать/править файлы и выполнять безопасные shell‑команды.
   - `agent-researcher.php` — агент‑исследователь, работающий с wiki/search инструментами.
@@ -30,6 +30,12 @@
 2. В `config.jsonc` включено автоподключение файлов контекста:
    - `context_files.enabled = true`;
    - `context_files.max_total_size = 1048576`.
+3. Долговременная память `.mind` (см. `docs/mind.md`):
+   - `mind.collect = true` — сообщения сессий пишутся в `.mind/user_<id>/sessions/`;
+   - `mind.session_summary.agent = my_summarizer_agent` — краткое описание сессии в `sessions.md`.
+4. Инструменты `mind.sessions`, `mind.search`, `mind.session.view` зарегистрированы в `ToolRegistry`; чтобы агент мог ими пользоваться, добавьте их в массив `tools` в конфиге нужного агента (`testapp/agents/*.php`).
+
+Рекомендуемый запуск testapp: `php bin/testconsole2` (задаёт `APP_START_DIR` и `APP_WORK_DIR` на `testapp`).
 
 ## Запуск сценариев todolist
 

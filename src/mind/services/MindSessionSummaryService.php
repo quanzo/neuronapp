@@ -8,6 +8,7 @@ use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\neuron\trimmers\ConfigurationAgentHistoryHeadSummarizer;
 use app\modules\neuron\classes\neuron\trimmers\FluidContextWindowTrimmer;
 use app\modules\neuron\classes\neuron\trimmers\TokenCounter;
+use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\mind\storage\UserMindStorage;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\Message;
@@ -56,10 +57,13 @@ final class MindSessionSummaryService
             return;
         }
 
-        $agent = $app->getAgent($agentName);
-        if ($agent === null) {
+        $agent0 = $app->getAgent($agentName);
+        if ($agent0 === null) {
             return;
         }
+
+        // клонируем класс чтобы он был чистым без истории
+        $agent = $agent0->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY);
 
         $meta = $mind->getSessionsIndex()->get($sessionKey);
         if ($meta === null) {
