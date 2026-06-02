@@ -135,6 +135,9 @@ final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummar
     private function summarizeViaAgent(string $transcript): string
     {
         $clone = $this->agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY);
+        if ($this->agentCfg->isExcludeLongTermMind()) {
+            $clone->setExcludeLongTermMind(true);
+        }
 
         // На время суммаризации отключаем инструменты и делаем инструкцию максимально жёсткой.
         $clone->tools = [];

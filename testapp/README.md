@@ -31,7 +31,8 @@
    - `context_files.enabled = true`;
    - `context_files.max_total_size = 1048576`.
 3. Долговременная память `.mind` (см. `docs/mind.md`):
-   - `mind.collect = true` — сообщения сессий пишутся в `.mind/user_<id>/sessions/`;
+   - в `testapp/config.jsonc` явно задано `mind.collect = true` (глобально по умолчанию сбор выключен);
+   - сообщения сессий пишутся в `.mind/user_<id>/sessions/`;
    - `mind.session_summary.agent = my_summarizer_agent` — краткое описание сессии в `sessions.md`.
 4. Инструменты `mind.sessions`, `mind.search`, `mind.session.view` зарегистрированы в `ToolRegistry`; чтобы агент мог ими пользоваться, добавьте их в массив `tools` в конфиге нужного агента (`testapp/agents/*.php`).
 

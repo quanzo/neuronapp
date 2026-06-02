@@ -6,6 +6,7 @@ namespace app\modules\neuron\tools;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\helpers\JsonHelper;
+use app\modules\neuron\mind\helpers\MindSummarySessionKeyHelper;
 use app\modules\neuron\mind\storage\MindPaths;
 use app\modules\neuron\mind\storage\UserMindStorage;
 use NeuronAI\Tools\PropertyType;
@@ -92,6 +93,9 @@ final class MindSessionsTool extends ATool
         $out = [];
         $n = 0;
         foreach ($rows as $meta) {
+            if (MindSummarySessionKeyHelper::isSummarySession($meta->getSessionKey())) {
+                continue;
+            }
             if ($n >= $limit) {
                 break;
             }

@@ -12,8 +12,8 @@ use app\modules\neuron\helpers\LlmCycleHelper;
 use app\modules\neuron\helpers\MindMessageBodyExportHelper;
 use app\modules\neuron\mind\storage\LegacyUserMindMigrator;
 use app\modules\neuron\mind\storage\MindPaths;
+use app\modules\neuron\mind\helpers\MindSummarySessionKeyHelper;
 use app\modules\neuron\mind\storage\UserMindStorage;
-use app\modules\neuron\mind\services\MindSessionSummaryService;
 use DateTimeImmutable;
 use Throwable;
 
@@ -25,7 +25,9 @@ use Throwable;
  * Если в {@see ConfigurationApp} выключена опция {@see ConfigurationApp::isLongTermMindCollectionEnabled()}
  * (`mind.collect` в `config.jsonc`), запись в `.mind` для всего процесса не выполняется.
  * Если у агента в DTO включено {@see \app\modules\neuron\classes\config\ConfigurationAgent::isExcludeLongTermMind()}
- * (исполнение Skill/TodoList с `pure_context: true`), запись в `.mind` не выполняется для этого агента.
+ * (исполнение Skill/TodoList с `pure_context: true`, LLM-суммаризация сессий), запись в `.mind` не выполняется.
+ * Служебные вызовы mind-summary используют отдельный sessionKey ({@see MindSummarySessionKeyHelper});
+ * для таких ключей не вызывается {@see UserMindStorage::refreshSessionSummary()} (защита от зацикливания).
  *
  * Пример:
  *
@@ -36,6 +38,11 @@ use Throwable;
 final class LongTermMindSubscriber
 {
     private static bool $isRegistered = false;
+
+    /**
+     * Глубина вложенных вызовов refreshSessionSummary (re-entrancy guard).
+     */
+    private static int $summaryRefreshDepth = 0;
 
     /**
      * Регистрирует обработчик события `agent.message.completed`.
@@ -117,16 +124,24 @@ final class LongTermMindSubscriber
                 // Текущая эвристика:
                 // - если summary пустой — пробуем заполнить;
                 // - иначе обновляем каждые 10 записей.
-                if ($wrote) {
+                if (
+                    $wrote
+                    && !MindSummarySessionKeyHelper::isSummarySession($sessionKey)
+                    && self::$summaryRefreshDepth === 0
+                ) {
                     $meta = $storage->getSessionsIndex()->get($sessionKey);
                     if ($meta !== null) {
                         $need = $meta->getSummary() === '' || ($meta->getMessageCount() % 10) === 0;
                         if ($need) {
-                            (new MindSessionSummaryService())->refreshSessionSummary(
-                                ConfigurationApp::getInstance(),
-                                $storage,
-                                $sessionKey,
-                            );
+                            ++self::$summaryRefreshDepth;
+                            try {
+                                $storage->refreshSessionSummary(
+                                    ConfigurationApp::getInstance(),
+                                    $sessionKey,
+                                );
+                            } finally {
+                                --self::$summaryRefreshDepth;
+                            }
                         }
                     }
                 }
@@ -143,6 +158,15 @@ final class LongTermMindSubscriber
     public static function reset(): void
     {
         self::$isRegistered = false;
+        self::$summaryRefreshDepth = 0;
+    }
+
+    /**
+     * Возвращает текущую глубину вложенных refreshSessionSummary (для тестов).
+     */
+    public static function getSummaryRefreshDepth(): int
+    {
+        return self::$summaryRefreshDepth;
     }
 
     /**

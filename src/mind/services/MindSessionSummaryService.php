@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\mind\services;
 
+use app\modules\neuron\interfaces\MindSessionSummaryRefresherInterface;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\neuron\trimmers\ConfigurationAgentHistoryHeadSummarizer;
 use app\modules\neuron\classes\neuron\trimmers\FluidContextWindowTrimmer;
 use app\modules\neuron\classes\neuron\trimmers\TokenCounter;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
+use app\modules\neuron\mind\helpers\MindSummarySessionKeyHelper;
 use app\modules\neuron\mind\storage\UserMindStorage;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\Message;
@@ -32,7 +34,7 @@ use function trim;
  * - `mind.session_summary.max_summary_chars` (int, default 300): ограничение индекса.
  * - `mind.session_summary.transcript_ratio` (float, default 0.25): доля окна, выделяемая под транскрипт.
  */
-final class MindSessionSummaryService
+final class MindSessionSummaryService implements MindSessionSummaryRefresherInterface
 {
     /**
      * Минимальная доля окна, которую имеет смысл выделять под транскрипт.
@@ -51,6 +53,10 @@ final class MindSessionSummaryService
      */
     public function refreshSessionSummary(ConfigurationApp $app, UserMindStorage $mind, string $sessionKey): void
     {
+        if (MindSummarySessionKeyHelper::isSummarySession($sessionKey)) {
+            return;
+        }
+
         $agentName = (string) $app->get('mind.session_summary.agent', '');
         $agentName = trim($agentName);
         if ($agentName === '') {
@@ -104,8 +110,9 @@ final class MindSessionSummaryService
             return;
         }
 
-        // Важно: суммаризатор запускает отдельный LLM-запрос. Его нужно исключить из `.mind`.
+        // Важно: суммаризатор запускает отдельный LLM-запрос — исключаем из `.mind` и изолируем sessionKey.
         $agent->setExcludeLongTermMind(true);
+        $agent->setSessionKey(MindSummarySessionKeyHelper::forMainSession($sessionKey));
 
         $summarizer = new ConfigurationAgentHistoryHeadSummarizer($agent);
         $summaryMsg = $summarizer->summarize($windowMessages, $contextWindow);

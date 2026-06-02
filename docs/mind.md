@@ -88,7 +88,7 @@ Legacy класс `UserMindMarkdownStorage` (`src/classes/storage/UserMindMarkdo
 - DTO: `AgentMessageEventDto` — `outgoingMessage` (отправленное в агент), `incomingMessage` (ответ ассистента как `NeuronMessage`, если есть: из `chat()` или последнее assistant-сообщение из истории после `structured()`), плюс `attachmentsCount`, `structured`, `durationSeconds`, базовые поля `BaseEventDto`.
 - Публикация: `ConfigurationAgent::dispatchMessageToAgent()` после успешного `performAgentRequest()` (включая structured и обычный `chat()`), а также после успешного wait-cycle без исключения (в этом случае `incomingMessage` может быть null).
 - Идентификатор пользователя для файлов `.mind` берётся из `ConfigurationApp::getUserId()` внутри подписчика.
-- Глобально сбор в `.mind` можно отключить в `config.jsonc`: `mind.collect: false` (или вложенный объект `"mind": { "collect": false }`). Тогда `ConfigurationApp::isLongTermMindCollectionEnabled()` возвращает `false`, и подписчик не пишет в storage (по умолчанию опция включена).
+- Глобально сбор в `.mind` включается в `config.jsonc`: `mind.collect: true` (или `"mind": { "collect": true }`). По умолчанию (`mind.collect` отсутствует) сбор **выключен** — `ConfigurationApp::isLongTermMindCollectionEnabled()` возвращает `false`, подписчик не пишет в storage.
 - Если у `AgentMessageEventDto::getAgent()` выставлено `ConfigurationAgent::isExcludeLongTermMind() === true`, подписчик **полностью пропускает** запись (используется при исполнении Skill/TodoList с опцией `pure_context: true`, см. `docs/skills.md`, `docs/todolist.md`).
 - `LongTermMindSubscriber` не пишет сообщения, распознанные как служебные циклом `LlmCycleHelper` (`isCycleEmptyMsg`, `isCycleRequestMsg`, `isCycleResponseMsg`), и не пишет пустой текст после нормализации тела.
 
@@ -126,6 +126,35 @@ Legacy класс `UserMindMarkdownStorage` (`src/classes/storage/UserMindMarkdo
 
 - если `mind.session_summary.agent` не задан — summary остаётся пустым;
 - для ограничения контекста используется тримминг истории по токенам.
+
+### API суммаризации (`UserMindStorage`)
+
+Запуск LLM-summary вынесен в [`UserMindStorage`](src/mind/storage/UserMindStorage.php) (внутри — [`MindSessionSummaryService`](src/mind/services/MindSessionSummaryService.php)):
+
+```php
+$paths = new MindPaths($app->getMindDir(), $app->getUserId());
+$mind = new UserMindStorage($paths);
+
+// Одна сессия: true, если summary непустой и изменился
+$updated = $mind->refreshSessionSummary($app, $sessionKey);
+
+// Все сессии индекса (пропуск служебных ключей и пустых)
+$result = $mind->refreshAllSessionSummaries($app);
+// $result->getAttempted(), getUpdated(), getSkipped()
+```
+
+Автоматически при записи сообщений: `LongTermMindSubscriber` вызывает `refreshSessionSummary` по эвристике (пустой summary или каждые 10 сообщений).
+
+### Защита от зацикливания (mind-summary)
+
+Служебный LLM-вызов суммаризатора публикует `agent.message.completed` так же, как основной агент. Чтобы не писать промпт/ответ суммаризации в транскрипт основной сессии и не запускать повторный `refreshSessionSummary`, используется комбинация:
+
+1. **`ConfigurationAgent::setExcludeLongTermMind(true)`** на клоне агента-суммаризатора — `LongTermMindSubscriber` полностью пропускает запись.
+2. **Отдельный sessionKey** — `MindSummarySessionKeyHelper::forMainSession($main)` → `$main:__mind_summary__` (если exclude сброшен, сообщения попадают только в служебную сессию, не в MAIN).
+3. **Подписчик** — не вызывает `refreshSessionSummary` для ключей с суффиксом `:__mind_summary__`; re-entrancy guard (`$summaryRefreshDepth`) при вложенном refresh.
+4. **Инструменты** — `mind.sessions` и `mind.search` не показывают служебные сессии (`isSummarySession`).
+
+Классы: `MindSummarySessionKeyHelper`, `MindSessionSummaryService`, `ConfigurationAgentHistoryHeadSummarizer` (проброс exclude во внутренний клон), `LongTermMindSubscriber`.
 
 ## Инструменты LLM для `.mind`
 

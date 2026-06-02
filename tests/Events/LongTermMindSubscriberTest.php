@@ -40,7 +40,7 @@ class LongTermMindSubscriberTest extends TestCase
         mkdir($this->tmpDir . '/.store', 0777, true);
 
         $dp = new DirPriority([$this->tmpDir]);
-        file_put_contents($this->tmpDir . '/config.jsonc', "{}\n");
+        file_put_contents($this->tmpDir . '/config.jsonc', "{\"mind\":{\"collect\":true}}\n");
         ConfigurationApp::init($dp, 'config.jsonc', 501);
 
         EventBus::clear();
@@ -217,13 +217,13 @@ class LongTermMindSubscriberTest extends TestCase
             'useCloneWithoutExclude'      => false,
             'clearExcludeBeforeTrigger'   => false,
         ]];
-        // 9. cloneForSession сбрасывает флаг: на DTO клон без exclude — запись должна появиться.
-        yield 'clone_clears_exclude_then_persists' => [[
+        // 9. cloneForSession сохраняет exclude через clone — запись не должна появиться.
+        yield 'clone_preserves_exclude_no_persist' => [[
             'attachAgent'                 => true,
             'excludeWhenAttached'         => true,
-            'userBody'                    => 'После клона пишем',
+            'userBody'                    => 'После клона не пишем',
             'assistantBody'               => 'Ок',
-            'expectRecord1Exists'         => true,
+            'expectRecord1Exists'         => false,
             'useCloneWithoutExclude'      => true,
             'clearExcludeBeforeTrigger'   => false,
         ]];

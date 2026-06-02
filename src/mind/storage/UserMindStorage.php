@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\mind\storage;
 
+use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\interfaces\MindSessionSummaryRefresherInterface;
 use app\modules\neuron\mind\dto\MindRecordDto;
 use app\modules\neuron\mind\dto\MindSessionMetaDto;
+use app\modules\neuron\mind\dto\MindStorageSummaryRefreshResultDto;
+use app\modules\neuron\mind\helpers\MindSummarySessionKeyHelper;
+use app\modules\neuron\mind\services\MindSessionSummaryService;
 use DateTimeImmutable;
-use RuntimeException;
 
 use function file_exists;
 
@@ -17,7 +21,8 @@ use function file_exists;
  * Отвечает за:
  * - открытие per-session storage по sessionKey;
  * - ведение индекса `sessions.md` с метаданными;
- * - (в следующих шагах) миграцию legacy storage и суммаризацию сессий.
+ * - миграцию legacy storage (см. {@see LegacyUserMindMigrator});
+ * - запуск LLM-суммаризации сессий ({@see refreshSessionSummary}, {@see refreshAllSessionSummaries}).
  *
  * Пример:
  *
@@ -25,7 +30,8 @@ use function file_exists;
  * $paths = new MindPaths($mindDir, $userId);
  * $mind = new UserMindStorage($paths);
  * $mind->appendMessage($sessionKey, 'user', 'Привет');
- * $hits = $mind->search($sessionKey, 'имя агента');
+ * $mind->refreshSessionSummary(ConfigurationApp::getInstance(), $sessionKey);
+ * $result = $mind->refreshAllSessionSummaries(ConfigurationApp::getInstance());
  * </code>
  */
 final class UserMindStorage
@@ -76,8 +82,7 @@ final class UserMindStorage
         $store = $this->openSession($sessionKey);
         $id = $store->appendMessage($role, $bodyPlain, $capturedAt);
 
-        // Обновляем индекс (минимально необходимый набор метаданных).
-        // Summary пока пустой — будет добавлено отдельным шагом.
+        // Обновляем индекс (summary заполняется через refreshSessionSummary / подписчик).
         $capturedAt ??= new DateTimeImmutable('now');
         $iso = $capturedAt->format(\DateTimeInterface::ATOM);
 
@@ -114,6 +119,78 @@ final class UserMindStorage
     public function searchSession(string $sessionKey, string $query, ?int $maxChars = 100000): array
     {
         return $this->openSession($sessionKey)->searchBlocks($query, $maxChars);
+    }
+
+    /**
+     * Пересчитывает summary одной сессии через LLM (делегирует {@see MindSessionSummaryService}).
+     *
+     * @param ConfigurationApp                        $app        Конфигурация приложения.
+     * @param string                                  $sessionKey Ключ основной сессии.
+     * @param MindSessionSummaryRefresherInterface|null $service  Сервис суммаризации (для тестов).
+     *
+     * @return bool true, если summary непустой и изменился относительно значения до вызова.
+     */
+    public function refreshSessionSummary(
+        ConfigurationApp $app,
+        string $sessionKey,
+        ?MindSessionSummaryRefresherInterface $service = null,
+    ): bool {
+        if (MindSummarySessionKeyHelper::isSummarySession($sessionKey)) {
+            return false;
+        }
+
+        $metaBefore = $this->index->get($sessionKey);
+        if ($metaBefore === null || $metaBefore->getMessageCount() === 0) {
+            return false;
+        }
+
+        $summaryBefore = $metaBefore->getSummary();
+
+        ($service ?? new MindSessionSummaryService())->refreshSessionSummary($app, $this, $sessionKey);
+
+        $metaAfter = $this->index->get($sessionKey);
+        if ($metaAfter === null) {
+            return false;
+        }
+
+        $summaryAfter = $metaAfter->getSummary();
+
+        return $summaryAfter !== '' && $summaryAfter !== $summaryBefore;
+    }
+
+    /**
+     * Пересчитывает summary для всех сессий индекса пользователя.
+     *
+     * Пропускает служебные sessionKey ({@see MindSummarySessionKeyHelper}) и сессии без сообщений.
+     *
+     * @param ConfigurationApp                        $app     Конфигурация приложения.
+     * @param MindSessionSummaryRefresherInterface|null $service Сервис суммаризации (для тестов).
+     */
+    public function refreshAllSessionSummaries(
+        ConfigurationApp $app,
+        ?MindSessionSummaryRefresherInterface $service = null,
+    ): MindStorageSummaryRefreshResultDto {
+        $service ??= new MindSessionSummaryService();
+        $result = new MindStorageSummaryRefreshResultDto();
+
+        foreach ($this->index->readAll() as $meta) {
+            $sessionKey = $meta->getSessionKey();
+            if (MindSummarySessionKeyHelper::isSummarySession($sessionKey)) {
+                $result->incrementSkipped();
+                continue;
+            }
+            if ($meta->getMessageCount() === 0) {
+                $result->incrementSkipped();
+                continue;
+            }
+
+            $result->incrementAttempted();
+            if ($this->refreshSessionSummary($app, $sessionKey, $service)) {
+                $result->incrementUpdated();
+            }
+        }
+
+        return $result;
     }
 
     /**

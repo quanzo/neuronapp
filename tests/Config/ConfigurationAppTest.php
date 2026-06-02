@@ -316,10 +316,21 @@ class ConfigurationAppTest extends TestCase
     }
 
     /**
-     * Без ключа `mind.collect` сбор долговременной памяти включён по умолчанию.
+     * Без ключа `mind.collect` сбор долговременной памяти выключен по умолчанию.
      */
-    public function testIsLongTermMindCollectionEnabledDefaultsTrue(): void
+    public function testIsLongTermMindCollectionEnabledDefaultsFalse(): void
     {
+        $dp = new DirPriority([$this->tmpDir]);
+        ConfigurationApp::init($dp, 'config.jsonc');
+        $this->assertFalse(ConfigurationApp::getInstance()->isLongTermMindCollectionEnabled());
+    }
+
+    /**
+     * `mind.collect: true` в конфиге явно включает сбор для `.mind`.
+     */
+    public function testIsLongTermMindCollectionEnabledTrueFromConfig(): void
+    {
+        file_put_contents($this->tmpDir . '/config.jsonc', "{\"mind\":{\"collect\":true}}\n");
         $dp = new DirPriority([$this->tmpDir]);
         ConfigurationApp::init($dp, 'config.jsonc');
         $this->assertTrue(ConfigurationApp::getInstance()->isLongTermMindCollectionEnabled());

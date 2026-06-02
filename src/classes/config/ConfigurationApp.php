@@ -326,7 +326,7 @@ class ConfigurationApp
      *
      * Читается из `config.jsonc` ключом `mind.collect` (вложенный объект `mind`, поле `collect`).
      * Значения `1`, `true`, строка `'true'` трактуются как включено; `0`, `false`, строка `'false'` — как выключено.
-     * При отсутствии ключа по умолчанию сбор **включён** (обратная совместимость).
+     * При отсутствии ключа по умолчанию сбор **выключен**; для записи в `.mind` задайте `mind.collect: true`.
      * Подписчик {@see \app\modules\neuron\classes\events\subscribers\LongTermMindSubscriber} при выключенной опции
      * не записывает сообщения в файлы `.mind` (см. `docs/mind.md`).
      *
@@ -337,7 +337,7 @@ class ConfigurationApp
      */
     public function isLongTermMindCollectionEnabled(): bool
     {
-        return OptionsHelper::toBool($this->get('mind.collect', true));
+        return OptionsHelper::toBool($this->get('mind.collect', false));
     }
 
     /**
