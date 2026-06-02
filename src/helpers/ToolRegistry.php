@@ -24,6 +24,9 @@ use app\modules\neuron\tools\RuWikiSearchTool;
 use app\modules\neuron\tools\TodoGotoTool;
 use app\modules\neuron\tools\TodoCompletedTool;
 use app\modules\neuron\tools\UniSearchTool;
+use app\modules\neuron\tools\MindSessionsTool;
+use app\modules\neuron\tools\MindSearchTool;
+use app\modules\neuron\tools\MindSessionViewTool;
 use NeuronAI\Tools\ToolInterface;
 
 /**
@@ -92,6 +95,9 @@ class ToolRegistry
             // но реализован тем же классом WebFetchTool (с другим публичным именем).
             'http_fetch'     => static fn(string $name, ConfigurationAgent $cfg): ToolInterface => new WebFetchTool(name: 'http_fetch'),
             'web_fetch'      => static fn(string $name, ConfigurationAgent $cfg): ToolInterface => new WebFetchTool(),
+            'mind.sessions'  => static fn(string $name, ConfigurationAgent $cfg): ToolInterface => new MindSessionsTool(),
+            'mind.search'    => static fn(string $name, ConfigurationAgent $cfg): ToolInterface => new MindSearchTool(),
+            'mind.session.view' => static fn(string $name, ConfigurationAgent $cfg): ToolInterface => new MindSessionViewTool(),
         ];
     }
 

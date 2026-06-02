@@ -7,10 +7,13 @@ namespace app\modules\neuron\classes\events\subscribers;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
 use app\modules\neuron\classes\events\EventBus;
-use app\modules\neuron\classes\storage\UserMindMarkdownStorage;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\helpers\LlmCycleHelper;
 use app\modules\neuron\helpers\MindMessageBodyExportHelper;
+use app\modules\neuron\mind\storage\LegacyUserMindMigrator;
+use app\modules\neuron\mind\storage\MindPaths;
+use app\modules\neuron\mind\storage\UserMindStorage;
+use app\modules\neuron\mind\services\MindSessionSummaryService;
 use DateTimeImmutable;
 use Throwable;
 
@@ -66,13 +69,23 @@ final class LongTermMindSubscriber
                 }
 
                 $userId = ConfigurationApp::getInstance()->getUserId();
-                $storage = new UserMindMarkdownStorage($mindDir, $userId);
                 $sessionKey = $payload->getSessionKey();
                 if ($sessionKey === '') {
                     $sessionKey = 'unknown';
                 }
 
                 $captured = self::parseCapturedAt($payload->getTimestamp());
+
+                $paths = new MindPaths($mindDir, $userId);
+
+                // Миграция legacy формата выполняется один раз: если есть legacy файлы и ещё нет sessions.md.
+                $migrator = new LegacyUserMindMigrator($mindDir, $userId);
+                if ($migrator->isMigrationNeeded()) {
+                    $migrator->migrate();
+                }
+
+                $storage = new UserMindStorage($paths);
+                $wrote = false;
 
                 $user = $payload->getOutgoingMessage();
                 if (
@@ -83,6 +96,7 @@ final class LongTermMindSubscriber
                     $body = trim(MindMessageBodyExportHelper::toStoragePlainBody($user));
                     if ($body !== '') {
                         $storage->appendMessage($sessionKey, $user->getRole(), $body, $captured);
+                        $wrote = true;
                     }
                 }
 
@@ -94,7 +108,26 @@ final class LongTermMindSubscriber
                 ) {
                     $body = trim(MindMessageBodyExportHelper::toStoragePlainBody($assistant));
                     if ($body !== '') {
-                        $storage->appendMessage($sessionKey, $assistant->getRole(), $body, new DateTimeImmutable());
+                        $storage->appendMessage($sessionKey, $assistant->getRole(), $body, $captured);
+                        $wrote = true;
+                    }
+                }
+
+                // Summary пересчитываем не на каждое сообщение, чтобы не создавать лишние LLM-вызовы.
+                // Текущая эвристика:
+                // - если summary пустой — пробуем заполнить;
+                // - иначе обновляем каждые 10 записей.
+                if ($wrote) {
+                    $meta = $storage->getSessionsIndex()->get($sessionKey);
+                    if ($meta !== null) {
+                        $need = $meta->getSummary() === '' || ($meta->getMessageCount() % 10) === 0;
+                        if ($need) {
+                            (new MindSessionSummaryService())->refreshSessionSummary(
+                                ConfigurationApp::getInstance(),
+                                $storage,
+                                $sessionKey,
+                            );
+                        }
                     }
                 }
             },

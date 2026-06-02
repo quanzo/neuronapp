@@ -20,11 +20,6 @@ namespace app\modules\neuron\helpers;
 final class MindStorageFilenameHelper
 {
     /**
-     * Максимальная длина «читаемой» части строкового id до усечения/хеширования.
-     */
-    private const MAX_LABEL_LENGTH = 64;
-
-    /**
      * Строит безопасный базовый сегмент имени файла для заданного user id.
      *
      * @param int|string $userId Идентификатор пользователя из {@see \app\modules\neuron\classes\config\ConfigurationApp::getUserId()}.
@@ -33,22 +28,7 @@ final class MindStorageFilenameHelper
      */
     public static function toBasename(int|string $userId): string
     {
-        if (\is_int($userId)) {
-            return 'user_' . (string) $userId;
-        }
-
-        $label = (string) $userId;
-        $label = str_replace(["\0", '/', '\\'], '_', $label);
-        $label = preg_replace('/[^\p{L}\p{N}_\-.]+/u', '_', $label) ?? '';
-        $label = trim($label, '._-');
-        if ($label === '') {
-            $label = 'empty';
-        }
-
-        if (mb_strlen($label, 'UTF-8') > self::MAX_LABEL_LENGTH) {
-            $label = mb_substr($label, 0, self::MAX_LABEL_LENGTH, 'UTF-8');
-        }
-
-        return 'user_' . $label;
+        // BC-wrapper: реализация переехала в `src/mind/helpers`.
+        return \app\modules\neuron\mind\helpers\MindStorageFilenameHelper::toBasename($userId);
     }
 }

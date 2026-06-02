@@ -296,4 +296,15 @@ final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummar
             '- 5–15 буллетов по сути (что делали/решили/где остановились).',
         ]);
     }
+
+    /**
+     * Возвращает текст инструкции суммаризатора.
+     *
+     * Метод добавлен для переиспользования в других компонентах (например, mind summary),
+     * чтобы не дублировать prompt и сохранить единообразие.
+     */
+    public static function getSummarizerInstructions(): string
+    {
+        return self::buildSummarizerInstructions();
+    }
 }

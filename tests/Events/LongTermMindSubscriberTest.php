@@ -10,10 +10,11 @@ use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\classes\events\subscribers\LongTermMindSubscriber;
-use app\modules\neuron\classes\storage\UserMindMarkdownStorage;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\LlmCycleHelper;
+use app\modules\neuron\mind\storage\MindPaths;
+use app\modules\neuron\mind\storage\SessionMindMarkdownStorage;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\Message as NeuronMessage;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -74,8 +75,9 @@ class LongTermMindSubscriberTest extends TestCase
 
         EventBus::trigger(EventNameEnum::AGENT_MESSAGE_COMPLETED->value, '*', $dto);
 
-        $storage = new UserMindMarkdownStorage(ConfigurationApp::getInstance()->getMindDir(), 501);
-        $this->assertNull($storage->getByRecordId(1));
+        $paths = new MindPaths(ConfigurationApp::getInstance()->getMindDir(), 501);
+        $sessionStorage = new SessionMindMarkdownStorage($paths, '20260412-120000-1-0');
+        $this->assertNull($sessionStorage->getByRecordId(1));
 
         $assistantOk = new NeuronMessage(MessageRole::ASSISTANT, 'Обычный ответ');
 
@@ -88,8 +90,8 @@ class LongTermMindSubscriberTest extends TestCase
 
         EventBus::trigger(EventNameEnum::AGENT_MESSAGE_COMPLETED->value, '*', $dto2);
 
-        $storage2 = new UserMindMarkdownStorage(ConfigurationApp::getInstance()->getMindDir(), 501);
-        $r1 = $storage2->getByRecordId(1);
+        $sessionStorage2 = new SessionMindMarkdownStorage($paths, '20260412-120000-1-0');
+        $r1 = $sessionStorage2->getByRecordId(1);
         $this->assertNotNull($r1);
         $this->assertStringContainsString('Реальный', $r1->getBody());
     }
@@ -122,8 +124,9 @@ class LongTermMindSubscriberTest extends TestCase
 
         EventBus::trigger(EventNameEnum::AGENT_MESSAGE_COMPLETED->value, '*', $dto);
 
-        $storage = new UserMindMarkdownStorage($app->getMindDir(), 501);
-        $this->assertNull($storage->getByRecordId(1));
+        $paths = new MindPaths($app->getMindDir(), 501);
+        $sessionStorage = new SessionMindMarkdownStorage($paths, '20260602-mind-collect-off');
+        $this->assertNull($sessionStorage->getByRecordId(1));
     }
 
     /**
@@ -284,8 +287,9 @@ class LongTermMindSubscriberTest extends TestCase
 
         EventBus::trigger(EventNameEnum::AGENT_MESSAGE_COMPLETED->value, '*', $dto);
 
-        $storage = new UserMindMarkdownStorage(ConfigurationApp::getInstance()->getMindDir(), 501);
-        $r1      = $storage->getByRecordId(1);
+        $paths = new MindPaths(ConfigurationApp::getInstance()->getMindDir(), 501);
+        $sessionStorage = new SessionMindMarkdownStorage($paths, $sessionKey);
+        $r1      = $sessionStorage->getByRecordId(1);
         if ($row['expectRecord1Exists']) {
             $this->assertNotNull($r1);
         } else {
