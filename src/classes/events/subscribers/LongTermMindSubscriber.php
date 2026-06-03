@@ -130,13 +130,14 @@ final class LongTermMindSubscriber
                     && self::$summaryRefreshDepth === 0
                 ) {
                     $meta = $storage->getSessionsIndex()->get($sessionKey);
+                    $cfgApp = $agent->getConfigurationApp();
                     if ($meta !== null) {
                         $need = $meta->getSummary() === '' || ($meta->getMessageCount() % 10) === 0;
                         if ($need) {
                             ++self::$summaryRefreshDepth;
                             try {
                                 $storage->refreshSessionSummary(
-                                    ConfigurationApp::getInstance(),
+                                    $cfgApp ?? ConfigurationApp::getInstance(),
                                     $sessionKey,
                                 );
                             } finally {
