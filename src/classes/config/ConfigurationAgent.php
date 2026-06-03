@@ -8,6 +8,7 @@ use app\modules\neuron\classes\ChatHistory;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\neuron\RAG;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
+use app\modules\neuron\mind\dto\config\MindConfigDto;
 use app\modules\neuron\events\Event;
 use app\modules\neuron\helpers\CallableWrapper;
 use app\modules\neuron\helpers\ChatHistoryCopyHelper;
@@ -215,6 +216,11 @@ class ConfigurationAgent implements IDependConfigApp
      * ```
      */
     private bool $excludeLongTermMind = false;
+
+    /**
+     * Блок `mind` из PHP-конфигурации агента; null — блок не задан (наследуется только app).
+     */
+    private ?MindConfigDto $mindConfig = null;
 
     /**
      * Дополнительные инструменты, которые может использовать LLM
@@ -814,6 +820,22 @@ class ConfigurationAgent implements IDependConfigApp
     {
         $this->excludeLongTermMind = $exclude;
         return $this;
+    }
+
+    /**
+     * Возвращает DTO блока `mind` из конфигурации агента или null, если блок не задан.
+     */
+    public function getMindConfig(): ?MindConfigDto
+    {
+        return $this->mindConfig;
+    }
+
+    /**
+     * Сливает mind app + agent: non-null поля агента перекрывают app.
+     */
+    public function resolveEffectiveMindConfig(ConfigurationApp $app): MindConfigDto
+    {
+        return MindConfigDto::resolveEffective($app, $this);
     }
 
     /**
@@ -1703,6 +1725,10 @@ class ConfigurationAgent implements IDependConfigApp
 
         if (array_key_exists('vectorStore', $cfg)) {
             $config->vectorStore = $cfg['vectorStore'];
+        }
+
+        if (array_key_exists('mind', $cfg) && is_array($cfg['mind'])) {
+            $config->mindConfig = MindConfigDto::fromConfigArray($cfg['mind']);
         }
 
         $config->setConfigurationApp($configApp);

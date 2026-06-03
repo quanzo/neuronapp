@@ -2,14 +2,15 @@
 
 require __DIR__ . '/../vendor/autoload.php';
 
-use app\modules\neuron\classes\command\HelloCommand;
-use app\modules\neuron\classes\command\RuwikiCommand;
-use app\modules\neuron\classes\command\SimpleMessageCommand;
-use app\modules\neuron\classes\command\TodolistCommand;
-use app\modules\neuron\classes\command\ClearAllSessionsCommand;
-use app\modules\neuron\classes\command\ClearSessionCommand;
-use app\modules\neuron\classes\command\OrchestrateCommand;
-use app\modules\neuron\classes\command\WikiCommand;
+use app\modules\neuron\command\ClearAllSessionsCommand;
+use app\modules\neuron\command\ClearSessionCommand;
+use app\modules\neuron\command\HelloCommand;
+use app\modules\neuron\command\MindSessionSummaryCommand;
+use app\modules\neuron\command\OrchestrateCommand;
+use app\modules\neuron\command\RuwikiCommand;
+use app\modules\neuron\command\SimpleMessageCommand;
+use app\modules\neuron\command\TodolistCommand;
+use app\modules\neuron\command\WikiCommand;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\console\TimedConsoleApplication;
 use app\modules\neuron\classes\dir\DirPriority;
@@ -101,6 +102,7 @@ $app->add(new RuwikiCommand());
 $app->add(new OrchestrateCommand());
 $app->add(new ClearSessionCommand());
 $app->add(new ClearAllSessionsCommand());
+$app->add(new MindSessionSummaryCommand());
 
 // Можно также добавить встроенную команду list, которая уже есть в Symfony,
 // поэтому отдельная HelpCommand не требуется, но при желании можно добавить.

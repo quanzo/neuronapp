@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Mind;
 
-use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\interfaces\MindSessionSummaryRefresherInterface;
 use app\modules\neuron\mind\storage\UserMindStorage;
 
@@ -13,16 +12,15 @@ use app\modules\neuron\mind\storage\UserMindStorage;
  */
 final class RecordingMindSessionSummaryRefresher implements MindSessionSummaryRefresherInterface
 {
-    /** @var list<array{app: ConfigurationApp, mind: UserMindStorage, sessionKey: string}> */
+    /** @var list<array{mind: UserMindStorage, sessionKey: string}> */
     private array $calls = [];
 
     /**
      * {@inheritdoc}
      */
-    public function refreshSessionSummary(ConfigurationApp $app, UserMindStorage $mind, string $sessionKey): void
+    public function refreshSessionSummary(UserMindStorage $mind, string $sessionKey): void
     {
         $this->calls[] = [
-            'app'        => $app,
             'mind'       => $mind,
             'sessionKey' => $sessionKey,
         ];
@@ -35,7 +33,7 @@ final class RecordingMindSessionSummaryRefresher implements MindSessionSummaryRe
     }
 
     /**
-     * @return list<array{app: ConfigurationApp, mind: UserMindStorage, sessionKey: string}>
+     * @return list<array{mind: UserMindStorage, sessionKey: string}>
      */
     public function getCalls(): array
     {

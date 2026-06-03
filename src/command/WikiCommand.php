@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\modules\neuron\classes\command;
+namespace app\modules\neuron\command;
 
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\classes\search\wiki\ArticleSearchFactory;
@@ -13,49 +13,62 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Консольная команда поиска одной статьи в RuWiki.
+ * Консольная команда поиска одной статьи в Wikipedia.
  *
  * Принимает текст запроса из опции {@see --message}, выполняет поиск по
- * российской RuWiki и выводит содержимое первой найденной статьи в виде
- * очищенного текстового блока.
+ * Wikipedia с помощью {@see ArticleSearchManager} и выводит содержимое
+ * первой найденной статьи в виде очищенного текстового блока.
  *
  * Пример вызова:
- *   php bin/console ruwiki --message "Теория относительности"
+ *   php bin/console wiki --message "Albert Einstein" --language en
  */
-class RuwikiCommand extends Command
+class WikiCommand extends Command
 {
     /**
      * Имя консольной команды.
      *
      * @var string|null
      */
-    protected static $defaultName = 'ruwiki';
+    protected static $defaultName = 'wiki';
+
+    /**
+     * Значение языка Wikipedia по умолчанию.
+     */
+    private const DEFAULT_LANGUAGE = 'ru';
 
     /**
      * Настраивает команду: описание и опции.
      *
      * Опции:
-     * - message — обязательный текстовый запрос для поиска статьи.
+     * - message  — обязательный текстовый запрос для поиска статьи;
+     * - language — необязательный код языка Wikipedia (en, ru, de и т.п.).
      */
     protected function configure(): void
     {
         $this
-            ->setDescription('Ищет статью в RuWiki и выводит текст первой найденной статьи.')
+            ->setDescription('Ищет статью в Wikipedia и выводит текст первой найденной статьи.')
             ->addOption(
                 'message',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Текст запроса для поиска статьи'
+            )
+            ->addOption(
+                'language',
+                null,
+                InputOption::VALUE_OPTIONAL,
+                'Язык Wikipedia (например, en, ru)',
+                self::DEFAULT_LANGUAGE
             );
     }
 
     /**
-     * Выполняет поиск статьи в RuWiki и выводит первую найденную.
+     * Выполняет поиск статьи в Wikipedia и выводит первую найденную.
      *
      * Последовательность:
-     * 1. Читает и валидирует опцию message.
+     * 1. Читает и валидирует опции message и language.
      * 2. Создаёт менеджер поиска через {@see ArticleSearchFactory}.
-     * 3. Выполняет поиск с лимитом в одну статью.
+     * 3. Выполняет поиск с лимитом в одну статью на источник.
      * 4. Выводит заголовок, URL и очищенный текст первой найденной статьи.
      *
      * @param InputInterface  $input  Ввод (опции команды).
@@ -73,8 +86,11 @@ class RuwikiCommand extends Command
             return Command::FAILURE;
         }
 
+        $language = (string) $input->getOption('language');
+        $language = trim($language) !== '' ? trim($language) : self::DEFAULT_LANGUAGE;
+
         try {
-            $manager = $this->createSearchManager();
+            $manager = $this->createSearchManager($language);
 
             /** @var ArticleContentDto[]|mixed $articles */
             $articles = $manager
@@ -94,16 +110,18 @@ class RuwikiCommand extends Command
     }
 
     /**
-     * Создаёт менеджер поиска статей RuWiki.
+     * Создаёт менеджер поиска статей Wikipedia для указанного языка.
      *
-     * Вынесено в отдельный метод для упрощения тестирования: в юнит‑тестах
-     * можно переопределить его и вернуть тестовый менеджер.
+     * Вынесено в отдельный метод для упрощения тестирования команды:
+     * в юнит-тестах можно переопределить его и вернуть тестовый менеджер.
      *
-     * @return ArticleSearchManager Менеджер поиска статей RuWiki.
+     * @param string $language Код языка Wikipedia.
+     *
+     * @return ArticleSearchManager Менеджер поиска статей.
      */
-    protected function createSearchManager(): ArticleSearchManager
+    protected function createSearchManager(string $language): ArticleSearchManager
     {
-        return ArticleSearchFactory::createRuWikiOnlyManager();
+        return ArticleSearchFactory::createWikipediaOnlyManager($language);
     }
 
     /**
@@ -124,6 +142,7 @@ class RuwikiCommand extends Command
         }
 
         $plainText = $this->convertHtmlToPlainText($article->content);
+        //$plainText = $article->content;
 
         $output->writeln(sprintf('=== %s ===', $article->title));
         $output->writeln(sprintf('Source: %s', $article->sourceUrl));

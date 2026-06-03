@@ -33,7 +33,9 @@
 - доступ к настройкам:
   - `getAll(): array<string,mixed>`;
   - `get(string $key, mixed $default = null): mixed` — поддерживает ключи вида `"context_files.allowed_paths"`;
-  - `isLongTermMindCollectionEnabled(): bool` — читает `mind.collect` из `config.jsonc` (по умолчанию `false`); при `true` подписчик `LongTermMindSubscriber` пишет в `.mind` (см. `docs/mind.md`);
+  - `getMindConfig(): MindConfigDto` (`app\modules\neuron\mind\dto\config`) — блок `mind` из `config.jsonc` (`null` в DTO = параметр не задан);
+  - `isLongTermMindCollectionEnabled(): bool` — `getMindConfig()->resolveCollect(false)`;
+  - effective для шага LLM: `MindConfigDto::resolveEffective(ConfigurationApp $app, ?ConfigurationAgent $agent, ?MindConfigDto $explicit)`; у агента также `ConfigurationAgent::resolveEffectiveMindConfig($app)` (делегирует в DTO, см. `docs/mind.md`);
   - `getLogContext()` — контекст логирования уровня приложения (содержит `session`).
 
 Файл `config.jsonc`:

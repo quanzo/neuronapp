@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\modules\neuron\classes\command;
+namespace app\modules\neuron\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\params\SessionParamsDto;

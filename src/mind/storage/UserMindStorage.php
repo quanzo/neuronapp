@@ -6,6 +6,7 @@ namespace app\modules\neuron\mind\storage;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\interfaces\MindSessionSummaryRefresherInterface;
+use app\modules\neuron\mind\dto\config\MindConfigDto;
 use app\modules\neuron\mind\dto\MindRecordDto;
 use app\modules\neuron\mind\dto\MindSessionMetaDto;
 use app\modules\neuron\mind\dto\MindStorageSummaryRefreshResultDto;
@@ -30,8 +31,8 @@ use function file_exists;
  * $paths = new MindPaths($mindDir, $userId);
  * $mind = new UserMindStorage($paths);
  * $mind->appendMessage($sessionKey, 'user', 'Привет');
- * $mind->refreshSessionSummary(ConfigurationApp::getInstance(), $sessionKey);
- * $result = $mind->refreshAllSessionSummaries(ConfigurationApp::getInstance());
+ * $effective = MindConfigDto::resolveEffective($app, $agentCfg);
+ * $mind->refreshSessionSummary($app, $sessionKey, null, $effective);
  * </code>
  */
 final class UserMindStorage
@@ -82,7 +83,6 @@ final class UserMindStorage
         $store = $this->openSession($sessionKey);
         $id = $store->appendMessage($role, $bodyPlain, $capturedAt);
 
-        // Обновляем индекс (summary заполняется через refreshSessionSummary / подписчик).
         $capturedAt ??= new DateTimeImmutable('now');
         $iso = $capturedAt->format(\DateTimeInterface::ATOM);
 
@@ -98,14 +98,18 @@ final class UserMindStorage
                 ->setSummary('');
             $this->index->upsert($meta);
         } else {
-            $existing
-                ->setStorageKey($storageKey)
-                ->setLastCapturedAt($iso)
-                ->setMessageCount($existing->getMessageCount() + 1);
-            if ($existing->getFirstCapturedAt() === '') {
-                $existing->setFirstCapturedAt($iso);
+            $firstCapturedAt = $existing->getFirstCapturedAt();
+            if ($firstCapturedAt === '') {
+                $firstCapturedAt = $iso;
             }
-            $this->index->upsert($existing);
+            $meta = (new MindSessionMetaDto())
+                ->setSessionKey($sessionKey)
+                ->setStorageKey($storageKey)
+                ->setFirstCapturedAt($firstCapturedAt)
+                ->setLastCapturedAt($iso)
+                ->setMessageCount($existing->getMessageCount() + 1)
+                ->setSummary($existing->getSummary());
+            $this->index->upsert($meta);
         }
 
         return $id;
@@ -124,9 +128,10 @@ final class UserMindStorage
     /**
      * Пересчитывает summary одной сессии через LLM (делегирует {@see MindSessionSummaryService}).
      *
-     * @param ConfigurationApp                        $app        Конфигурация приложения.
-     * @param string                                  $sessionKey Ключ основной сессии.
-     * @param MindSessionSummaryRefresherInterface|null $service  Сервис суммаризации (для тестов).
+     * @param ConfigurationApp                          $app           Конфигурация приложения.
+     * @param string                                    $sessionKey    Ключ основной сессии.
+     * @param MindSessionSummaryRefresherInterface|null $service       Сервис суммаризации (для тестов).
+     * @param MindConfigDto|null                        $effectiveMind Effective mind (null → только app).
      *
      * @return bool true, если summary непустой и изменился относительно значения до вызова.
      */
@@ -134,6 +139,7 @@ final class UserMindStorage
         ConfigurationApp $app,
         string $sessionKey,
         ?MindSessionSummaryRefresherInterface $service = null,
+        ?MindConfigDto $effectiveMind = null,
     ): bool {
         if (MindSummarySessionKeyHelper::isSummarySession($sessionKey)) {
             return false;
@@ -146,31 +152,28 @@ final class UserMindStorage
 
         $summaryBefore = $metaBefore->getSummary();
 
-        ($service ?? new MindSessionSummaryService())->refreshSessionSummary($app, $this, $sessionKey);
+        $effective = $effectiveMind ?? MindConfigDto::resolveEffective($app);
+        $refresher = $service ?? MindSessionSummaryService::fromMindConfig($effective, $app);
 
-        $metaAfter = $this->index->get($sessionKey);
-        if ($metaAfter === null) {
-            return false;
-        }
+        $updated = $this->refreshSessionSummaryWithService($refresher, $sessionKey);
 
-        $summaryAfter = $metaAfter->getSummary();
-
-        return $summaryAfter !== '' && $summaryAfter !== $summaryBefore;
+        return $updated && $summaryBefore !== ($this->index->get($sessionKey)?->getSummary() ?? '');
     }
 
     /**
      * Пересчитывает summary для всех сессий индекса пользователя.
      *
-     * Пропускает служебные sessionKey ({@see MindSummarySessionKeyHelper}) и сессии без сообщений.
-     *
-     * @param ConfigurationApp                        $app     Конфигурация приложения.
-     * @param MindSessionSummaryRefresherInterface|null $service Сервис суммаризации (для тестов).
+     * @param ConfigurationApp                          $app           Конфигурация приложения.
+     * @param MindSessionSummaryRefresherInterface|null $service       Сервис суммаризации (для тестов).
+     * @param MindConfigDto|null                        $effectiveMind Effective mind (null → только app).
      */
     public function refreshAllSessionSummaries(
         ConfigurationApp $app,
         ?MindSessionSummaryRefresherInterface $service = null,
+        ?MindConfigDto $effectiveMind = null,
     ): MindStorageSummaryRefreshResultDto {
-        $service ??= new MindSessionSummaryService();
+        $effective = $effectiveMind ?? MindConfigDto::resolveEffective($app);
+        $refresher = $service ?? MindSessionSummaryService::fromMindConfig($effective, $app);
         $result = new MindStorageSummaryRefreshResultDto();
 
         foreach ($this->index->readAll() as $meta) {
@@ -185,12 +188,40 @@ final class UserMindStorage
             }
 
             $result->incrementAttempted();
-            if ($this->refreshSessionSummary($app, $sessionKey, $service)) {
+            if ($this->refreshSessionSummaryWithService($refresher, $sessionKey)) {
                 $result->incrementUpdated();
             }
         }
 
         return $result;
+    }
+
+    /**
+     * Пересчитывает summary при уже созданном сервисе (без повторного merge конфигурации).
+     *
+     * @return bool true, если summary непустой и изменился.
+     */
+    private function refreshSessionSummaryWithService(
+        MindSessionSummaryRefresherInterface $service,
+        string $sessionKey,
+    ): bool {
+        $metaBefore = $this->index->get($sessionKey);
+        if ($metaBefore === null || $metaBefore->getMessageCount() === 0) {
+            return false;
+        }
+
+        $summaryBefore = $metaBefore->getSummary();
+
+        $service->refreshSessionSummary($this, $sessionKey);
+
+        $metaAfter = $this->index->get($sessionKey);
+        if ($metaAfter === null) {
+            return false;
+        }
+
+        $summaryAfter = $metaAfter->getSummary();
+
+        return $summaryAfter !== '' && $summaryAfter !== $summaryBefore;
     }
 
     /**

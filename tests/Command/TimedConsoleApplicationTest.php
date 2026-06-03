@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Command;
 
-use app\modules\neuron\classes\command\HelloCommand;
+use app\modules\neuron\command\HelloCommand;
 use app\modules\neuron\classes\console\TimedConsoleApplication;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;

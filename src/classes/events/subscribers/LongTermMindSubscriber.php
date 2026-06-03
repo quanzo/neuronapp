@@ -4,27 +4,31 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\events\subscribers;
 
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
 use app\modules\neuron\classes\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\helpers\LlmCycleHelper;
 use app\modules\neuron\helpers\MindMessageBodyExportHelper;
+use app\modules\neuron\mind\dto\config\MindConfigDto;
+use app\modules\neuron\mind\services\MindSessionSummaryService;
 use app\modules\neuron\mind\storage\LegacyUserMindMigrator;
 use app\modules\neuron\mind\storage\MindPaths;
 use app\modules\neuron\mind\helpers\MindSummarySessionKeyHelper;
 use app\modules\neuron\mind\storage\UserMindStorage;
 use DateTimeImmutable;
+use NeuronAI\Chat\Messages\Message as NeuronMessage;
 use Throwable;
 
 /**
  * Подписчик записи завершённых шагов LLM в долговременную память `.mind`.
  *
  * Реагирует на {@see EventNameEnum::AGENT_MESSAGE_COMPLETED}, фильтрует служебные сообщения цикла
- * {@see LlmCycleHelper} и пустые тексты, затем дописывает блоки через {@see UserMindMarkdownStorage}.
- * Если в {@see ConfigurationApp} выключена опция {@see ConfigurationApp::isLongTermMindCollectionEnabled()}
- * (`mind.collect` в `config.jsonc`), запись в `.mind` для всего процесса не выполняется.
- * Если у агента в DTO включено {@see \app\modules\neuron\classes\config\ConfigurationAgent::isExcludeLongTermMind()}
+ * {@see LlmCycleHelper} и пустые тексты, затем дописывает блоки через {@see UserMindStorage}.
+ * Если в effective-конфиге `mind` выключен `collect` ({@see MindConfigDto::resolveCollect()},
+ * merge app + agent с приоритетом агента), запись в `.mind` не выполняется.
+ * Если у агента в DTO включено {@see ConfigurationAgent::isExcludeLongTermMind()}
  * (исполнение Skill/TodoList с `pure_context: true`, LLM-суммаризация сессий), запись в `.mind` не выполняется.
  * Служебные вызовы mind-summary используют отдельный sessionKey ({@see MindSummarySessionKeyHelper});
  * для таких ключей не вызывается {@see UserMindStorage::refreshSessionSummary()} (защита от зацикливания).
@@ -65,17 +69,19 @@ final class LongTermMindSubscriber
                     return;
                 }
 
-                if (!ConfigurationApp::getInstance()->isLongTermMindCollectionEnabled()) {
+                $app = ConfigurationApp::getInstance();
+                $effectiveMind = MindConfigDto::resolveEffective($app, $agent);
+                if (!$effectiveMind->resolveCollect(false)) {
                     return;
                 }
 
                 try {
-                    $mindDir = ConfigurationApp::getInstance()->getMindDir();
+                    $mindDir = $app->getMindDir();
                 } catch (Throwable) {
                     return;
                 }
 
-                $userId = ConfigurationApp::getInstance()->getUserId();
+                $userId = $app->getUserId();
                 $sessionKey = $payload->getSessionKey();
                 if ($sessionKey === '') {
                     $sessionKey = 'unknown';
@@ -94,31 +100,10 @@ final class LongTermMindSubscriber
                 $storage = new UserMindStorage($paths);
                 $wrote = false;
 
-                $user = $payload->getOutgoingMessage();
-                if (
-                    $user !== null
-                    && !LlmCycleHelper::isCycleEmptyMsg($user)
-                    && !LlmCycleHelper::isCycleRequestMsg($user)
-                ) {
-                    $body = trim(MindMessageBodyExportHelper::toStoragePlainBody($user));
-                    if ($body !== '') {
-                        $storage->appendMessage($sessionKey, $user->getRole(), $body, $captured);
-                        $wrote = true;
-                    }
-                }
-
-                $assistant = $payload->getIncomingMessage();
-                if (
-                    $assistant !== null
-                    && !LlmCycleHelper::isCycleEmptyMsg($assistant)
-                    && !LlmCycleHelper::isCycleResponseMsg($assistant)
-                ) {
-                    $body = trim(MindMessageBodyExportHelper::toStoragePlainBody($assistant));
-                    if ($body !== '') {
-                        $storage->appendMessage($sessionKey, $assistant->getRole(), $body, $captured);
-                        $wrote = true;
-                    }
-                }
+                $wrote = self::tryAppendFromPayload($storage, $sessionKey, $payload->getOutgoingMessage(), $captured)
+                    || $wrote;
+                $wrote = self::tryAppendFromPayload($storage, $sessionKey, $payload->getIncomingMessage(), $captured)
+                    || $wrote;
 
                 // Summary пересчитываем не на каждое сообщение, чтобы не создавать лишние LLM-вызовы.
                 // Текущая эвристика:
@@ -130,15 +115,17 @@ final class LongTermMindSubscriber
                     && self::$summaryRefreshDepth === 0
                 ) {
                     $meta = $storage->getSessionsIndex()->get($sessionKey);
-                    $cfgApp = $agent->getConfigurationApp();
                     if ($meta !== null) {
                         $need = $meta->getSummary() === '' || ($meta->getMessageCount() % 10) === 0;
                         if ($need) {
                             ++self::$summaryRefreshDepth;
                             try {
+                                $summaryService = MindSessionSummaryService::fromMindConfig($effectiveMind, $app);
                                 $storage->refreshSessionSummary(
-                                    $cfgApp ?? ConfigurationApp::getInstance(),
+                                    $app,
                                     $sessionKey,
+                                    $summaryService,
+                                    $effectiveMind,
                                 );
                             } finally {
                                 --self::$summaryRefreshDepth;
@@ -151,6 +138,44 @@ final class LongTermMindSubscriber
         );
 
         self::$isRegistered = true;
+    }
+
+    /**
+     * Дописывает одно сообщение в per-session storage, если оно проходит фильтры цикла и непустого тела.
+     *
+     * @param UserMindStorage     $storage    Хранилище пользователя.
+     * @param string              $sessionKey Ключ сессии.
+     * @param NeuronMessage|null  $message    Сообщение LLM или null.
+     * @param DateTimeImmutable   $captured   Время записи.
+     *
+     * @return bool true, если сообщение записано.
+     */
+    private static function tryAppendFromPayload(
+        UserMindStorage $storage,
+        string $sessionKey,
+        ?NeuronMessage $message,
+        DateTimeImmutable $captured,
+    ): bool {
+        if ($message === null) {
+            return false;
+        }
+
+        if (LlmCycleHelper::isCycleEmptyMsg($message)) {
+            return false;
+        }
+
+        if (LlmCycleHelper::isCycleRequestMsg($message) || LlmCycleHelper::isCycleResponseMsg($message)) {
+            return false;
+        }
+
+        $body = trim(MindMessageBodyExportHelper::toStoragePlainBody($message));
+        if ($body === '') {
+            return false;
+        }
+
+        $storage->appendMessage($sessionKey, $message->getRole(), $body, $captured);
+
+        return true;
     }
 
     /**

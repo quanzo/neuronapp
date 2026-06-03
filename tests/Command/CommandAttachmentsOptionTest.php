@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Command;
 
-use app\modules\neuron\classes\command\SimpleMessageCommand;
-use app\modules\neuron\classes\command\TodolistCommand;
+use app\modules\neuron\command\SimpleMessageCommand;
+use app\modules\neuron\command\TodolistCommand;
 use app\modules\neuron\classes\dto\attachments\ImageFileAttachmentDto;
 use app\modules\neuron\classes\dto\attachments\TextFileAttachmentDto;
 use app\modules\neuron\helpers\AttachmentHelper;

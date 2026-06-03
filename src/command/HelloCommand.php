@@ -1,6 +1,6 @@
 <?php
 
-namespace app\modules\neuron\classes\command;
+namespace app\modules\neuron\command;
 
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;

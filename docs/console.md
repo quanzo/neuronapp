@@ -1,6 +1,6 @@
 ## Консольные команды
 
-В проекте используются консольные команды (на базе Symfony Console) для работы с агентами, отправки сообщений и выполнения списков TodoList. Основные команды располагаются в `src/classes/command`.
+В проекте используются консольные команды (на базе Symfony Console) для работы с агентами, отправки сообщений и выполнения списков TodoList. Основные команды располагаются в `src/command`.
 
 ### Общие правила
 
@@ -68,6 +68,32 @@ Source of truth:
 
 - `php bin/console sessions:clear --dry-run`
 - `php bin/console sessions:clear --yes`
+
+### Команда `mind:summary`
+
+Класс: `MindSessionSummaryCommand`.
+
+**Назначение**: принудительно пересчитать LLM-summary одной сессии в `.mind` (поле `summary` в `sessions.md`). Не зависит от эвристики подписчика (пустой summary / каждые 10 сообщений).
+
+Опции:
+
+- `--session_id` (обязательно) — ключ основной сессии (не служебный `:__mind_summary__`);
+- `--agent` (опционально) — имя агента для merge блока `mind` (app + agent).
+
+Требования:
+
+- в effective-конфиге задан `mind.session_summary.agent`;
+- сессия присутствует в индексе `.mind` и `messageCount > 0`.
+
+Примеры:
+
+- `php bin/console mind:summary --session_id 20250301-143022-123456-0`
+- `php bin/console mind:summary --session_id 20250301-143022-123456-0 --agent default`
+
+Типичные ошибки:
+
+- сессия не найдена в `sessions.md` — в `.mind` ещё нет записей (нужен `mind.collect: true` и диалог);
+- пустой summary после вызова — агент-суммаризатор не сконфигурирован или LLM не вернул текст (см. `.logs/<sessionKey>.log`).
 
 ### Команда `simplemessage`
 
@@ -138,7 +164,7 @@ Source of truth:
 - `ConfigurationAgent` для работы с LLM и историей чата;
 - `AttachmentHelper` и `ConsoleHelper` для работы с вложениями и форматированием вывода.
 
-Подробности по каждому такому классу можно посмотреть в `src/classes/command`.
+Подробности по каждому такому классу можно посмотреть в `src/command`.
 
 ### Команда `orchestrate`
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Command;
 
-use app\modules\neuron\classes\command\TodolistCommand;
+use app\modules\neuron\command\TodolistCommand;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\dto\run\RunStateDto;
@@ -21,7 +21,7 @@ use Symfony\Component\Console\Output\BufferedOutput;
  * незавершённого run в неинтерактивном режиме команда завершается с FAILURE
  * и выводит сообщение с подсказкой указать --resume или --abort.
  *
- * Тестируемая сущность: {@see \app\modules\neuron\classes\command\TodolistCommand}
+ * Тестируемая сущность: {@see \app\modules\neuron\command\TodolistCommand}
  */
 class TodolistCommandUnfinishedCheckpointTest extends TestCase
 {

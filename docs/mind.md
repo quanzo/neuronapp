@@ -4,6 +4,11 @@
 
 Начиная с версии **per-session** формат изменён: вместо одного файла на пользователя создаётся **отдельное хранилище на каждую сессию**. Это даёт агентам возможность точнее выбирать релевантный контекст (например, найти факт из ранней сессии и применить его в поздней).
 
+### DTO модуля
+
+- `src/mind/dto/config/` — конфигурация (`MindConfigDto`, `MindSessionSummaryConfigDto`);
+- `src/mind/dto/` — данные хранения и операций (`MindRecordDto`, `MindSessionMetaDto`, `MindStorageSummaryRefreshResultDto`, …).
+
 ## Расположение
 
 - Путь: `ConfigurationApp::getMindDir()` → подкаталог `.mind` в одной из баз `DirPriority`.
@@ -88,7 +93,7 @@ Legacy класс `UserMindMarkdownStorage` (`src/classes/storage/UserMindMarkdo
 - DTO: `AgentMessageEventDto` — `outgoingMessage` (отправленное в агент), `incomingMessage` (ответ ассистента как `NeuronMessage`, если есть: из `chat()` или последнее assistant-сообщение из истории после `structured()`), плюс `attachmentsCount`, `structured`, `durationSeconds`, базовые поля `BaseEventDto`.
 - Публикация: `ConfigurationAgent::dispatchMessageToAgent()` после успешного `performAgentRequest()` (включая structured и обычный `chat()`), а также после успешного wait-cycle без исключения (в этом случае `incomingMessage` может быть null).
 - Идентификатор пользователя для файлов `.mind` берётся из `ConfigurationApp::getUserId()` внутри подписчика.
-- Глобально сбор в `.mind` включается в `config.jsonc`: `mind.collect: true` (или `"mind": { "collect": true }`). По умолчанию (`mind.collect` отсутствует) сбор **выключен** — `ConfigurationApp::isLongTermMindCollectionEnabled()` возвращает `false`, подписчик не пишет в storage.
+- Сбор в `.mind` включается через `mind.collect: true` в app и/или agent config. По умолчанию на уровне app сбор **выключен** (`MindConfigDto::resolveCollect(false)`). Подписчик проверяет **effective** mind (merge app + agent).
 - Если у `AgentMessageEventDto::getAgent()` выставлено `ConfigurationAgent::isExcludeLongTermMind() === true`, подписчик **полностью пропускает** запись (используется при исполнении Skill/TodoList с опцией `pure_context: true`, см. `docs/skills.md`, `docs/todolist.md`).
 - `LongTermMindSubscriber` не пишет сообщения, распознанные как служебные циклом `LlmCycleHelper` (`isCycleEmptyMsg`, `isCycleRequestMsg`, `isCycleResponseMsg`), и не пишет пустой текст после нормализации тела.
 
@@ -110,11 +115,16 @@ Legacy класс `UserMindMarkdownStorage` (`src/classes/storage/UserMindMarkdo
 
 В индексе `sessions.md` поле `summary` может заполняться автоматически через LLM-агента.
 
-Конфигурация в `config.jsonc`:
+Конфигурация задаётся блоком `mind` в `config.jsonc` и опционально в PHP-конфиге агента (`agents/*.php`). Типизированный вид — [`MindConfigDto`](src/mind/dto/config/MindConfigDto.php) и вложенный [`MindSessionSummaryConfigDto`](src/mind/dto/config/MindSessionSummaryConfigDto.php) (каталог `src/mind/dto/config/`).
+
+В DTO поле со значением `null` означает «не задано в конфигурации». Эффективные настройки для шага LLM: `MindConfigDto::resolveEffective($app, $agent)` (или обёртка `ConfigurationAgent::resolveEffectiveMindConfig($app)`) — merge app + agent, **non-null поля агента перекрывают app**; готовый effective можно передать третьим аргументом `$explicit`.
+
+`config.jsonc`:
 
 ```jsonc
 {
   "mind": {
+    "collect": true,
     "session_summary": {
       "agent": "my_summarizer_agent",
       "max_summary_chars": 300,
@@ -124,26 +134,38 @@ Legacy класс `UserMindMarkdownStorage` (`src/classes/storage/UserMindMarkdo
 }
 ```
 
-- если `mind.session_summary.agent` не задан — summary остаётся пустым;
-- для ограничения контекста используется тримминг истории по токенам.
+Переопределение в агенте (пример):
+
+```php
+'mind' => [
+    'collect' => true,
+    'session_summary' => [
+        'agent' => 'my_summarizer_agent',
+        'max_summary_chars' => 200,
+    ],
+],
+```
+
+- `mind.collect` по умолчанию на уровне app — `false`; для записи в `.mind` задайте `collect: true` (app или agent);
+- если после merge `session_summary.agent` не задан — summary остаётся пустым;
+- [`MindSessionSummaryService`](src/mind/services/MindSessionSummaryService.php) получает effective `MindConfigDto` в конструкторе.
 
 ### API суммаризации (`UserMindStorage`)
-
-Запуск LLM-summary вынесен в [`UserMindStorage`](src/mind/storage/UserMindStorage.php) (внутри — [`MindSessionSummaryService`](src/mind/services/MindSessionSummaryService.php)):
 
 ```php
 $paths = new MindPaths($app->getMindDir(), $app->getUserId());
 $mind = new UserMindStorage($paths);
+$effective = MindConfigDto::resolveEffective($app, $agentCfg);
 
-// Одна сессия: true, если summary непустой и изменился
-$updated = $mind->refreshSessionSummary($app, $sessionKey);
+$service = MindSessionSummaryService::fromMindConfig($effective, $app);
+$updated = $mind->refreshSessionSummary($app, $sessionKey, $service, $effective);
 
-// Все сессии индекса (пропуск служебных ключей и пустых)
-$result = $mind->refreshAllSessionSummaries($app);
-// $result->getAttempted(), getUpdated(), getSkipped()
+$result = $mind->refreshAllSessionSummaries($app, $service, $effective);
 ```
 
-Автоматически при записи сообщений: `LongTermMindSubscriber` вызывает `refreshSessionSummary` по эвристике (пустой summary или каждые 10 сообщений).
+Автоматически при записи сообщений: `LongTermMindSubscriber` использует effective mind (collect + refresh) с приоритетом конфига агента.
+
+**CLI:** `php bin/console mind:summary --session_id <sessionKey>` ([`MindSessionSummaryCommand`](../src/command/MindSessionSummaryCommand.php)) — принудительный пересчёт summary для одной сессии; опционально `--agent` для merge конфига. См. `docs/console.md`.
 
 ### Защита от зацикливания (mind-summary)
 

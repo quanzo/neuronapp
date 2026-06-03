@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Command;
 
-use app\modules\neuron\classes\command\RuwikiCommand;
-use app\modules\neuron\classes\command\WikiCommand;
+use app\modules\neuron\command\RuwikiCommand;
+use app\modules\neuron\command\WikiCommand;
 use app\modules\neuron\classes\dto\wiki\ArticleContentDto;
 use app\modules\neuron\classes\search\wiki\ArticleSearchManager;
 use app\modules\neuron\enums\ContentSourceType;

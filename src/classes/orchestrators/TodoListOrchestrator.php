@@ -360,7 +360,7 @@ class TodoListOrchestrator
     /**
      * Вычисляет индекс первого todo и при необходимости откатывает историю чата для resume.
      *
-     * Логика согласована с {@see \app\modules\neuron\classes\command\TodolistCommand}
+     * Логика согласована с {@see \app\modules\neuron\command\TodolistCommand}
      * (ветка `--resume`): чекпоинт один на сессию (`RunStateDto::DEF_AGENT_NAME`), поле
      * `todolist_name` должно совпадать с исполняемым списком, иначе resume не применяется
      * (типичный случай — после успешного `init` чекпоинт удалён, перед `step` файла нет).

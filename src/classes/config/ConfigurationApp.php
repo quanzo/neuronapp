@@ -28,6 +28,7 @@ use app\modules\neuron\helpers\CommentsHelper;
 use app\modules\neuron\helpers\JsonHelper;
 use app\modules\neuron\helpers\OptionsHelper;
 use app\modules\neuron\helpers\SessionKeyHelper;
+use app\modules\neuron\mind\dto\config\MindConfigDto;
 use app\modules\neuron\helpers\StorageFileHelper;
 use app\modules\neuron\traits\LoggerAwareContextualTrait;
 use app\modules\neuron\traits\LoggerAwareTrait;
@@ -99,6 +100,9 @@ class ConfigurationApp
 
     /** Сервис защиты исходящих сообщений LLM (лениво инициализируется). */
     private ?OutputSafe $outputSafe = null;
+
+    /** Кэш DTO блока `mind` из config.jsonc. */
+    private ?MindConfigDto $mindConfigDto = null;
 
     /**
      * Базовый ключ сессии (временна́я часть без имени агента).
@@ -337,7 +341,22 @@ class ConfigurationApp
      */
     public function isLongTermMindCollectionEnabled(): bool
     {
-        return OptionsHelper::toBool($this->get('mind.collect', false));
+        return $this->getMindConfig()->resolveCollect(false);
+    }
+
+    /**
+     * Возвращает DTO настроек долговременной памяти `.mind` из config.jsonc.
+     *
+     * Поля со значением null в DTO означают, что параметр не задан на уровне приложения.
+     * Для эффективных настроек агента используйте {@see ConfigurationAgent::resolveEffectiveMindConfig()}.
+     */
+    public function getMindConfig(): MindConfigDto
+    {
+        if ($this->mindConfigDto === null) {
+            $this->mindConfigDto = MindConfigDto::fromConfigurationApp($this);
+        }
+
+        return $this->mindConfigDto;
     }
 
     /**
@@ -945,6 +964,7 @@ class ConfigurationApp
         if ($this->configPath === null) {
             // Файл не найден в приоритетных директориях — используем настройки по умолчанию.
             $this->config = [];
+            $this->mindConfigDto = null;
 
             return;
         }
@@ -958,5 +978,6 @@ class ConfigurationApp
         $cleanJson = CommentsHelper::stripComments($contents);
 
         $this->config = JsonHelper::decodeAssociativeForConfigFile($cleanJson, $this->configPath);
+        $this->mindConfigDto = null;
     }
 }
