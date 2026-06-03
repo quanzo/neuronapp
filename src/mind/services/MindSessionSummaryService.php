@@ -8,6 +8,7 @@ use app\modules\neuron\interfaces\MindSessionSummaryRefresherInterface;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\neuron\trimmers\ConfigurationAgentHistoryHeadSummarizer;
+use app\modules\neuron\mind\interfaces\MindSessionSummarySummarizerInterface;
 use app\modules\neuron\classes\neuron\trimmers\FluidContextWindowTrimmer;
 use app\modules\neuron\classes\neuron\trimmers\TokenCounter;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
@@ -38,13 +39,30 @@ use function trim;
 final class MindSessionSummaryService implements MindSessionSummaryRefresherInterface
 {
     /**
-     * @param MindConfigDto                  $mindConfig         Effective-конфиг mind.
-     * @param ConfigurationAgent|null $summarizerTemplate Агент-суммаризатор или null.
+     * @param MindConfigDto                           $mindConfig         Effective-конфиг mind.
+     * @param ConfigurationAgent|null                 $summarizerTemplate Агент-суммаризатор или null.
+     * @param MindSessionSummarySummarizerInterface|null $injectedSummarizer Подмена summarizer (тесты).
      */
     private function __construct(
         private readonly MindConfigDto $mindConfig,
         private readonly ?ConfigurationAgent $summarizerTemplate,
+        private readonly ?MindSessionSummarySummarizerInterface $injectedSummarizer = null,
     ) {
+    }
+
+    /**
+     * Создаёт сервис с подменой summarizer (для unit-тестов).
+     *
+     * @param MindConfigDto                         $mindConfig         Effective mind.
+     * @param ConfigurationAgent                    $summarizerTemplate Агент-суммаризатор.
+     * @param MindSessionSummarySummarizerInterface $summarizer         Тестовый double.
+     */
+    public static function forTest(
+        MindConfigDto $mindConfig,
+        ConfigurationAgent $summarizerTemplate,
+        MindSessionSummarySummarizerInterface $summarizer,
+    ): self {
+        return new self($mindConfig, $summarizerTemplate, $summarizer);
     }
 
     /**
@@ -111,11 +129,14 @@ final class MindSessionSummaryService implements MindSessionSummaryRefresherInte
         // ограничение на кол-во символов в результате
         $maxChars = $summaryCfg->resolveMaxSummaryChars();
 
+        $previousSummary = trim($meta->getSummary());
+        $previousSummary = $previousSummary !== '' ? $previousSummary : null;
+
         $agent->setExcludeLongTermMind(true);
         $agent->setSessionKey(MindSummarySessionKeyHelper::forMainSession($sessionKey));
 
-        $summarizer = new ConfigurationAgentHistoryHeadSummarizer($agent);
-        $summaryMsg = $summarizer->summarize($windowMessages, $contextWindow, $maxChars);
+        $summarizer = $this->injectedSummarizer ?? new ConfigurationAgentHistoryHeadSummarizer($agent);
+        $summaryMsg = $summarizer->summarize($windowMessages, $contextWindow, $maxChars, $previousSummary);
         if ($summaryMsg === null) {
             return;
         }

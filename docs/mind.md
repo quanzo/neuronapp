@@ -150,6 +150,17 @@ Legacy класс `UserMindMarkdownStorage` (`src/classes/storage/UserMindMarkdo
 - если после merge `session_summary.agent` не задан — summary остаётся пустым;
 - [`MindSessionSummaryService`](src/mind/services/MindSessionSummaryService.php) получает effective `MindConfigDto` в конструкторе.
 
+### Инкрементальное обновление summary
+
+При пересчёте summary (подписчик, `UserMindStorage::refreshSessionSummary`, CLI `mind:summary`) сервис читает текущее значение поля `summary` из индекса `sessions.md`. Если оно непустое, оно передаётся в промпт LLM как блок `PREVIOUS_SUMMARY` с задачей **merge**: сохранить важные факты из старого резюме, дополнить и уточнить по новому транскрипту, не дублировать формулировки. Если summary ещё не было — выполняется первичная свёртка транскрипта (как раньше).
+
+Сборка user-промпта: [`MindSessionSummaryPromptHelper`](src/mind/helpers/MindSessionSummaryPromptHelper.php); вызов LLM — [`ConfigurationAgentHistoryHeadSummarizer`](src/classes/neuron/trimmers/ConfigurationAgentHistoryHeadSummarizer.php) (опциональный 4-й аргумент `previousSummary`).
+
+Ограничения без изменений:
+
+- в промпт попадает только **хвост** истории сессии (`transcript_ratio` × `contextWindow` суммаризатора), не полный лог;
+- длина записанного summary ограничивается `max_summary_chars` (предыдущее summary при записи уже укладывалось в этот лимит).
+
 ### API суммаризации (`UserMindStorage`)
 
 ```php

@@ -6,6 +6,8 @@ namespace app\modules\neuron\classes\neuron\trimmers;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
+use app\modules\neuron\mind\helpers\MindSessionSummaryPromptHelper;
+use app\modules\neuron\mind\interfaces\MindSessionSummarySummarizerInterface;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\ContentBlocks\FileContent;
 use NeuronAI\Chat\Messages\ContentBlocks\ImageContent;
@@ -39,7 +41,7 @@ use function trim;
  * $summary = $summarizer->summarize($headMessages, $contextWindow);
  * </code>
  */
-final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummarizerInterface
+final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummarizerInterface, MindSessionSummarySummarizerInterface
 {
     /**
      * Маркер, подставляемый вместо бинарного/медиа контента.
@@ -105,16 +107,20 @@ final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummar
     /**
      * {@inheritdoc}
      */
-    public function summarize(array $headMessages, int $contextWindow, ?int $maxChars = null): ?Message
-    {
+    public function summarize(
+        array $headMessages,
+        int $contextWindow,
+        ?int $maxChars = null,
+        ?string $previousSummary = null,
+    ): ?Message {
         if ($headMessages === [] || $contextWindow <= 0) {
             return null;
         }
 
         // максимальное кол-во слов
         $maxWords = 200;
-        if ($maxChars > 0) {
-            $maxWords = (int)round($maxChars / 10);
+        if ($maxChars !== null && $maxChars > 0) {
+            $maxWords = (int)round($maxChars / 16);
         }
 
         $transcript = $this->buildTranscript($headMessages);
@@ -122,7 +128,7 @@ final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummar
             return null;
         }
 
-        $summaryText = $this->summarizeViaAgent($transcript, $maxWords);
+        $summaryText = $this->summarizeViaAgent($transcript, $maxWords, $previousSummary);
         $summaryText = trim($summaryText);
         if ($summaryText === '') {
             return null;
@@ -138,7 +144,7 @@ final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummar
     /**
      * Генерирует summary через клон {@see ConfigurationAgent}.
      */
-    private function summarizeViaAgent(string $transcript, $countWord = 100): string
+    private function summarizeViaAgent(string $transcript, int $countWord = 100, ?string $previousSummary = null): string
     {
         $clone = $this->agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY);
         if ($this->agentCfg->isExcludeLongTermMind()) {
@@ -149,22 +155,8 @@ final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummar
         $clone->tools        = [];
         $clone->toolMaxTries = 0;
         $clone->instructions = self::buildSummarizerInstructions();
-        $transcript          = trim($transcript);
 
-        $text = <<<TEXT
-            # STRICTLY
-            - The maximum word count in the result is __{$countWord}__ word
-            
-            # TASK
-            Collapse the story into a summary
-
-            #TRANSCRIPT
-
-            ```
-            $transcript
-            ```
-        TEXT;
-
+        $text = MindSessionSummaryPromptHelper::buildUserPrompt($transcript, $previousSummary, $countWord);
 
         $userMsg = new Message(
             MessageRole::USER,
