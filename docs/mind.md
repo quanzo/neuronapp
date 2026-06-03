@@ -165,7 +165,7 @@ $result = $mind->refreshAllSessionSummaries($app, $service, $effective);
 
 Автоматически при записи сообщений: `LongTermMindSubscriber` использует effective mind (collect + refresh) с приоритетом конфига агента.
 
-**CLI:** `php bin/console mind:summary --session_id <sessionKey>` ([`MindSessionSummaryCommand`](../src/command/MindSessionSummaryCommand.php)) — принудительный пересчёт summary для одной сессии; опционально `--agent` для merge конфига. См. `docs/console.md`.
+**CLI:** `php bin/console mind:summary --session_id <sessionKey> --agent <summarizer>` ([`MindSessionSummaryCommand`](../src/command/MindSessionSummaryCommand.php)) — принудительный пересчёт summary; блок `mind` в app config не нужен; опционально `--max-summary-chars`, `--transcript-ratio`. Автоматический подписчик по-прежнему использует `MindConfigDto::resolveEffective` из config. См. `docs/console.md`.
 
 ### Защита от зацикливания (mind-summary)
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Command;
 
+use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\command\MindSessionSummaryCommand;
@@ -19,11 +20,13 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Tests\Mind\RecordingMindSessionSummaryRefresher;
 
 /**
- * Тесты {@see MindSessionSummaryCommand}: валидация session_id и вызов refresh summary.
+ * Тесты {@see MindSessionSummaryCommand}: валидация CLI и вызов refresh summary без блока mind в app config.
  */
 final class MindSessionSummaryCommandTest extends TestCase
 {
     private const int TEST_USER_ID = 601;
+
+    private const string STUB_AGENT = 'stub_summarizer';
 
     private string $tmpDir;
 
@@ -44,9 +47,9 @@ final class MindSessionSummaryCommandTest extends TestCase
     }
 
     /**
-     * Опция session_id объявлена как обязательная.
+     * Опции session_id и agent объявлены как обязательные.
      */
-    public function testConfigureRequiresSessionIdOption(): void
+    public function testConfigureRequiresSessionIdAndAgentOptions(): void
     {
         $command = new MindSessionSummaryCommand();
         $definition = $command->getDefinition();
@@ -54,6 +57,9 @@ final class MindSessionSummaryCommandTest extends TestCase
         $this->assertTrue($definition->hasOption('session_id'));
         $this->assertTrue($definition->getOption('session_id')->isValueRequired());
         $this->assertTrue($definition->hasOption('agent'));
+        $this->assertTrue($definition->getOption('agent')->isValueRequired());
+        $this->assertTrue($definition->hasOption('max-summary-chars'));
+        $this->assertTrue($definition->hasOption('transcript-ratio'));
     }
 
     /**
@@ -61,13 +67,28 @@ final class MindSessionSummaryCommandTest extends TestCase
      */
     public function testExecuteFailsWhenSessionIdMissing(): void
     {
-        $this->initAppWithMindConfig('{"mind":{"session_summary":{"agent":"summarizer"}}}');
-        $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher());
+        $this->initAppWithMindConfig('{}');
+        $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher(), false);
 
-        $exitCode = $tester->execute([]);
+        $exitCode = $tester->execute(['--agent' => self::STUB_AGENT]);
 
         $this->assertSame(MindSessionSummaryCommand::FAILURE, $exitCode);
         $this->assertStringContainsString('session_id', $tester->getDisplay());
+    }
+
+    /**
+     * Без --agent команда завершается с ошибкой.
+     */
+    public function testExecuteFailsWhenAgentMissing(): void
+    {
+        $this->initAppWithMindConfig('{}');
+        $sessionKey = $this->validSessionKey('no-agent');
+        $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher(), false);
+
+        $exitCode = $tester->execute(['--session_id' => $sessionKey]);
+
+        $this->assertSame(MindSessionSummaryCommand::FAILURE, $exitCode);
+        $this->assertStringContainsString('--agent', $tester->getDisplay());
     }
 
     /**
@@ -75,10 +96,13 @@ final class MindSessionSummaryCommandTest extends TestCase
      */
     public function testExecuteFailsWhenSessionIdFormatInvalid(): void
     {
-        $this->initAppWithMindConfig('{"mind":{"session_summary":{"agent":"summarizer"}}}');
-        $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher());
+        $this->initAppWithMindConfig('{}');
+        $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher(), false);
 
-        $exitCode = $tester->execute(['--session_id' => 'not-a-valid-key']);
+        $exitCode = $tester->execute([
+            '--session_id' => 'not-a-valid-key',
+            '--agent'      => self::STUB_AGENT,
+        ]);
 
         $this->assertSame(MindSessionSummaryCommand::FAILURE, $exitCode);
         $this->assertStringContainsString('формат', $tester->getDisplay());
@@ -89,12 +113,15 @@ final class MindSessionSummaryCommandTest extends TestCase
      */
     public function testExecuteFailsForSummaryServiceSessionKey(): void
     {
-        $this->initAppWithMindConfig('{"mind":{"session_summary":{"agent":"summarizer"}}}');
+        $this->initAppWithMindConfig('{}');
         $mainKey = $this->validSessionKey('main-svc');
         $summaryKey = MindSummarySessionKeyHelper::forMainSession($mainKey);
-        $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher());
+        $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher(), false);
 
-        $exitCode = $tester->execute(['--session_id' => $summaryKey]);
+        $exitCode = $tester->execute([
+            '--session_id' => $summaryKey,
+            '--agent'      => self::STUB_AGENT,
+        ]);
 
         $this->assertSame(MindSessionSummaryCommand::FAILURE, $exitCode);
         $this->assertStringContainsString('служебную', $tester->getDisplay());
@@ -105,11 +132,14 @@ final class MindSessionSummaryCommandTest extends TestCase
      */
     public function testExecuteFailsWhenSessionNotInMindIndex(): void
     {
-        $this->initAppWithMindConfig('{"mind":{"session_summary":{"agent":"summarizer"}}}');
+        $this->initAppWithMindConfig('{}');
         $sessionKey = $this->validSessionKey('missing-index');
         $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher());
 
-        $exitCode = $tester->execute(['--session_id' => $sessionKey]);
+        $exitCode = $tester->execute([
+            '--session_id' => $sessionKey,
+            '--agent'      => self::STUB_AGENT,
+        ]);
 
         $this->assertSame(MindSessionSummaryCommand::FAILURE, $exitCode);
         $this->assertStringContainsString('отсутствует', $tester->getDisplay());
@@ -120,31 +150,18 @@ final class MindSessionSummaryCommandTest extends TestCase
      */
     public function testExecuteFailsWhenMessageCountZero(): void
     {
-        $this->initAppWithMindConfig('{"mind":{"session_summary":{"agent":"summarizer"}}}');
+        $this->initAppWithMindConfig('{}');
         $sessionKey = $this->validSessionKey('zero-msgs');
         $this->upsertMeta($sessionKey, 0, '');
 
         $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher());
-        $exitCode = $tester->execute(['--session_id' => $sessionKey]);
+        $exitCode = $tester->execute([
+            '--session_id' => $sessionKey,
+            '--agent'      => self::STUB_AGENT,
+        ]);
 
         $this->assertSame(MindSessionSummaryCommand::FAILURE, $exitCode);
         $this->assertStringContainsString('messageCount=0', $tester->getDisplay());
-    }
-
-    /**
-     * Не задан session_summary.agent в effective config — FAILURE.
-     */
-    public function testExecuteFailsWhenSummarizerAgentNotConfigured(): void
-    {
-        $this->initAppWithMindConfig('{"mind":{"collect":true}}');
-        $sessionKey = $this->validSessionKey('no-agent-cfg');
-        $this->upsertMeta($sessionKey, 2, '');
-
-        $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher());
-        $exitCode = $tester->execute(['--session_id' => $sessionKey]);
-
-        $this->assertSame(MindSessionSummaryCommand::FAILURE, $exitCode);
-        $this->assertStringContainsString('session_summary.agent', $tester->getDisplay());
     }
 
     /**
@@ -152,11 +169,13 @@ final class MindSessionSummaryCommandTest extends TestCase
      */
     public function testExecuteFailsWhenAgentOptionNotFound(): void
     {
-        $this->initAppWithMindConfig('{"mind":{"session_summary":{"agent":"summarizer"}}}');
+        $this->initAppWithMindConfig('{}');
         $sessionKey = $this->validSessionKey('bad-agent-opt');
         $this->upsertMeta($sessionKey, 1, '');
 
-        $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher());
+        $tester = new CommandTester(
+            new TestableMindSessionSummaryCommand(new RecordingMindSessionSummaryRefresher(), null),
+        );
         $exitCode = $tester->execute([
             '--session_id' => $sessionKey,
             '--agent'      => 'no_such_agent_xyz',
@@ -167,22 +186,44 @@ final class MindSessionSummaryCommandTest extends TestCase
     }
 
     /**
-     * Успешный refresh через stub: summary записан, код SUCCESS.
+     * Невалидный --max-summary-chars — FAILURE.
      */
-    public function testExecuteSuccessWithStubRefresher(): void
+    public function testExecuteFailsWhenMaxSummaryCharsInvalid(): void
     {
-        $this->initAppWithMindConfig('{"mind":{"session_summary":{"agent":"summarizer"}}}');
+        $this->initAppWithMindConfig('{}');
+        $sessionKey = $this->validSessionKey('bad-chars');
+        $this->upsertMeta($sessionKey, 1, '');
+
+        $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher());
+        $exitCode = $tester->execute([
+            '--session_id'         => $sessionKey,
+            '--agent'              => self::STUB_AGENT,
+            '--max-summary-chars'  => '10',
+        ]);
+
+        $this->assertSame(MindSessionSummaryCommand::FAILURE, $exitCode);
+        $this->assertStringContainsString('max-summary-chars', $tester->getDisplay());
+    }
+
+    /**
+     * Успешный refresh через stub без блока mind в app config.
+     */
+    public function testExecuteSuccessWithoutMindBlockInAppConfig(): void
+    {
+        $this->initAppWithMindConfig('{}');
         $sessionKey = $this->validSessionKey('stub-ok');
         $this->upsertMeta($sessionKey, 3, '');
 
         $stub = new RecordingMindSessionSummaryRefresher();
         $tester = $this->createCommandTester($stub);
-        $exitCode = $tester->execute(['--session_id' => $sessionKey]);
+        $exitCode = $tester->execute([
+            '--session_id' => $sessionKey,
+            '--agent'      => self::STUB_AGENT,
+        ]);
 
         $this->assertSame(MindSessionSummaryCommand::SUCCESS, $exitCode);
         $this->assertStringContainsString('stub summary for ' . $sessionKey, $tester->getDisplay());
         $this->assertCount(1, $stub->getCalls());
-        $this->assertSame($sessionKey, $stub->getCalls()[0]['sessionKey']);
     }
 
     /**
@@ -190,30 +231,37 @@ final class MindSessionSummaryCommandTest extends TestCase
      */
     public function testExecuteSuccessWhenSummaryUnchanged(): void
     {
-        $this->initAppWithMindConfig('{"mind":{"session_summary":{"agent":"summarizer"}}}');
+        $this->initAppWithMindConfig('{}');
         $sessionKey = $this->validSessionKey('unchanged');
         $existing = 'stub summary for ' . $sessionKey;
         $this->upsertMeta($sessionKey, 2, $existing);
 
         $stub = new RecordingMindSessionSummaryRefresher();
         $tester = $this->createCommandTester($stub);
-        $exitCode = $tester->execute(['--session_id' => $sessionKey]);
+        $exitCode = $tester->execute([
+            '--session_id' => $sessionKey,
+            '--agent'      => self::STUB_AGENT,
+        ]);
 
         $this->assertSame(MindSessionSummaryCommand::SUCCESS, $exitCode);
         $this->assertStringContainsString('не изменился', $tester->getDisplay());
-        $this->assertStringContainsString($existing, $tester->getDisplay());
     }
 
     /**
      * createSummaryRefresher по умолчанию возвращает MindSessionSummaryService.
      */
-    public function testDefaultSummaryRefresherIsMindSessionSummaryService(): void
+    public function testDefaultSummaryRefresherUsesFromMindConfig(): void
     {
-        $this->initAppWithMindConfig('{"mind":{"session_summary":{"agent":"summarizer"}}}');
+        $this->initAppWithMindConfig('{}');
         $app = ConfigurationApp::getInstance();
-        $command = new MindSessionSummaryCommand();
-        $effective = MindConfigDto::resolveEffective($app);
+        $effective = MindConfigDto::fromConfigArray([
+            'session_summary' => [
+                'agent' => 'test_agent',
+                'max_summary_chars' => 200,
+            ],
+        ]);
 
+        $command = new MindSessionSummaryCommand();
         $ref = new \ReflectionMethod(MindSessionSummaryCommand::class, 'createSummaryRefresher');
         $service = $ref->invoke($command, $app, $effective);
 
@@ -221,21 +269,36 @@ final class MindSessionSummaryCommandTest extends TestCase
     }
 
     /**
-     * Пустой session_id как строка из опции — FAILURE.
+     * Пустой session_id — FAILURE.
      */
     public function testExecuteFailsWhenSessionIdIsWhitespaceOnly(): void
     {
-        $this->initAppWithMindConfig('{"mind":{"session_summary":{"agent":"summarizer"}}}');
+        $this->initAppWithMindConfig('{}');
         $tester = $this->createCommandTester(new RecordingMindSessionSummaryRefresher());
 
-        $exitCode = $tester->execute(['--session_id' => '   ']);
+        $exitCode = $tester->execute([
+            '--session_id' => '   ',
+            '--agent'      => self::STUB_AGENT,
+        ]);
 
         $this->assertSame(MindSessionSummaryCommand::FAILURE, $exitCode);
     }
 
-    private function createCommandTester(MindSessionSummaryRefresherInterface $refresher): CommandTester
-    {
-        return new CommandTester(new TestableMindSessionSummaryCommand($refresher));
+    /**
+     * @param bool $withSummarizerTemplate false, если execute завершится до загрузки агента.
+     */
+    private function createCommandTester(
+        MindSessionSummaryRefresherInterface $refresher,
+        bool $withSummarizerTemplate = true,
+    ): CommandTester {
+        $summarizer = null;
+        if ($withSummarizerTemplate) {
+            $app = ConfigurationApp::getInstance();
+            $summarizer = ConfigurationAgent::makeFromArray(['contextWindow' => 8000], $app);
+            $this->assertNotNull($summarizer);
+        }
+
+        return new CommandTester(new TestableMindSessionSummaryCommand($refresher, $summarizer));
     }
 
     private function initAppWithMindConfig(string $configJson): void

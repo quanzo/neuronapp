@@ -73,27 +73,29 @@ Source of truth:
 
 Класс: `MindSessionSummaryCommand`.
 
-**Назначение**: принудительно пересчитать LLM-summary одной сессии в `.mind` (поле `summary` в `sessions.md`). Не зависит от эвристики подписчика (пустой summary / каждые 10 сообщений).
+**Назначение**: принудительно пересчитать LLM-summary одной сессии в `.mind` (поле `summary` в `sessions.md`). Не зависит от эвристики подписчика (пустой summary / каждые 10 сообщений). **Блок `mind` в `config.jsonc` не обязателен** — агент и параметры summary задаются в CLI.
 
 Опции:
 
 - `--session_id` (обязательно) — ключ основной сессии (не служебный `:__mind_summary__`);
-- `--agent` (опционально) — имя агента для merge блока `mind` (app + agent).
+- `--agent` (обязательно) — имя агента-суммаризатора (`agents/*.php`, например `my_summarizer_agent`);
+- `--max-summary-chars` (опционально) — лимит длины summary в индексе (≥ 50; иначе 300);
+- `--transcript-ratio` (опционально) — доля окна агента под транскрипт (0.05–0.5; иначе 0.25).
 
 Требования:
 
-- в effective-конфиге задан `mind.session_summary.agent`;
+- агент `--agent` существует в каталоге агентов приложения;
 - сессия присутствует в индексе `.mind` и `messageCount > 0`.
 
 Примеры:
 
-- `php bin/console mind:summary --session_id 20250301-143022-123456-0`
-- `php bin/console mind:summary --session_id 20250301-143022-123456-0 --agent default`
+- `php bin/console mind:summary --session_id 20250301-143022-123456-0 --agent my_summarizer_agent`
+- `php bin/console mind:summary --session_id 20250301-143022-123456-0 --agent my_summarizer_agent --max-summary-chars 400 --transcript-ratio 0.3`
 
 Типичные ошибки:
 
-- сессия не найдена в `sessions.md` — в `.mind` ещё нет записей (нужен `mind.collect: true` и диалог);
-- пустой summary после вызова — агент-суммаризатор не сконфигурирован или LLM не вернул текст (см. `.logs/<sessionKey>.log`).
+- сессия не найдена в `sessions.md` — в `.mind` ещё нет записей для этой сессии;
+- пустой summary после вызова — LLM не вернул текст (см. `.logs/<sessionKey>.log`).
 
 ### Команда `simplemessage`
 

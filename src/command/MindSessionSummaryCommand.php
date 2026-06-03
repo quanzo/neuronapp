@@ -8,10 +8,12 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\interfaces\MindSessionSummaryRefresherInterface;
 use app\modules\neuron\mind\dto\config\MindConfigDto;
+use app\modules\neuron\mind\helpers\MindSessionSummaryCliConfigHelper;
 use app\modules\neuron\mind\helpers\MindSummarySessionKeyHelper;
 use app\modules\neuron\mind\services\MindSessionSummaryService;
 use app\modules\neuron\mind\storage\MindPaths;
 use app\modules\neuron\mind\storage\UserMindStorage;
+use InvalidArgumentException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -20,14 +22,15 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * Консольная команда принудительного пересчёта LLM-summary сессии в `.mind`.
  *
- * Записывает или обновляет поле `summary` в индексе `sessions.md` для указанного sessionKey.
- * Использует effective-конфиг `mind` (app + опциональный merge от `--agent`).
+ * Не требует блока `mind` в config приложения: агент-суммаризатор и параметры summary
+ * задаются в CLI. Блок `mind` в config используется только автоматическим подписчиком.
  *
  * Примеры:
  *
  * <code>
- * php bin/console mind:summary --session_id 20250301-143022-123456-0
- * php bin/console mind:summary --session_id 20250301-143022-123456-0 --agent default
+ * php bin/console mind:summary --session_id 20250301-143022-123456-0 --agent my_summarizer_agent
+ * php bin/console mind:summary --session_id 20250301-143022-123456-0 --agent my_summarizer_agent \
+ *   --max-summary-chars 400 --transcript-ratio 0.3
  * </code>
  */
 class MindSessionSummaryCommand extends AbstractAgentCommand
@@ -47,19 +50,36 @@ class MindSessionSummaryCommand extends AbstractAgentCommand
             ->addOption(
                 'agent',
                 null,
+                InputOption::VALUE_REQUIRED,
+                'Имя агента-суммаризатора (agents/*.php, например my_summarizer_agent)',
+            )
+            ->addOption(
+                'max-summary-chars',
+                null,
                 InputOption::VALUE_OPTIONAL,
-                'Имя агента для merge блока mind (app + agent)',
+                'Максимальная длина summary в индексе (UTF-8, не меньше 50)',
+            )
+            ->addOption(
+                'transcript-ratio',
+                null,
+                InputOption::VALUE_OPTIONAL,
+                'Доля контекстного окна агента под транскрипт (0.05–0.5)',
             );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $sessionId = (string) ($input->getOption('session_id') ?? '');
-        $agentName = $input->getOption('agent');
-        $agentName = $agentName !== null && $agentName !== '' ? (string) $agentName : null;
+        $sessionId = trim((string) ($input->getOption('session_id') ?? ''));
+        $agentName = trim((string) ($input->getOption('agent') ?? ''));
 
         if ($sessionId === '') {
             $output->writeln('<error>Не указан --session_id.</error>');
+
+            return Command::FAILURE;
+        }
+
+        if ($agentName === '') {
+            $output->writeln('<error>Не указан --agent (имя агента-суммаризатора).</error>');
 
             return Command::FAILURE;
         }
@@ -81,28 +101,26 @@ class MindSessionSummaryCommand extends AbstractAgentCommand
             return Command::FAILURE;
         }
 
+        try {
+            $summaryConfig = MindSessionSummaryCliConfigHelper::fromInput($input, $agentName);
+        } catch (InvalidArgumentException $e) {
+            $output->writeln('<error>' . $e->getMessage() . '</error>');
+
+            return Command::FAILURE;
+        }
+
         $app = ConfigurationApp::getInstance();
         $app->setSessionKey($sessionId);
         $this->resolveFileLogger($app);
 
-        $agentCfg = null;
-        if ($agentName !== null) {
-            $agentCfg = $app->getAgent($agentName);
-            if ($agentCfg === null) {
-                $output->writeln(sprintf('<error>Агент "%s" не найден.</error>', $agentName));
-
-                return Command::FAILURE;
-            }
-        }
-
-        $effective = MindConfigDto::resolveEffective($app, $agentCfg);
-        if ($effective->resolveSessionSummary()->resolveAgent() === '') {
-            $output->writeln(
-                '<error>Не задан mind.session_summary.agent в конфигурации (app или agent после merge).</error>',
-            );
+        $summarizer = $this->resolveSummarizerAgent($app, $agentName);
+        if ($summarizer === null) {
+            $output->writeln(sprintf('<error>Агент-суммаризатор "%s" не найден.</error>', $agentName));
 
             return Command::FAILURE;
         }
+
+        $effective = new MindConfigDto(null, $summaryConfig);
 
         $paths = new MindPaths($app->getMindDir(), $app->getUserId());
         $mind = new UserMindStorage($paths);
@@ -126,6 +144,7 @@ class MindSessionSummaryCommand extends AbstractAgentCommand
         }
 
         $output->writeln(sprintf('SessionKey: <info>%s</info>', $sessionId));
+        $output->writeln(sprintf('Агент-суммаризатор: <info>%s</info>', $agentName));
         $output->writeln(sprintf('Сообщений в .mind: <info>%d</info>', $meta->getMessageCount()));
 
         $service = $this->createSummaryRefresher($app, $effective);
@@ -150,6 +169,14 @@ class MindSessionSummaryCommand extends AbstractAgentCommand
         $output->writeln($summaryAfter);
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Загружает шаблон агента-суммаризатора по имени (переопределяется в тестах).
+     */
+    protected function resolveSummarizerAgent(ConfigurationApp $app, string $agentName): ?ConfigurationAgent
+    {
+        return $app->getAgent($agentName);
     }
 
     /**

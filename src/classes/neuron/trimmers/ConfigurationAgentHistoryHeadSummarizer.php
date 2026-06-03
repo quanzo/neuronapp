@@ -105,10 +105,16 @@ final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummar
     /**
      * {@inheritdoc}
      */
-    public function summarize(array $headMessages, int $contextWindow): ?Message
+    public function summarize(array $headMessages, int $contextWindow, ?int $maxChars = null): ?Message
     {
         if ($headMessages === [] || $contextWindow <= 0) {
             return null;
+        }
+
+        // максимальное кол-во слов
+        $maxWords = 200;
+        if ($maxChars > 0) {
+            $maxWords = (int)round($maxChars / 10);
         }
 
         $transcript = $this->buildTranscript($headMessages);
@@ -116,7 +122,7 @@ final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummar
             return null;
         }
 
-        $summaryText = $this->summarizeViaAgent($transcript);
+        $summaryText = $this->summarizeViaAgent($transcript, $maxWords);
         $summaryText = trim($summaryText);
         if ($summaryText === '') {
             return null;
@@ -132,7 +138,7 @@ final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummar
     /**
      * Генерирует summary через клон {@see ConfigurationAgent}.
      */
-    private function summarizeViaAgent(string $transcript): string
+    private function summarizeViaAgent(string $transcript, $countWord = 100): string
     {
         $clone = $this->agentCfg->cloneForSession(ChatHistoryCloneMode::RESET_EMPTY);
         if ($this->agentCfg->isExcludeLongTermMind()) {
@@ -140,13 +146,29 @@ final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummar
         }
 
         // На время суммаризации отключаем инструменты и делаем инструкцию максимально жёсткой.
-        $clone->tools = [];
+        $clone->tools        = [];
         $clone->toolMaxTries = 0;
         $clone->instructions = self::buildSummarizerInstructions();
+        $transcript          = trim($transcript);
+
+        $text = <<<TEXT
+            # STRICTLY
+            - The maximum word count in the result is __{$countWord}__ word
+            
+            # TASK
+            Collapse the story into a summary
+
+            #TRANSCRIPT
+
+            ```
+            $transcript
+            ```
+        TEXT;
+
 
         $userMsg = new Message(
             MessageRole::USER,
-            "Сверни историю в summary.\n\nТранскрипт:\n" . $transcript
+            $text
         );
 
         $response = $clone->sendMessage($userMsg);

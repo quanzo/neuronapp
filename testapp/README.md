@@ -33,7 +33,8 @@
 3. Долговременная память `.mind` (см. `docs/mind.md`):
    - в `testapp/config.jsonc` явно задано `mind.collect = true` (глобально по умолчанию сбор выключен);
    - сообщения сессий пишутся в `.mind/user_<id>/sessions/`;
-   - `mind.session_summary.agent = my_summarizer_agent` — краткое описание сессии в `sessions.md`.
+   - `mind.session_summary.agent = my_summarizer_agent` — краткое описание сессии в `sessions.md` (для автоматического подписчика);
+   - ручной пересчёт summary: `php bin/console mind:summary --session_id <sessionKey> --agent my_summarizer_agent` (блок `mind` в config для CLI не обязателен).
 4. Инструменты `mind.sessions`, `mind.search`, `mind.session.view` зарегистрированы в `ToolRegistry`; чтобы агент мог ими пользоваться, добавьте их в массив `tools` в конфиге нужного агента (`testapp/agents/*.php`).
 
 Рекомендуемый запуск testapp: `php bin/testconsole2` (задаёт `APP_START_DIR` и `APP_WORK_DIR` на `testapp`).

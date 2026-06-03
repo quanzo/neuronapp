@@ -25,7 +25,7 @@ use function trim;
  * Сервис генерации краткого описания (summary) сессии для индекса `sessions.md`.
  *
  * Настройки — {@see MindConfigDto}; шаблон агента-суммаризатора резолвится при создании
- * через {@see self::fromMindConfig()}.
+ * через {@see self::fromMindConfig()} (подписчик, storage, CLI).
  *
  * Пример:
  *
@@ -108,11 +108,14 @@ final class MindSessionSummaryService implements MindSessionSummaryRefresherInte
             return;
         }
 
+        // ограничение на кол-во символов в результате
+        $maxChars = $summaryCfg->resolveMaxSummaryChars();
+
         $agent->setExcludeLongTermMind(true);
         $agent->setSessionKey(MindSummarySessionKeyHelper::forMainSession($sessionKey));
 
         $summarizer = new ConfigurationAgentHistoryHeadSummarizer($agent);
-        $summaryMsg = $summarizer->summarize($windowMessages, $contextWindow);
+        $summaryMsg = $summarizer->summarize($windowMessages, $contextWindow, $maxChars);
         if ($summaryMsg === null) {
             return;
         }
@@ -124,8 +127,6 @@ final class MindSessionSummaryService implements MindSessionSummaryRefresherInte
 
         $summary = preg_replace('/\s+/u', ' ', $summary) ?? $summary;
         $summary = trim($summary);
-
-        $maxChars = $summaryCfg->resolveMaxSummaryChars();
 
         if (mb_strlen($summary, 'UTF-8') > $maxChars) {
             $summary = mb_substr($summary, 0, $maxChars - 1, 'UTF-8') . '…';
