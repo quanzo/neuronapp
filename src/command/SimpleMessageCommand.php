@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace app\modules\neuron\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dto\console\ConsoleServiceMessagesDto;
 use app\modules\neuron\classes\dto\console\OutputDto;
 use app\modules\neuron\classes\todo\TodoList;
-use app\modules\neuron\helpers\ConsoleHelper;
 use app\modules\neuron\helpers\AttachmentHelper;
+use app\modules\neuron\helpers\ConsoleHelper;
 use NeuronAI\Chat\Enums\MessageRole;
 use Revolt\EventLoop;
-use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -40,13 +40,6 @@ class SimpleMessageCommand extends AbstractAgentCommand
 
     /**
      * Настраивает команду: описание и опции.
-     *
-     * Опции:
-     * - agent   — имя агента (файл в agents/ без расширения), обязательно.
-     * - message — текст сообщения пользователя, обязательно.
-     * - session_id — необязательный ключ сессии для продолжения диалога;
-     *   должен существовать в хранилище сессий, иначе выводится ошибка.
-     * - file/-f — пути к файлам, которые будут прикреплены к запросу (можно указывать несколько раз).
      */
     protected function configure(): void
     {
@@ -69,128 +62,89 @@ class SimpleMessageCommand extends AbstractAgentCommand
     /**
      * Выполняет команду: валидация опций, получение агента, отправка сообщения, вывод ответа.
      *
-     * Последовательность:
-     * 1. Проверка обязательных опций agent и message.
-     * 2. Получение конфигурации агента через {@see ConfigurationApp::getAgent()}.
-     * 3. При переданном session_id — проверка формата и существования сессии,
-     *    затем установка ключа на конфиге агента.
-     * 4. Создание TodoList с одним заданием (текст сообщения) и вызов
-     *    execute() в очереди событийного цикла с ожиданием Future.
-     * 5. Вывод последнего сообщения из истории чата и sessionKey.
-     *
-     * @param InputInterface  $input  Ввод (опции команды).
-     * @param OutputInterface $output Вывод в консоль.
-     *
      * @return int Command::SUCCESS или Command::FAILURE.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $arFormatAvailable = [
-            'md',
-            'json',
-            'txt'
-        ];
-        $agentName   = $input->getOption('agent');
-        $messageText = $input->getOption('message');
-        $sessionId   = $input->getOption('session_id');
-        $formatOut   = $input->getOption('format');
+        $agentName   = (string) ($input->getOption('agent') ?? '');
+        $messageText = (string) ($input->getOption('message') ?? '');
+        $sessionId   = (string) ($input->getOption('session_id') ?? '');
         $fileOptions = $input->getOption('file');
         $resume      = (bool) $input->getOption('resume');
         $abort       = (bool) $input->getOption('abort');
 
-        // Проверка обязательных опций
-        if ($agentName === null || $agentName === '') {
-            $output->writeln('<error>Не указан агент. Используйте --agent.</error>');
-            return Command::FAILURE;
+        $formatResolved = ConsoleHelper::resolveFormat($input->getOption('format'), 'md');
+        if ($formatResolved instanceof OutputDto) {
+            return $this->finish($output, $formatResolved, 'md');
+        }
+        $formatOut = $formatResolved;
+
+        $service = new ConsoleServiceMessagesDto();
+
+        if ($agentName === '') {
+            return $this->finish($output, OutputDto::fromMissingAgentOption($sessionId), $formatOut);
         }
 
-        if ($messageText === null || $messageText === '') {
-            $output->writeln('<error>Не указано сообщение. Используйте --message.</error>');
-            return Command::FAILURE;
+        if ($messageText === '') {
+            return $this->finish($output, OutputDto::fromMissingMessageOption($sessionId), $formatOut);
         }
 
-        if ($formatOut === null || $formatOut === '') {
-            $formatOut = 'md';
-        }
-        if (!in_array($formatOut, $arFormatAvailable)) {
-            $output->writeln('<error>Формат вывода задан не корректно.</error>');
-            return Command::FAILURE;
-        }
-
-        // Подготовка вложений (attachments) из указанных файлов, если они есть.
         $attachments = [];
         if (is_array($fileOptions) && $fileOptions !== []) {
-            $attachments = AttachmentHelper::buildAttachmentsFromPaths($fileOptions, $output);
-            if ($attachments === null) {
-                // Сообщение об ошибке уже выведено.
-                return Command::FAILURE;
+            $buildResult = AttachmentHelper::buildAttachmentsFromPaths($fileOptions);
+            if ($buildResult->isError()) {
+                return $this->finish($output, OutputDto::fromError($buildResult->getErrorMessage(), $sessionId), $formatOut);
             }
+            $attachments = $buildResult->getAttachments();
         }
 
-        // Получение конфигурации приложения и конфига агента по имени
         $configApp = ConfigurationApp::getInstance();
 
-        // Если передан session_id — проверяем формат и существование сессии, затем подставляем ключ
-        if ($sessionId !== null && $sessionId !== '') {
+        if ($sessionId !== '') {
             if (!ConfigurationApp::isValidSessionKey($sessionId)) {
-                $output->writeln(sprintf(
-                    '<error>Неверный формат session_id. Ожидается формат %s.</error>',
-                    ConfigurationApp::describeSessionKeyFormat()
-                ));
-                return Command::FAILURE;
+                return $this->finish($output, OutputDto::fromInvalidSessionKey($sessionId), $formatOut);
             }
 
             if (!ConfigurationApp::getInstance()->sessionExists($sessionId)) {
-                $output->writeln(sprintf('<error>Сессия с session_id "%s" не найдена.</error>', $sessionId));
-                return Command::FAILURE;
+                return $this->finish($output, OutputDto::fromSessionNotFound($sessionId), $formatOut);
             }
             $configApp->setSessionKey($sessionId);
         }
 
-        // установим логгер
         $this->resolveFileLogger($configApp);
 
         $agentCfg = $configApp->getAgent($agentName);
 
         if ($agentCfg === null) {
-            $output->writeln(sprintf('<error>Агент "%s" не найден.</error>', $agentName));
-            return Command::FAILURE;
+            return $this->finish($output, OutputDto::fromAgentNotFound($agentName, $configApp->getSessionKey()), $formatOut);
         }
 
-        // проверим а завершено ли предыдущее сообщение
         $runStateDto = $agentCfg->getExistRunStateDto();
         if ($runStateDto) {
             if ($abort) {
-                // сброс флага "идет выполнение списка"
                 $agentCfg->abortRunState();
-                $output->writeln('Статус "выполняется список" убран');
+                $service->addPlain('Статус "выполняется список" убран');
             } elseif ($resume) {
                 $agentCfg->resumeRunState();
-                $output->writeln('Откат истории выполнен');
+                $service->addPlain('Откат истории выполнен');
                 $agentCfg->abortRunState();
-                $output->writeln('Статус "выполняется список" убран');
+                $service->addPlain('Статус "выполняется список" убран');
             } else {
-                $output->writeln(
-                    sprintf(
-                        '<error>В сессии обнаружено незавершённое выполнение списка "%s".</error>',
-                        $runStateDto->getTodolistName()
-                    )
-                );
-                return Command::FAILURE;
+                return $this->finish($output, OutputDto::fromUnfinishedRun(
+                    $runStateDto->getTodolistName(),
+                    $configApp->getSessionKey(),
+                ), $formatOut);
             }
         }
 
-        // Список из одного задания (текст сообщения), использующий глобальную конфигурацию приложения
         $todoList = new TodoList($messageText, 'inline_message', $configApp);
         $todoList->setDefaultConfigurationAgent($agentCfg);
 
-        // Запуск асинхронного выполнения в очереди событийного цикла и ожидание результата
-        $history = null;
         $error = null;
 
-        EventLoop::queue(static function () use ($todoList, $attachments, &$history, &$error): void {
+        EventLoop::queue(static function () use ($todoList, $attachments, &$error): void {
             try {
-                $history = $todoList->execute(
+                $todoList->execute(
                     MessageRole::USER,
                     $attachments,
                     null
@@ -202,31 +156,10 @@ class SimpleMessageCommand extends AbstractAgentCommand
 
         EventLoop::run();
 
-        $outDto = $error ? OutputDto::fromException($error, $agentCfg) : OutputDto::fromAgent($agentCfg);
-        $out    = ConsoleHelper::formatOut($outDto, $agentCfg->getSessionKey(), $formatOut);
-        $output->writeln($out);
-        if ($outDto->isError()) {
-            return Command::FAILURE;
-        }
-        return Command::SUCCESS;
-        /*
-        if ($error !== null) {
-            $output->writeln('<error>' . $error->getMessage() . '</error>');
-            return Command::FAILURE;
-        }
+        $outDto = $error !== null
+            ? OutputDto::fromException($error, $agentCfg)
+            : OutputDto::fromAgent($agentCfg);
 
-        // Извлечение последнего сообщения (ответ ассистента) и вывод содержимого
-        $lastMessage = $history->getLastMessage();
-        if ($lastMessage === false) {
-            $output->writeln('<error>Нет ответа в истории чата.</error>');
-            return Command::FAILURE;
-        }
-        $content = $lastMessage->getContent();
-
-        $output->writeln(
-            ConsoleHelper::formatOut($content ?? '[пусто]', $agentCfg->getSessionKey(), $formatOut)
-        );
-        return Command::SUCCESS;
-        */
+        return $this->finish($output, $outDto->withServiceMessages($service), $formatOut);
     }
 }

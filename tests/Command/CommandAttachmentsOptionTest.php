@@ -11,7 +11,6 @@ use app\modules\neuron\classes\dto\attachments\TextFileAttachmentDto;
 use app\modules\neuron\helpers\AttachmentHelper;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Output\BufferedOutput;
 
 /**
  * Тесты CLI-опций файлов и вспомогательной логики построения вложений в консольных командах.
@@ -53,10 +52,10 @@ final class CommandAttachmentsOptionTest extends TestCase
         file_put_contents($imageFile, "\x89PNG\r\n\x1a\n");
 
         try {
-            $output = new BufferedOutput();
-            $attachments = AttachmentHelper::buildAttachmentsFromPaths([$textFile, $imageFile], $output);
+            $result = AttachmentHelper::buildAttachmentsFromPaths([$textFile, $imageFile]);
 
-            $this->assertIsArray($attachments);
+            $this->assertFalse($result->isError());
+            $attachments = $result->getAttachments();
             $this->assertCount(2, $attachments);
             $this->assertInstanceOf(TextFileAttachmentDto::class, $attachments[0]);
             $this->assertInstanceOf(ImageFileAttachmentDto::class, $attachments[1]);
@@ -70,11 +69,10 @@ final class CommandAttachmentsOptionTest extends TestCase
     {
         $missing = 'definitely_non_existing_file_' . uniqid() . '.txt';
 
-        $output = new BufferedOutput();
-        $attachments = AttachmentHelper::buildAttachmentsFromPaths([$missing], $output);
+        $result = AttachmentHelper::buildAttachmentsFromPaths([$missing]);
 
-        $this->assertNull($attachments);
-        $display = $output->fetch();
-        $this->assertStringContainsString('не найден или недоступен', $display);
+        $this->assertTrue($result->isError());
+        $this->assertStringContainsString('не найден или недоступен', $result->getErrorMessage());
+        $this->assertSame([], $result->getAttachments());
     }
 }

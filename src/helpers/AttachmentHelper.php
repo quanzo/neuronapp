@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\helpers;
 
+use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dto\attachments\AttachmentBuildResultDto;
 use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\attachments\ImageFileAttachmentDto;
 use app\modules\neuron\classes\dto\attachments\TextFileAttachmentDto;
 use app\modules\neuron\interfaces\IAttachmentFile;
 use NeuronAI\Chat\Messages\ContentBlocks\ContentBlockInterface;
-use Symfony\Component\Console\Output\OutputInterface;
-use app\modules\neuron\classes\config\ConfigurationApp;
 
 /**
  * Хелпер для построения DTO вложений (attachments) из путей к файлам.
@@ -25,23 +25,21 @@ final class AttachmentHelper
      *
      * Каждый путь может быть абсолютным или относительным. Относительные пути
      * интерпретируются относительно текущей рабочей директории (getcwd()).
-     * При любой ошибке (пустой путь, файл не найден или недоступен) в вывод
-     * пишется сообщение об ошибке, а метод возвращает null.
+     * При любой ошибке (пустой путь, файл не найден или недоступен) возвращает
+     * {@see AttachmentBuildResultDto} с непустым {@see AttachmentBuildResultDto::getErrorMessage()}.
      *
-     * @param array<int,mixed> $paths  Сырые значения опции --file/-f.
-     * @param OutputInterface  $output Консольный вывод для сообщений об ошибках.
-     *
-     * @return array<int,AttachmentDto>|null Массив DTO вложений или null при ошибке.
+     * @param array<int,mixed> $paths Сырые значения опции --file/-f.
      */
-    public static function buildAttachmentsFromPaths(array $paths, OutputInterface $output): ?array
+    public static function buildAttachmentsFromPaths(array $paths): AttachmentBuildResultDto
     {
         $attachments = [];
         $cwd = getcwd() ?: '.';
 
         foreach ($paths as $rawPath) {
             if (!is_string($rawPath) || $rawPath === '') {
-                $output->writeln('<error>Путь в опции --file не может быть пустым.</error>');
-                return null;
+                return new AttachmentBuildResultDto(
+                    errorMessage: 'Путь в опции --file не может быть пустым.',
+                );
             }
 
             $isAbsolute = str_starts_with($rawPath, DIRECTORY_SEPARATOR);
@@ -49,14 +47,15 @@ final class AttachmentHelper
             $real = realpath($candidate);
 
             if ($real === false || !is_file($real) || !is_readable($real)) {
-                $output->writeln(sprintf('<error>Файл "%s" не найден или недоступен.</error>', $rawPath));
-                return null;
+                return new AttachmentBuildResultDto(
+                    errorMessage: sprintf('Файл "%s" не найден или недоступен.', $rawPath),
+                );
             }
 
             $attachments[] = self::resolveAttachmentDto($real);
         }
 
-        return $attachments;
+        return new AttachmentBuildResultDto(attachments: $attachments);
     }
 
     /**

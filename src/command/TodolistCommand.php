@@ -11,10 +11,7 @@ use app\modules\neuron\helpers\AttachmentHelper;
 use app\modules\neuron\helpers\ConsoleHelper;
 use app\modules\neuron\helpers\TodoListResumeHelper;
 use NeuronAI\Chat\Enums\MessageRole;
-use NeuronAI\Chat\History\ChatHistoryInterface;
-use NeuronAI\Chat\Messages\Message;
 use Revolt\EventLoop;
-use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -26,12 +23,6 @@ use Symfony\Component\Console\Output\OutputInterface;
  * исполняет его с помощью агента из опции {@see --agent} через
  * {@see TodoList::execute()}, выводит итоговый ответ агента и
  * {@see sessionKey} для продолжения сессии.
- *
- * Исполнитель — всегда агент из опции --agent; в файле TodoList агент не задаётся.
- *
- * При запуске с --session_id, если в сессии есть незавершённое выполнение (чекпоинт не finished),
- * в интерактивном режиме выводится сообщение и запрос выбора: продолжить (resume) или прервать (abort).
- * В неинтерактивном режиме в этом случае команда завершается с ошибкой и подсказкой указать --resume или --abort.
  *
  * Примеры вызова:
  *   php bin/console todolist --todolist code-review --agent default
@@ -46,14 +37,6 @@ class TodolistCommand extends AbstractAgentCommand
 
     /**
      * Настраивает команду: описание и опции.
-     *
-     * Опции:
-     * - todolist   — имя списка заданий (файл в todos/ без расширения), обязательно (кроме --abort).
-     * - agent      — имя агента LLM для исполнения, обязательно.
-     * - session_id — необязательный ключ сессии для продолжения диалога; обязателен для --resume и --abort.
-     * - resume     — продолжить прерванное выполнение с последнего чекпоинта (требует session_id и тот же todolist).
-     * - abort      — сбросить состояние незавершённого run для сессии (требует session_id и agent); список не выполняется.
-     * - file/-f    — пути к файлам, которые будут прикреплены к запросу (можно указывать несколько раз).
      */
     protected function configure(): void
     {
@@ -79,116 +62,103 @@ class TodolistCommand extends AbstractAgentCommand
     /**
      * Выполняет команду: загрузка TodoList и агента, опциональная подстановка session_id, исполнение, вывод результата.
      *
-     * @param InputInterface  $input  Ввод (опции команды).
-     * @param OutputInterface $output Вывод в консоль.
-     *
      * @return int Command::SUCCESS или Command::FAILURE.
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $arFormatAvailable = [
-            'md',
-            'json',
-            'txt'
-        ];
-        $todolistName = $input->getOption('todolist');
-        $agentName    = $input->getOption('agent');
-        $sessionId    = $input->getOption('session_id');
+        $todolistName = (string) ($input->getOption('todolist') ?? '');
+        $agentName    = (string) ($input->getOption('agent') ?? '');
+        $sessionId    = (string) ($input->getOption('session_id') ?? '');
         $resume       = (bool) $input->getOption('resume');
         $abort        = (bool) $input->getOption('abort');
-        $formatOut    = $input->getOption('format');
         $fileOptions  = $input->getOption('file');
         $dateOption   = $input->getOption('date');
         $branchOption = $input->getOption('branch');
         $userOption   = $input->getOption('user');
 
-        if ($agentName === null || $agentName === '') {
-            $output->writeln('<error>Не указан агент. Используйте --agent.</error>');
-            return Command::FAILURE;
+        $formatResolved = ConsoleHelper::resolveFormat($input->getOption('format'), 'md');
+        if ($formatResolved instanceof OutputDto) {
+            return $this->finish($output, $formatResolved, 'md');
+        }
+        $formatOut = $formatResolved;
+
+        if ($agentName === '') {
+            return $this->finish($output, OutputDto::fromMissingAgentOption($sessionId), $formatOut);
         }
 
         $configApp = ConfigurationApp::getInstance();
 
-        // Если передан session_id — проверяем формат и существование сессии, затем подставляем ключ
-        if ($sessionId !== null && $sessionId !== '') {
+        if ($sessionId !== '') {
             if (!ConfigurationApp::isValidSessionKey($sessionId)) {
-                $output->writeln(sprintf(
-                    '<error>Неверный формат session_id. Ожидается формат %s.</error>',
-                    ConfigurationApp::describeSessionKeyFormat()
-                ));
-                return Command::FAILURE;
+                return $this->finish($output, OutputDto::fromInvalidSessionKey($sessionId), $formatOut);
             }
 
             if (!ConfigurationApp::getInstance()->sessionExists($sessionId)) {
-                $output->writeln(sprintf('<error>Сессия с session_id "%s" не найдена.</error>', $sessionId));
-                return Command::FAILURE;
+                return $this->finish($output, OutputDto::fromSessionNotFound($sessionId), $formatOut);
             }
             $configApp->setSessionKey($sessionId);
         }
 
-        // установим логгер
         $this->resolveFileLogger($configApp);
 
         $agentCfg = $configApp->getAgent($agentName);
 
         if ($agentCfg === null) {
-            $output->writeln(sprintf('<error>Агент "%s" не найден.</error>', $agentName));
-            return Command::FAILURE;
+            return $this->finish($output, OutputDto::fromAgentNotFound($agentName, $configApp->getSessionKey()), $formatOut);
         }
 
         if ($abort) {
             $runStateDto = $agentCfg->getExistRunStateDto();
             if ($runStateDto) {
                 $runStateDto->delete();
-                $output->writeln(sprintf('Состояние незавершённого run для сессии "%s" и агента "%s" сброшено.', $sessionId, $agentName));
-                return Command::SUCCESS;
-            } else {
-                $output->writeln('<error>Для --abort необходимо наличие незавершенной сессии. Команда в сессии завершена или неправильно задан --session_id.</error>');
-                return Command::FAILURE;
+
+                return $this->finish($output, OutputDto::fromResponse(
+                    sprintf('Состояние незавершённого run для сессии "%s" и агента "%s" сброшено.', $sessionId, $agentName),
+                    $configApp->getSessionKey(),
+                ), $formatOut);
             }
+
+            return $this->finish($output, OutputDto::fromError(
+                'Для --abort необходимо наличие незавершенной сессии. Команда в сессии завершена или неправильно задан --session_id.',
+                $configApp->getSessionKey(),
+            ), $formatOut);
         }
 
-        if ($todolistName === null || $todolistName === '') {
-            $output->writeln('<error>Не указан список заданий. Используйте --todolist.</error>');
-            return Command::FAILURE;
+        if ($todolistName === '') {
+            return $this->finish($output, OutputDto::fromError(
+                'Не указан список заданий. Используйте --todolist.',
+                $configApp->getSessionKey(),
+            ), $formatOut);
         }
 
-        if ($formatOut === null || $formatOut === '') {
-            $formatOut = 'md';
-        }
-        if (!in_array($formatOut, $arFormatAvailable)) {
-            $output->writeln('<error>Формат вывода задан не корректно.</error>');
-            return Command::FAILURE;
-        }
-
-        // Подготовка вложений (attachments) из указанных файлов, если они есть.
         $attachments = [];
         if (is_array($fileOptions) && $fileOptions !== []) {
-            $attachments = AttachmentHelper::buildAttachmentsFromPaths($fileOptions, $output);
-            if ($attachments === null) {
-                // Сообщение об ошибке уже выведено.
-                return Command::FAILURE;
+            $buildResult = AttachmentHelper::buildAttachmentsFromPaths($fileOptions);
+            if ($buildResult->isError()) {
+                return $this->finish($output, OutputDto::fromError($buildResult->getErrorMessage(), $configApp->getSessionKey()), $formatOut);
             }
+            $attachments = $buildResult->getAttachments();
         }
 
         $todoList = $configApp->getTodoList($todolistName);
 
         if ($todoList === null) {
-            $output->writeln(sprintf('<error>TodoList "%s" не найден.</error>', $todolistName));
-            return Command::FAILURE;
+            return $this->finish($output, OutputDto::fromError(
+                sprintf('TodoList "%s" не найден.', $todolistName),
+                $configApp->getSessionKey(),
+            ), $formatOut);
         }
 
         $startFromTodoIndex = 0;
 
-        // При обычном запуске с session_id проверяем незавершённый run и при необходимости спрашиваем пользователя.
-        if (!$resume && !$abort && $sessionId !== null && $sessionId !== '') {
+        if (!$resume && !$abort && $sessionId !== '') {
             $runStateDto = $agentCfg->getExistRunStateDto();
             if ($runStateDto) {
-                $output->writeln(sprintf(
-                    '<error>В сессии обнаружено незавершённое выполнение списка "%s". Укажите --resume для продолжения или --abort для сброса.</error>',
-                    $runStateDto->getTodolistName()
-                ));
-                return Command::FAILURE;
+                return $this->finish($output, OutputDto::fromUnfinishedRun(
+                    $runStateDto->getTodolistName(),
+                    $configApp->getSessionKey(),
+                    true,
+                ), $formatOut);
             }
         }
 
@@ -197,21 +167,27 @@ class TodolistCommand extends AbstractAgentCommand
 
             if (!$plan->isResumeAvailable()) {
                 if ($plan->getReason() === 'finished') {
-                    $output->writeln('<error>Выполнение списка уже завершено; продолжение недоступно.</error>');
-                    return Command::FAILURE;
+                    return $this->finish($output, OutputDto::fromError(
+                        'Выполнение списка уже завершено; продолжение недоступно.',
+                        $configApp->getSessionKey(),
+                    ), $formatOut);
                 }
 
                 if ($plan->getReason() === 'todolist_mismatch') {
-                    $output->writeln(sprintf(
-                        '<error>Продолжить можно только тот же список: в чекпоинте "%s", указан "%s".</error>',
-                        $plan->getRunStateDto()?->getTodolistName() ?? '',
-                        $todolistName
-                    ));
-                    return Command::FAILURE;
+                    return $this->finish($output, OutputDto::fromError(
+                        sprintf(
+                            'Продолжить можно только тот же список: в чекпоинте "%s", указан "%s".',
+                            $plan->getRunStateDto()?->getTodolistName() ?? '',
+                            $todolistName
+                        ),
+                        $configApp->getSessionKey(),
+                    ), $formatOut);
                 }
 
-                $output->writeln('<error>Нет сохранённого состояния для продолжения (чекпоинт не найден).</error>');
-                return Command::FAILURE;
+                return $this->finish($output, OutputDto::fromError(
+                    'Нет сохранённого состояния для продолжения (чекпоинт не найден).',
+                    $configApp->getSessionKey(),
+                ), $formatOut);
             }
 
             if (!TodoListResumeHelper::applyHistoryRollback($agentCfg, $plan)) {
@@ -224,9 +200,7 @@ class TodolistCommand extends AbstractAgentCommand
             $startFromTodoIndex = $plan->getStartFromTodoIndex();
         }
 
-        if ($todoList !== null) {
-            $todoList->setDefaultConfigurationAgent($agentCfg);
-        }
+        $todoList->setDefaultConfigurationAgent($agentCfg);
 
         $sessionParamsDto = null;
         if (
@@ -240,12 +214,11 @@ class TodolistCommand extends AbstractAgentCommand
                 ->setUser($userOption);
         }
 
-        $history = null;
         $error = null;
 
-        EventLoop::queue(static function () use ($todoList, $attachments, $startFromTodoIndex, $sessionParamsDto, &$history, &$error): void {
+        EventLoop::queue(static function () use ($todoList, $attachments, $startFromTodoIndex, $sessionParamsDto, &$error): void {
             try {
-                $history = $todoList->execute(
+                $todoList->execute(
                     MessageRole::USER,
                     $attachments,
                     null,
@@ -259,42 +232,10 @@ class TodolistCommand extends AbstractAgentCommand
 
         EventLoop::run();
 
-        $outDto = $error ? OutputDto::fromException($error, $agentCfg) : OutputDto::fromAgent($agentCfg);
-        $out    = ConsoleHelper::formatOut($outDto, $agentCfg->getSessionKey(), $formatOut);
-        $output->writeln($out);
-        if ($outDto->isError()) {
-            return Command::FAILURE;
-        }
-        return Command::SUCCESS;
+        $outDto = $error !== null
+            ? OutputDto::fromException($error, $agentCfg)
+            : OutputDto::fromAgent($agentCfg);
 
-        
-        
-        if ($error !== null) {
-            $output->writeln('<error>' . $error->getMessage() . '</error>');
-            $output->writeln('<error>' .  $error->getFile() . ' ' . $error->getLine() . '</error>');
-            $output->writeln('<error>' .  $error->getTraceAsString() . '</error>');
-            return Command::FAILURE;
-        }
-
-        /**
-         * @var ChatHistoryInterface $history
-         */
-
-        $lastMessage = $history->getLastMessage();
-        if ($lastMessage === false) {
-            $output->writeln('<error>Нет ответа в истории чата.</error>');
-            return Command::FAILURE;
-        }
-
-        /**
-         * @var Message $lastMessage
-         */
-        $content = $lastMessage->getContent();
-
-        $output->writeln(
-            ConsoleHelper::formatOut($content, $agentCfg->getSessionKey(), $formatOut)
-        );
-
-        return Command::SUCCESS;
+        return $this->finish($output, $outDto, $formatOut);
     }
 }

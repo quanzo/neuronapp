@@ -4,7 +4,7 @@
 
 ### Общие правила
 
-- Точка входа: `bin/console.php` использует `TimedConsoleApplication` — после выполнения команды в stderr выводится строка вида `Время выполнения: X.XXX с` (в режиме `--quiet` / `-q` не показывается).
+- Точка входа: `bin/console.php` использует `TimedConsoleApplication` — после выполнения команды в stderr выводится строка вида `Время выполнения: X.XXX с` (в режиме `--quiet` / `-q` не показывается). Это независимо от полей `startedUnixTime` / `endedUnixTime` / `durationSeconds` в `OutputDto` (они попадают в stdout в md/txt/json).
 - Все команды используют `ConfigurationApp` и producers для поиска агентов и todolist.
 - История чата и `sessionKey` позволяют продолжать диалог между запусками.
 - Формат `session_id` валидируется через `ConfigurationApp::isValidSessionKey()` и должен соответствовать `Ymd-His-u-userId`.
@@ -25,6 +25,61 @@ Source of truth:
 
 - значение без `userId` считается невалидным для CLI;
 - при неверном формате команды `simplemessage` и `todolist` должны показывать сообщение, построенное из `ConfigurationApp::describeSessionKeyFormat()`, а не из вручную захардкоженной строки.
+
+### Унифицированный вывод (OutputDto)
+
+LLM-команды `simplemessage`, `todolist`, `mind:summary` и `orchestrate` возвращают результат через DTO `src/classes/dto/console/OutputDto.php` и хелпер `src/helpers/ConsoleHelper.php`.
+
+Поля DTO:
+
+| Поле | Назначение |
+|------|------------|
+| `response` | Текст ответа LLM / summary / последнее сообщение ассистента |
+| `sessionKey` | Ключ сессии (пустая строка, если ещё не известен) |
+| `errorMessage` | Ошибка команды: валидация CLI, исключение, пустой ответ LLM |
+| `serviceMessages` | Сервисные сообщения (не ошибки): массив `{ text, level }`, `level`: `plain` \| `info` \| `comment` |
+| `orchestrator` | Только для `orchestrate`: вложенный `OrchestratorResultDto` |
+| `startedUnixTime` | Unix timestamp (секунды) старта `Command::run()`; внутри — `UnixTimeDto`, в JSON — плоский int |
+| `endedUnixTime` | Unix timestamp окончания в момент `finish()`; внутри — `UnixTimeDto` |
+| `durationSeconds` | Длительность в секундах (float, 3 знака), монотонный замер `hrtime()`; расчёт в `OutputExecutionTimingDto` |
+
+Тайминг (классы в `src/classes/dto/console/`):
+
+- `UnixTimeDto` — value-object unix timestamp: `now()`, `fromSeconds()`, `formatKeyValue()`, `toArray()` → int;
+- `OutputExecutionTimingStartDto` — снимок старта: `captureNow()` в `AbstractAgentCommand::run()`;
+- `OutputExecutionTimingDto` — итог: `fromStartSnapshot($start)` в `finish()`, `formatTextLines()` для md/txt, `toArray()` для json.
+
+Правило: LLM-команды **не пишут** результат и сервисные сообщения через `$output->writeln()` — только один вызов `AbstractAgentCommand::finish()` / `ConsoleHelper::writeResult()`.
+
+Форматы (`--format`):
+
+- `md` (по умолчанию для `simplemessage`, `todolist`, `mind:summary`) — при наличии `serviceMessages` они выводятся первыми (`plain` — как есть, `info` — `<info>`, `comment` — `<comment>`), затем `response` или `<error>...</error>`, затем строка `sessionKey=...`, при наличии timing — строки из `OutputExecutionTimingDto::formatTextLines()`;
+- `txt` — как `md`;
+- `json` (по умолчанию для `orchestrate`) — JSON-объект с полями DTO.
+
+Exit code:
+
+- `0` — успех (`errorMessage` пустой; для `orchestrate` дополнительно `orchestrator.success === true`);
+- `1` — ошибка (`errorMessage` непустой или `orchestrator.success === false`).
+
+Фабрики `OutputDto`:
+
+- `fromAgent(ConfigurationAgent)` — последнее сообщение истории чата агента;
+- `fromResponse(string, sessionKey)` — готовый текст (например, summary из `.mind`);
+- `fromError(string, sessionKey)` — произвольная ошибка;
+- `fromMissingAgentOption(sessionKey)` — не указан `--agent`;
+- `fromMissingMessageOption(sessionKey)` — не указан `--message`;
+- `fromAgentNotFound(agentName, sessionKey)` — агент не найден;
+- `fromSummarizerAgentNotFound(agentName, sessionKey)` — агент-суммаризатор не найден (`mind:summary`);
+- `fromInvalidSessionKey(sessionKey, optionLabel)` — неверный формат ключа сессии;
+- `fromSessionNotFound(sessionId)` — сессия не найдена;
+- `fromUnfinishedRun(todolistName, sessionKey, withResumeHint)` — незавершённый run;
+- `fromException(Throwable, ConfigurationAgent)` — исключение при выполнении LLM;
+- `fromOrchestrator(OrchestratorResultDto)` — результат оркестратора с вложенным блоком `orchestrator`.
+
+Сервисные сообщения накапливаются в `ConsoleServiceMessagesDto` и подмешиваются через `OutputDto::withServiceMessages()` перед `finish()`.
+
+**Breaking change для `orchestrate`**: ранее stdout содержал плоский JSON `OrchestratorResultDto::toArray()`. Теперь — обёртка `OutputDto` с полями `response`, `sessionKey` и вложенным `orchestrator`. Скрипты-интеграции должны читать метрики из `orchestrator.*`.
 
 ### Команды очистки сессий
 
@@ -80,7 +135,8 @@ Source of truth:
 - `--session_id` (обязательно) — ключ основной сессии (не служебный `:__mind_summary__`);
 - `--agent` (обязательно) — имя агента-суммаризатора (`agents/*.php`, например `my_summarizer_agent`);
 - `--max-summary-chars` (опционально) — лимит длины summary в индексе (≥ 50; иначе 300);
-- `--transcript-ratio` (опционально) — доля окна агента под транскрипт (0.05–0.5; иначе 0.25).
+- `--transcript-ratio` (опционально) — доля окна агента под транскрипт (0.05–0.5; иначе 0.25);
+- `--format` (опционально, по умолчанию `md`) — формат вывода (`md`, `txt`, `json`).
 
 Требования:
 
@@ -111,14 +167,14 @@ Source of truth:
   - формат проверяется через `ConfigurationApp::isValidSessionKey()`;
   - существование файла истории проверяется через `ConfigurationApp::sessionExists()` без привязки к агенту;
 - `--format` (опционально, по умолчанию `md`) — формат вывода (`md`, `txt`, `json`);
-- `-f|--file` (массив путей) — файлы, которые будут добавлены как вложения через `AttachmentHelper::buildAttachmentsFromPaths()`.
+- `-f|--file` (массив путей) — файлы, которые будут добавлены как вложения через `AttachmentHelper::buildAttachmentsFromPaths()` (возвращает `AttachmentBuildResultDto`).
 
 Поведение:
 
 - при `--session_id` конфиг приложения получает этот ключ через `ConfigurationApp::setSessionKey()`;
 - создаётся `TodoList` с одним пунктом (сообщением);
 - запускается `TodoList::execute()` с ролью `MessageRole::USER`;
-- последний ответ ассистента форматируется `ConsoleHelper::formatOut()` и выводится вместе с sessionKey.
+- результат упаковывается в `OutputDto` и выводится через `ConsoleHelper::writeResult()` / `AbstractAgentCommand::finish()`.
 
 ### Команда `todolist`
 
@@ -156,7 +212,7 @@ Source of truth:
 - `TodoList` получает конфигурацию агента (`setDefaultConfigurationAgent($agentCfg)`);
 - из `--date/--branch/--user` формируется `SessionParamsDto`, который передаётся в `TodoList::execute()` и влияет на значения параметров;
 - вложения из `-f|--file` превращаются в DTO через `AttachmentHelper::buildAttachmentsFromPaths()` и используются для всех задач;
-- выводится ответ последнего сообщения из истории чата, отформатированный `ConsoleHelper::formatOut()`.
+- результат упаковывается в `OutputDto` и выводится через `ConsoleHelper::writeResult()`.
 
 ### Другие команды
 
@@ -181,6 +237,7 @@ Source of truth:
 - `--step` (обязательно) — имя step-todolist;
 - `--finish` (обязательно) — имя finish-todolist;
 - `--session_id` (опционально) — ключ существующей сессии;
+- `--format` (опционально, по умолчанию `json`) — формат вывода (`md`, `txt`, `json`);
 - `--max_iters` (опционально, default: `100`) — максимум итераций step;
 - `--restart_on_fail` (флаг) — разрешить перезапуск цикла при ошибках;
 - `--max_restarts` (опционально, default: `0`) — максимум перезапусков;
@@ -195,7 +252,7 @@ Source of truth:
 - если rollback истории невозможен из-за отсутствия `history_message_count`, оркестратор публикует событие `orchestrator.resume_history_missing`, но продолжает выполнение с рассчитанного индекса;
 - в обоих финальных сценариях (успех/лимит) выполняется `finish`;
 - жизненный цикл оркестратора публикуется в `EventBus` событиями `orchestrator.*`;
-- результат печатается в JSON (`success`, `reason`, `iterations`, `restartCount`, `sessionKey`).
+- результат печатается как `OutputDto` (поля `response`, `sessionKey`, вложенный `orchestrator` с `success`, `reason`, `iterations`, `restartCount` и др.).
 
 Пример:
 

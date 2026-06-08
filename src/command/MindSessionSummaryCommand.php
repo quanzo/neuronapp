@@ -6,6 +6,9 @@ namespace app\modules\neuron\command;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dto\console\ConsoleServiceMessagesDto;
+use app\modules\neuron\classes\dto\console\OutputDto;
+use app\modules\neuron\helpers\ConsoleHelper;
 use app\modules\neuron\interfaces\MindSessionSummaryRefresherInterface;
 use app\modules\neuron\mind\dto\config\MindConfigDto;
 use app\modules\neuron\mind\helpers\MindSessionSummaryCliConfigHelper;
@@ -14,7 +17,6 @@ use app\modules\neuron\mind\services\MindSessionSummaryService;
 use app\modules\neuron\mind\storage\MindPaths;
 use app\modules\neuron\mind\storage\UserMindStorage;
 use InvalidArgumentException;
-use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -64,7 +66,8 @@ class MindSessionSummaryCommand extends AbstractAgentCommand
                 null,
                 InputOption::VALUE_OPTIONAL,
                 'Доля контекстного окна агента под транскрипт (0.05–0.5)',
-            );
+            )
+            ->addOption('format', null, InputOption::VALUE_OPTIONAL, 'Формат вывода. Доступно: md, txt, json', 'md');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -72,41 +75,37 @@ class MindSessionSummaryCommand extends AbstractAgentCommand
         $sessionId = trim((string) ($input->getOption('session_id') ?? ''));
         $agentName = trim((string) ($input->getOption('agent') ?? ''));
 
-        if ($sessionId === '') {
-            $output->writeln('<error>Не указан --session_id.</error>');
+        $formatResolved = ConsoleHelper::resolveFormat($input->getOption('format'), 'md');
+        if ($formatResolved instanceof OutputDto) {
+            return $this->finish($output, $formatResolved, 'md');
+        }
+        $formatOut = $formatResolved;
 
-            return Command::FAILURE;
+        $service = new ConsoleServiceMessagesDto();
+
+        if ($sessionId === '') {
+            return $this->finish($output, OutputDto::fromError('Не указан --session_id.'), $formatOut);
         }
 
         if ($agentName === '') {
-            $output->writeln('<error>Не указан --agent (имя агента-суммаризатора).</error>');
-
-            return Command::FAILURE;
+            return $this->finish($output, OutputDto::fromError('Не указан --agent (имя агента-суммаризатора).', $sessionId), $formatOut);
         }
 
         if (MindSummarySessionKeyHelper::isSummarySession($sessionId)) {
-            $output->writeln(
-                '<error>Нельзя суммаризировать служебную сессию mind-summary. Укажите ключ основной сессии.</error>',
-            );
-
-            return Command::FAILURE;
+            return $this->finish($output, OutputDto::fromError(
+                'Нельзя суммаризировать служебную сессию mind-summary. Укажите ключ основной сессии.',
+                $sessionId,
+            ), $formatOut);
         }
 
         if (!ConfigurationApp::isValidSessionKey($sessionId)) {
-            $output->writeln(sprintf(
-                '<error>Неверный формат --session_id. Ожидается формат %s.</error>',
-                ConfigurationApp::describeSessionKeyFormat(),
-            ));
-
-            return Command::FAILURE;
+            return $this->finish($output, OutputDto::fromInvalidSessionKey($sessionId, '--session_id'), $formatOut);
         }
 
         try {
             $summaryConfig = MindSessionSummaryCliConfigHelper::fromInput($input, $agentName);
         } catch (InvalidArgumentException $e) {
-            $output->writeln('<error>' . $e->getMessage() . '</error>');
-
-            return Command::FAILURE;
+            return $this->finish($output, OutputDto::fromError($e->getMessage(), $sessionId), $formatOut);
         }
 
         $app = ConfigurationApp::getInstance();
@@ -115,9 +114,7 @@ class MindSessionSummaryCommand extends AbstractAgentCommand
 
         $summarizer = $this->resolveSummarizerAgent($app, $agentName);
         if ($summarizer === null) {
-            $output->writeln(sprintf('<error>Агент-суммаризатор "%s" не найден.</error>', $agentName));
-
-            return Command::FAILURE;
+            return $this->finish($output, OutputDto::fromSummarizerAgentNotFound($agentName, $sessionId), $formatOut);
         }
 
         $effective = new MindConfigDto(null, $summaryConfig);
@@ -126,49 +123,48 @@ class MindSessionSummaryCommand extends AbstractAgentCommand
         $mind = new UserMindStorage($paths);
         $meta = $mind->getSessionsIndex()->get($sessionId);
         if ($meta === null) {
-            $output->writeln(sprintf(
-                '<error>Сессия "%s" отсутствует в индексе .mind (sessions.md).</error>',
+            return $this->finish($output, OutputDto::fromError(
+                sprintf('Сессия "%s" отсутствует в индексе .mind (sessions.md).', $sessionId),
                 $sessionId,
-            ));
-
-            return Command::FAILURE;
+            ), $formatOut);
         }
 
         if ($meta->getMessageCount() === 0) {
-            $output->writeln(sprintf(
-                '<error>В сессии "%s" нет сообщений в .mind (messageCount=0).</error>',
+            return $this->finish($output, OutputDto::fromError(
+                sprintf('В сессии "%s" нет сообщений в .mind (messageCount=0).', $sessionId),
                 $sessionId,
-            ));
-
-            return Command::FAILURE;
+            ), $formatOut);
         }
 
-        $output->writeln(sprintf('SessionKey: <info>%s</info>', $sessionId));
-        $output->writeln(sprintf('Агент-суммаризатор: <info>%s</info>', $agentName));
-        $output->writeln(sprintf('Сообщений в .mind: <info>%d</info>', $meta->getMessageCount()));
+        $service
+            ->addInfo(sprintf('SessionKey: %s', $sessionId))
+            ->addInfo(sprintf('Агент-суммаризатор: %s', $agentName))
+            ->addInfo(sprintf('Сообщений в .mind: %d', $meta->getMessageCount()));
 
-        $service = $this->createSummaryRefresher($app, $effective);
-        $updated = $mind->refreshSessionSummary($app, $sessionId, $service, $effective);
+        $summaryRefresher = $this->createSummaryRefresher($app, $effective);
+        $updated = $mind->refreshSessionSummary($app, $sessionId, $summaryRefresher, $effective);
 
         $metaAfter = $mind->getSessionsIndex()->get($sessionId);
         $summaryAfter = $metaAfter?->getSummary() ?? '';
 
         if ($summaryAfter === '') {
-            $output->writeln('<error>Summary не получен (проверьте агента-суммаризатора и логи).</error>');
-
-            return Command::FAILURE;
+            return $this->finish($output, OutputDto::fromError(
+                'Summary не получен (проверьте агента-суммаризатора и логи).',
+                $sessionId,
+            ), $formatOut);
         }
 
         if ($updated) {
-            $output->writeln('<info>Summary обновлён.</info>');
+            $service->addInfo('Summary обновлён.');
         } else {
-            $output->writeln('<comment>Summary не изменился (уже актуален).</comment>');
+            $service->addComment('Summary не изменился (уже актуален).');
         }
 
-        $output->writeln('');
-        $output->writeln($summaryAfter);
-
-        return Command::SUCCESS;
+        return $this->finish(
+            $output,
+            OutputDto::fromResponse($summaryAfter, $sessionId)->withServiceMessages($service),
+            $formatOut,
+        );
     }
 
     /**

@@ -4,7 +4,7 @@
 
 ### Вложения из консоли (`--file/-f`)
 
-Консольные команды (`simplemessage`, `todolist`) позволяют передавать файлы через опцию `--file` (`-f`). Обработка реализована в `AttachmentHelper::buildAttachmentsFromPaths()`:
+Консольные команды (`simplemessage`, `todolist`) позволяют передавать файлы через опцию `--file` (`-f`). Обработка реализована в `AttachmentHelper::buildAttachmentsFromPaths()` (возвращает `AttachmentBuildResultDto`):
 
 - на вход подаётся список путей (строки);
 - относительные пути интерпретируются относительно текущей рабочей директории (`getcwd()`);
