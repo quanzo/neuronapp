@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\modules\neuron\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dto\console\OutputDto;
 use app\modules\neuron\classes\todo\TodoList;
 use app\modules\neuron\helpers\ConsoleHelper;
 use app\modules\neuron\helpers\AttachmentHelper;
@@ -201,6 +202,14 @@ class SimpleMessageCommand extends AbstractAgentCommand
 
         EventLoop::run();
 
+        $outDto = $error ? OutputDto::fromException($error, $agentCfg) : OutputDto::fromAgent($agentCfg);
+        $out    = ConsoleHelper::formatOut($outDto, $agentCfg->getSessionKey(), $formatOut);
+        $output->writeln($out);
+        if ($outDto->isError()) {
+            return Command::FAILURE;
+        }
+        return Command::SUCCESS;
+        /*
         if ($error !== null) {
             $output->writeln('<error>' . $error->getMessage() . '</error>');
             return Command::FAILURE;
@@ -217,7 +226,7 @@ class SimpleMessageCommand extends AbstractAgentCommand
         $output->writeln(
             ConsoleHelper::formatOut($content ?? '[пусто]', $agentCfg->getSessionKey(), $formatOut)
         );
-
         return Command::SUCCESS;
+        */
     }
 }
