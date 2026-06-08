@@ -4,7 +4,7 @@
 
 ### Общие правила
 
-- Точка входа: `bin/console.php` использует `TimedConsoleApplication` — после выполнения команды в stderr выводится строка вида `Время выполнения: X.XXX с` (в режиме `--quiet` / `-q` не показывается). Это независимо от полей `startedUnixTime` / `endedUnixTime` / `durationSeconds` в `OutputDto` (они попадают в stdout в md/txt/json).
+- Точка входа: `bin/console.php` использует `TimedConsoleApplication` — после выполнения команды в stderr выводится строка вида `Время выполнения: X.XXX с` (в режиме `--quiet` / `-q` не показывается). Это независимо от полей `startedAt` / `endedAt` / `durationSeconds` в `OutputDto` (они попадают в stdout в md/txt/json).
 - Все команды используют `ConfigurationApp` и producers для поиска агентов и todolist.
 - История чата и `sessionKey` позволяют продолжать диалог между запусками.
 - Формат `session_id` валидируется через `ConfigurationApp::isValidSessionKey()` и должен соответствовать `Ymd-His-u-userId`.
@@ -39,21 +39,25 @@ LLM-команды `simplemessage`, `todolist`, `mind:summary` и `orchestrate` 
 | `errorMessage` | Ошибка команды: валидация CLI, исключение, пустой ответ LLM |
 | `serviceMessages` | Сервисные сообщения (не ошибки): массив `{ text, level }`, `level`: `plain` \| `info` \| `comment` |
 | `orchestrator` | Только для `orchestrate`: вложенный `OrchestratorResultDto` |
-| `startedUnixTime` | Unix timestamp (секунды) старта `Command::run()`; внутри — `UnixTimeDto`, в JSON — плоский int |
-| `endedUnixTime` | Unix timestamp окончания в момент `finish()`; внутри — `UnixTimeDto` |
-| `durationSeconds` | Длительность в секундах (float, 3 знака), монотонный замер `hrtime()`; расчёт в `OutputExecutionTimingDto` |
+| `startedAt` | Монотонное время старта `Command::run()` (float, наносекунды `hrtime`); внутри — `HrtimeDto` |
+| `endedAt` | Монотонное время окончания в момент `finish()`; внутри — `HrtimeDto` |
+| `durationSeconds` | Длительность в секундах (float, 3 знака): `endedAt->subtract(startedAt)->toSeconds()` |
 
-Тайминг (классы в `src/classes/dto/console/`):
+Тайминг — единственный класс `HrtimeDto` (`src/classes/dto/console/HrtimeDto.php`):
 
-- `UnixTimeDto` — value-object unix timestamp: `now()`, `fromSeconds()`, `formatKeyValue()`, `toArray()` → int;
-- `OutputExecutionTimingStartDto` — снимок старта: `captureNow()` в `AbstractAgentCommand::run()`;
-- `OutputExecutionTimingDto` — итог: `fromStartSnapshot($start)` в `finish()`, `formatTextLines()` для md/txt, `toArray()` для json.
+- `now()` / `fromNanoseconds()` — создание;
+- `add()` / `subtract()` — арифметика двух меток;
+- `toSeconds()`, `formatKeyValue()`, `toArray()` — сериализация.
+
+В `AbstractAgentCommand::run()` сохраняется `HrtimeDto::now()`; в `finish()` — `withCommandTiming($start, HrtimeDto::now())`.
+
+**Breaking change**: ранее JSON содержал `startedUnixTime` / `endedUnixTime` (unix int). Теперь — `startedAt` / `endedAt` (float, наносекунды hrtime).
 
 Правило: LLM-команды **не пишут** результат и сервисные сообщения через `$output->writeln()` — только один вызов `AbstractAgentCommand::finish()` / `ConsoleHelper::writeResult()`.
 
 Форматы (`--format`):
 
-- `md` (по умолчанию для `simplemessage`, `todolist`, `mind:summary`) — при наличии `serviceMessages` они выводятся первыми (`plain` — как есть, `info` — `<info>`, `comment` — `<comment>`), затем `response` или `<error>...</error>`, затем строка `sessionKey=...`, при наличии timing — строки из `OutputExecutionTimingDto::formatTextLines()`;
+- `md` (по умолчанию для `simplemessage`, `todolist`, `mind:summary`) — при наличии `serviceMessages` они выводятся первыми (`plain` — как есть, `info` — `<info>`, `comment` — `<comment>`), затем `response` или `<error>...</error>`, затем строка `sessionKey=...`, при наличии timing — строки из `OutputDto::formatTimingTextLines()`;
 - `txt` — как `md`;
 - `json` (по умолчанию для `orchestrate`) — JSON-объект с полями DTO.
 

@@ -9,8 +9,7 @@ use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\dto\console\ConsoleServiceMessagesDto;
 use app\modules\neuron\classes\dto\console\OutputDto;
-use app\modules\neuron\classes\dto\console\OutputExecutionTimingDto;
-use app\modules\neuron\classes\dto\console\UnixTimeDto;
+use app\modules\neuron\classes\dto\console\HrtimeDto;
 use app\modules\neuron\classes\dto\orchestrator\OrchestratorResultDto;
 use app\modules\neuron\classes\neuron\history\InMemoryFullChatHistory;
 use NeuronAI\Chat\Enums\MessageRole;
@@ -271,62 +270,59 @@ final class OutputDtoTest extends TestCase
     }
 
     /**
-     * withExecutionTiming добавляет поля timing в toArray.
+     * withCommandTiming добавляет поля timing в toArray.
      */
-    public function testWithExecutionTimingInToArray(): void
+    public function testWithCommandTimingInToArray(): void
     {
-        $timing = OutputExecutionTimingDto::fromMeasurement(
-            UnixTimeDto::fromSeconds(100),
-            UnixTimeDto::fromSeconds(105),
-            0,
-            2_500_000_000,
-        );
-        $arr = OutputDto::fromResponse('ok', 'k')->withExecutionTiming($timing)->toArray();
+        $started = HrtimeDto::fromNanoseconds(0.0);
+        $ended = HrtimeDto::fromNanoseconds(2_500_000_000.0);
+        $arr = OutputDto::fromResponse('ok', 'k')->withCommandTiming($started, $ended)->toArray();
 
-        $this->assertSame(100, $arr['startedUnixTime']);
-        $this->assertSame(105, $arr['endedUnixTime']);
+        $this->assertSame(0.0, $arr['startedAt']);
+        $this->assertSame(2_500_000_000.0, $arr['endedAt']);
         $this->assertSame(2.5, $arr['durationSeconds']);
     }
 
     /**
-     * Без executionTiming ключи timing отсутствуют в toArray.
+     * Без command timing ключи timing отсутствуют в toArray.
      */
-    public function testToArrayWithoutExecutionTimingOmitsKeys(): void
+    public function testToArrayWithoutCommandTimingOmitsKeys(): void
     {
         $arr = OutputDto::fromResponse('ok', 'k')->toArray();
 
-        $this->assertArrayNotHasKey('startedUnixTime', $arr);
-        $this->assertArrayNotHasKey('endedUnixTime', $arr);
+        $this->assertArrayNotHasKey('startedAt', $arr);
+        $this->assertArrayNotHasKey('endedAt', $arr);
         $this->assertArrayNotHasKey('durationSeconds', $arr);
     }
 
     /**
-     * withServiceMessages сохраняет executionTiming в копии DTO.
+     * withServiceMessages сохраняет command timing в копии DTO.
      */
-    public function testWithServiceMessagesPreservesExecutionTiming(): void
+    public function testWithServiceMessagesPreservesCommandTiming(): void
     {
-        $timing = OutputExecutionTimingDto::fromMeasurement(
-            UnixTimeDto::fromSeconds(1),
-            UnixTimeDto::fromSeconds(2),
-            0,
-            1_000_000_000,
-        );
+        $started = HrtimeDto::fromNanoseconds(0.0);
+        $ended = HrtimeDto::fromNanoseconds(1_000_000_000.0);
         $service = (new ConsoleServiceMessagesDto())->addPlain('note');
         $dto = OutputDto::fromResponse('r', 'k')
-            ->withExecutionTiming($timing)
+            ->withCommandTiming($started, $ended)
             ->withServiceMessages($service);
 
-        $this->assertSame($timing, $dto->getExecutionTiming());
+        $this->assertSame($started, $dto->getStartedAt());
+        $this->assertSame($ended, $dto->getEndedAt());
         $this->assertSame(1.0, $dto->toArray()['durationSeconds']);
         $this->assertArrayHasKey('serviceMessages', $dto->toArray());
     }
 
     /**
-     * getExecutionTiming возвращает null для DTO без замера.
+     * getStartedAt/getEndedAt возвращают null для DTO без замера.
      */
-    public function testGetExecutionTimingNullByDefault(): void
+    public function testGetTimingNullByDefault(): void
     {
-        $this->assertNull(OutputDto::fromResponse('x', 'k')->getExecutionTiming());
+        $dto = OutputDto::fromResponse('x', 'k');
+
+        $this->assertNull($dto->getStartedAt());
+        $this->assertNull($dto->getEndedAt());
+        $this->assertNull($dto->getDurationSeconds());
     }
 
     /**

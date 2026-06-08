@@ -6,8 +6,7 @@ namespace Tests\Helpers;
 
 use app\modules\neuron\classes\dto\console\ConsoleServiceMessagesDto;
 use app\modules\neuron\classes\dto\console\OutputDto;
-use app\modules\neuron\classes\dto\console\OutputExecutionTimingDto;
-use app\modules\neuron\classes\dto\console\UnixTimeDto;
+use app\modules\neuron\classes\dto\console\HrtimeDto;
 use app\modules\neuron\classes\dto\orchestrator\OrchestratorResultDto;
 use app\modules\neuron\helpers\ConsoleHelper;
 use PHPUnit\Framework\TestCase;
@@ -194,44 +193,38 @@ final class ConsoleHelperTest extends TestCase
     }
 
     /**
-     * formatOut json включает поля execution timing.
+     * formatOut json включает поля command timing.
      */
-    public function testFormatOutJsonIncludesExecutionTiming(): void
+    public function testFormatOutJsonIncludesCommandTiming(): void
     {
-        $timing = OutputExecutionTimingDto::fromMeasurement(
-            UnixTimeDto::fromSeconds(1_700_000_000),
-            UnixTimeDto::fromSeconds(1_700_000_010),
-            0,
-            5_000_000_000,
+        $dto = OutputDto::fromResponse('r', 'k')->withCommandTiming(
+            HrtimeDto::fromNanoseconds(0.0),
+            HrtimeDto::fromNanoseconds(5_000_000_000.0),
         );
-        $dto = OutputDto::fromResponse('r', 'k')->withExecutionTiming($timing);
 
         $decoded = json_decode(ConsoleHelper::formatOut($dto, 'json'), true);
 
         $this->assertIsArray($decoded);
-        $this->assertSame(1_700_000_000, $decoded['startedUnixTime']);
-        $this->assertSame(1_700_000_010, $decoded['endedUnixTime']);
+        $this->assertEqualsWithDelta(0.0, $decoded['startedAt'], 0.001);
+        $this->assertEqualsWithDelta(5_000_000_000.0, $decoded['endedAt'], 0.001);
         $this->assertEqualsWithDelta(5.0, $decoded['durationSeconds'], 0.001);
     }
 
     /**
      * formatOut md/txt выводит строки timing после sessionKey.
      */
-    public function testFormatOutMdIncludesExecutionTimingFooter(): void
+    public function testFormatOutMdIncludesCommandTimingFooter(): void
     {
-        $timing = OutputExecutionTimingDto::fromMeasurement(
-            UnixTimeDto::fromSeconds(100),
-            UnixTimeDto::fromSeconds(103),
-            0,
-            1_500_000_000,
+        $dto = OutputDto::fromResponse('hello', 'sess')->withCommandTiming(
+            HrtimeDto::fromNanoseconds(100.0),
+            HrtimeDto::fromNanoseconds(1_500_000_100.0),
         );
-        $dto = OutputDto::fromResponse('hello', 'sess')->withExecutionTiming($timing);
 
         $text = ConsoleHelper::formatOut($dto, 'md');
 
         $this->assertStringContainsString('sessionKey=sess', $text);
-        $this->assertStringContainsString('startedUnixTime=100', $text);
-        $this->assertStringContainsString('endedUnixTime=103', $text);
+        $this->assertStringContainsString('startedAt=100', $text);
+        $this->assertStringContainsString('endedAt=1500000100', $text);
         $this->assertStringContainsString('durationSeconds=1.5', $text);
     }
 
@@ -242,8 +235,8 @@ final class ConsoleHelperTest extends TestCase
     {
         $text = ConsoleHelper::formatOut(OutputDto::fromResponse('x', 'y'), 'md');
 
-        $this->assertStringNotContainsString('startedUnixTime=', $text);
-        $this->assertStringNotContainsString('endedUnixTime=', $text);
+        $this->assertStringNotContainsString('startedAt=', $text);
+        $this->assertStringNotContainsString('endedAt=', $text);
         $this->assertStringNotContainsString('durationSeconds=', $text);
     }
 }

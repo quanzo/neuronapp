@@ -99,9 +99,8 @@ class ConsoleHelper
         $parts[] = '';
         $parts[] = 'sessionKey=' . $dto->getSessionKey();
 
-        $timing = $dto->getExecutionTiming();
-        if ($timing !== null) {
-            array_push($parts, ...$timing->formatTextLines());
+        if ($dto->getStartedAt() !== null) {
+            array_push($parts, ...$dto->formatTimingTextLines());
         }
 
         return implode(PHP_EOL, $parts) . PHP_EOL;

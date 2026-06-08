@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace app\modules\neuron\command;
 
 use app\modules\neuron\classes\config\ConfigurationApp;
+use app\modules\neuron\classes\dto\console\HrtimeDto;
 use app\modules\neuron\classes\dto\console\OutputDto;
-use app\modules\neuron\classes\dto\console\OutputExecutionTimingDto;
-use app\modules\neuron\classes\dto\console\OutputExecutionTimingStartDto;
 use app\modules\neuron\classes\events\subscribers\LlmInferenceLoggingSubscriber;
 use app\modules\neuron\helpers\ConsoleHelper;
 use app\modules\neuron\classes\events\subscribers\LongTermMindSubscriber;
@@ -24,7 +23,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class AbstractAgentCommand extends Command
 {
-    private ?OutputExecutionTimingStartDto $commandTimingStart = null;
+    private ?HrtimeDto $commandStartedAt = null;
 
     /**
      * Установим в приложение логгер
@@ -56,7 +55,7 @@ class AbstractAgentCommand extends Command
      */
     public function run(InputInterface $input, OutputInterface $output): int
     {
-        $this->commandTimingStart = OutputExecutionTimingStartDto::captureNow();
+        $this->commandStartedAt = HrtimeDto::now();
 
         return parent::run($input, $output);
     }
@@ -70,10 +69,8 @@ class AbstractAgentCommand extends Command
      */
     protected function finish(OutputInterface $output, OutputDto $dto, string $format): int
     {
-        if ($this->commandTimingStart !== null) {
-            $dto = $dto->withExecutionTiming(
-                OutputExecutionTimingDto::fromStartSnapshot($this->commandTimingStart)
-            );
+        if ($this->commandStartedAt !== null) {
+            $dto = $dto->withCommandTiming($this->commandStartedAt, HrtimeDto::now());
         }
 
         return ConsoleHelper::writeResult($output, $dto, $format);

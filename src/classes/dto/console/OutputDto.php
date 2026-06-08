@@ -16,8 +16,8 @@ use Throwable;
  * DTO унифицированного вывода консольных LLM-команд.
  *
  * Содержит текст ответа, ключ сессии, сервисные сообщения, опциональные
- * метки времени выполнения, сообщение об ошибке и (для `orchestrate`) вложенный
- * результат оркестратора.
+ * метки времени старта/окончания (HrtimeDto), сообщение об ошибке и (для
+ * `orchestrate`) вложенный результат оркестратора.
  *
  * Пример:
  *
@@ -30,7 +30,9 @@ class OutputDto
 {
     private ?OrchestratorResultDto $orchestrator = null;
 
-    private ?OutputExecutionTimingDto $executionTiming = null;
+    private ?HrtimeDto $startedAt = null;
+
+    private ?HrtimeDto $endedAt = null;
 
     private ConsoleServiceMessagesDto $serviceMessages;
 
@@ -88,22 +90,63 @@ class OutputDto
     }
 
     /**
-     * Метки времени выполнения команды (если заданы в finish()).
+     * Метка времени старта команды (если задана в finish()).
      */
-    public function getExecutionTiming(): ?OutputExecutionTimingDto
+    public function getStartedAt(): ?HrtimeDto
     {
-        return $this->executionTiming;
+        return $this->startedAt;
     }
 
     /**
-     * Возвращает копию DTO с метками времени выполнения.
+     * Метка времени окончания команды (если задана в finish()).
      */
-    public function withExecutionTiming(OutputExecutionTimingDto $timing): self
+    public function getEndedAt(): ?HrtimeDto
+    {
+        return $this->endedAt;
+    }
+
+    /**
+     * Длительность выполнения в секундах или null, если timing не задан.
+     */
+    public function getDurationSeconds(): ?float
+    {
+        if ($this->startedAt === null || $this->endedAt === null) {
+            return null;
+        }
+
+        return $this->endedAt->subtract($this->startedAt)->toSeconds();
+    }
+
+    /**
+     * Возвращает копию DTO с метками времени старта и окончания.
+     */
+    public function withCommandTiming(HrtimeDto $startedAt, HrtimeDto $endedAt): self
     {
         $clone = $this->copy();
-        $clone->executionTiming = $timing;
+        $clone->startedAt = $startedAt;
+        $clone->endedAt = $endedAt;
 
         return $clone;
+    }
+
+    /**
+     * Строки timing для md/txt вывода.
+     *
+     * @return list<string>
+     */
+    public function formatTimingTextLines(): array
+    {
+        if ($this->startedAt === null || $this->endedAt === null) {
+            return [];
+        }
+
+        $duration = $this->getDurationSeconds();
+
+        return [
+            $this->startedAt->formatKeyValue('startedAt'),
+            $this->endedAt->formatKeyValue('endedAt'),
+            'durationSeconds=' . $duration,
+        ];
     }
 
     /**
@@ -196,8 +239,10 @@ class OutputDto
         if ($this->orchestrator !== null) {
             $res['orchestrator'] = $this->orchestrator->toArray();
         }
-        if ($this->executionTiming !== null) {
-            $res = array_merge($res, $this->executionTiming->toArray());
+        if ($this->startedAt !== null && $this->endedAt !== null) {
+            $res['startedAt'] = $this->startedAt->toArray();
+            $res['endedAt'] = $this->endedAt->toArray();
+            $res['durationSeconds'] = $this->getDurationSeconds();
         }
 
         return $res;
@@ -388,7 +433,8 @@ class OutputDto
     {
         $clone = new self($this->errorMessage, $this->response, $this->sessionKey);
         $clone->orchestrator = $this->orchestrator;
-        $clone->executionTiming = $this->executionTiming;
+        $clone->startedAt = $this->startedAt;
+        $clone->endedAt = $this->endedAt;
         $clone->serviceMessages = new ConsoleServiceMessagesDto();
         $clone->serviceMessages->merge($this->serviceMessages);
 
