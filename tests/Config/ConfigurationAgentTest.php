@@ -403,6 +403,144 @@ class ConfigurationAgentTest extends TestCase
     }
 
     /**
+     * Явный thinkingBudget переопределяет формулу contextWindow/32 с clamp до минимум 1.
+     */
+    public function testResolveThinkingBudgetUsesExplicitOverride(): void
+    {
+        foreach ($this->explicitThinkingBudgetProvider() as $caseName => [$contextWindow, $thinkingBudget, $expected]) {
+            $cfg = ConfigurationAgent::makeFromArray([
+                'contextWindow' => 50000,
+            ], ConfigurationApp::getInstance());
+            $cfg->contextWindow = $contextWindow;
+            $cfg->thinkingBudget = $thinkingBudget;
+
+            $method = new \ReflectionMethod(ConfigurationAgent::class, 'resolveThinkingBudget');
+            $method->setAccessible(true);
+            $actual = $method->invoke($cfg);
+
+            $this->assertSame($expected, $actual, 'Explicit budget case failed: ' . $caseName);
+        }
+    }
+
+    /**
+     * Наборы данных для проверки явного thinkingBudget.
+     *
+     * @return array<string, array{0:int,1:int|null,2:int}>
+     */
+    public function explicitThinkingBudgetProvider(): array
+    {
+        return [
+            // явный бюджет переопределяет большой contextWindow
+            'override large context' => [32768, 500, 500],
+            'positive custom budget' => [50000, 2048, 2048],
+            'minimum explicit budget' => [32768, 1, 1],
+            'small explicit budget' => [131072, 32, 32],
+            'medium explicit budget' => [262144, 1024, 1024],
+            // граничные и некорректные значения clamp до 1
+            'zero explicit budget' => [32768, 0, 1],
+            'negative explicit budget' => [32768, -100, 1],
+            'large negative explicit budget' => [50000, -99999, 1],
+            // null — fallback к формуле
+            'null uses formula small context' => [64, null, 2],
+            'null uses formula default context' => [50000, null, 1562],
+            'null uses formula large context' => [131072, null, 4096],
+        ];
+    }
+
+    /**
+     * makeFromArray() читает thinkingBudget из массива конфигурации.
+     */
+    public function testMakeFromArrayReadsThinkingBudget(): void
+    {
+        $withBudget = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+            'thinkingBudget' => 777,
+        ], ConfigurationApp::getInstance());
+        $this->assertNotNull($withBudget);
+        $this->assertSame(777, $withBudget->thinkingBudget);
+
+        $withNull = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+            'thinkingBudget' => null,
+        ], ConfigurationApp::getInstance());
+        $this->assertNotNull($withNull);
+        $this->assertNull($withNull->thinkingBudget);
+
+        $withoutKey = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+        ], ConfigurationApp::getInstance());
+        $this->assertNotNull($withoutKey);
+        $this->assertNull($withoutKey->thinkingBudget);
+    }
+
+    /**
+     * При thinking=true явный thinkingBudget прокидывается в provider-конфиг вместо формулы.
+     */
+    public function testApplyThinkingToProviderUsesExplicitThinkingBudget(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+            'thinking' => true,
+            'thinkingBudget' => 777,
+        ], ConfigurationApp::getInstance());
+
+        $providerConfig = [
+            CallableWrapper::class,
+            'createObject',
+            'class' => EchoProvider::class,
+            'parameters' => [
+                'options' => [
+                    'num_ctx' => 32768,
+                ],
+            ],
+        ];
+
+        $method = new \ReflectionMethod(ConfigurationAgent::class, 'applyThinkingToProviderCallableConfig');
+        $method->setAccessible(true);
+        $normalized = $method->invoke($cfg, $providerConfig);
+
+        $this->assertSame(777, $normalized['parameters']['chat_template_kwargs']['thinking_token_budget']);
+        $this->assertSame(777, $normalized['parameters']['chat_template_kwargs']['thinking_budget']);
+    }
+
+    /**
+     * setThinkingBudget() обновляет бюджет у уже созданного provider-объекта.
+     */
+    public function testSetThinkingBudgetSyncsProvider(): void
+    {
+        $provider = new OpenAILike(
+            baseUri: 'http://localhost:11521/v1',
+            key: 'sk-test',
+            model: 'base',
+            parameters: ['options' => ['num_ctx' => 32768]]
+        );
+
+        $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+            'thinking' => true,
+            'safeInput' => false,
+            'safeOutput' => false,
+            'provider' => $provider,
+        ], ConfigurationApp::getInstance());
+
+        $resolvedAuto = $cfg->getProvider();
+        $paramsAuto = $this->getProviderParameters($resolvedAuto);
+        $this->assertSame(1024, $paramsAuto['chat_template_kwargs']['thinking_token_budget'] ?? null);
+
+        $cfg->setThinkingBudget(2048);
+        $resolvedExplicit = $cfg->getProvider();
+        $this->assertSame($provider, $resolvedExplicit);
+        $paramsExplicit = $this->getProviderParameters($resolvedExplicit);
+        $this->assertSame(2048, $paramsExplicit['chat_template_kwargs']['thinking_token_budget'] ?? null);
+        $this->assertSame(2048, $paramsExplicit['chat_template_kwargs']['thinking_budget'] ?? null);
+
+        $cfg->setThinkingBudget(null);
+        $resolvedFormula = $cfg->getProvider();
+        $paramsFormula = $this->getProviderParameters($resolvedFormula);
+        $this->assertSame(1024, $paramsFormula['chat_template_kwargs']['thinking_token_budget'] ?? null);
+    }
+
+    /**
      * При safeInput=true опасный prompt-injection блокируется исключением.
      */
     public function testSendMessageBlocksUnsafeInputWhenSafeInputEnabled(): void

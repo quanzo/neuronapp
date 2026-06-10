@@ -83,6 +83,7 @@ Edge cases:
   - `contextWindow` — размер контекстного окна LLM;
   - `thinking` — включает режим размышлений (think) для совместимых моделей; при `true` в provider-параметры
     автоматически добавляются `chat_template_kwargs.enable_thinking=true`, `options.think=true` и budget-поля;
+  - `thinkingBudget` — явный бюджет токенов на размышления (`int|null`); `null` — авторасчёт как 1/32 от `contextWindow`;
   - `provider` — конфигурация провайдера (`AIProviderInterface` или `callable`);
   - `instructions` — системный промпт (строка, `Stringable` или `callable`);
   - `useAgentsFile` — подключать ли содержимое `AGENTS.md` к системному промпту (по умолчанию `false`).
@@ -151,7 +152,8 @@ Edge cases:
 Для `ConfigurationAgent` доступны:
 
 - `isThink(): bool` — текущий статус think-режима;
-- `setThink(bool $think): self` — fluent-переключатель think-режима.
+- `setThink(bool $think): self` — fluent-переключатель think-режима;
+- `setThinkingBudget(?int $thinkingBudget): self` — fluent-задание явного бюджета (`null` — вернуться к авторасчёту).
 
 Компоненты `Skill` и `TodoList` могут временно переопределять think через опции шапки
 `think`/`thinking` (приоритет у `think`). Переопределение применяется к clone-сессии
@@ -160,10 +162,14 @@ Edge cases:
 `setThink()` работает в runtime: обновляет think-настройки у уже созданного provider
 и синхронизирует провайдер в уже созданном agent. Поэтому повторный вызов
 `getProvider()` всегда возвращает экземпляр с актуальным состоянием think.
+Внутри `ConfigurationAgent` выбор базового provider централизован отдельно от
+применения think-настроек и guard-декораторов, поэтому порядок остаётся единым
+для instance-provider, callable-provider и уже кешированного `_provider`.
 
-При `thinking=true` бюджет размышлений вычисляется по формуле:
+При `thinking=true` бюджет размышлений определяется так:
 
-- `thinkingBudget = max(1, intdiv(contextWindow, 32))`
+- если задан `thinkingBudget` — `max(1, thinkingBudget)`;
+- иначе — `max(1, intdiv(contextWindow, 32))`.
 
 Этот бюджет автоматически прокидывается в provider-конфиг:
 

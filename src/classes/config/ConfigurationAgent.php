@@ -113,9 +113,18 @@ class ConfigurationAgent implements IDependConfigApp
      * Включает или выключает режим размышлений (think) для модели.
      *
      * При включении в параметры провайдера автоматически добавляется бюджет
-     * размышлений, вычисляемый как 1/32 от {@see self::$contextWindow}.
+     * размышлений через {@see self::resolveThinkingBudget()}.
      */
     public bool $thinking = false;
+
+    /**
+     * Явный бюджет токенов на размышления модели.
+     *
+     * null — вычислять автоматически как 1/32 от {@see self::$contextWindow}.
+     *
+     * @var int|null
+     */
+    public ?int $thinkingBudget = null;
 
     /**
      * Этот параметр переключает диалог модуля на определенную историю сообщений.
@@ -493,32 +502,48 @@ class ConfigurationAgent implements IDependConfigApp
             $response = $this->performAgentRequest($agent, $message);
         } catch (\Throwable $performError) {
             if ($performError instanceof InputSafetyViolationException) {
-                $duration = $this->calculateDurationSeconds($start);
-                $this->triggerAgentMessageFailed($attachmentsCount, $isStructured, $message, $duration, $performError);
-                throw $performError;
+                $this->triggerAgentMessageFailedAndThrow(
+                    $attachmentsCount,
+                    $isStructured,
+                    $message,
+                    $start,
+                    $performError
+                );
             }
 
             if (!($agent instanceof Agent) && !($agent instanceof RAG)) {
-                $duration = $this->calculateDurationSeconds($start);
-                $this->triggerAgentMessageFailed($attachmentsCount, $isStructured, $message, $duration, $performError);
-                throw $performError;
+                $this->triggerAgentMessageFailedAndThrow(
+                    $attachmentsCount,
+                    $isStructured,
+                    $message,
+                    $start,
+                    $performError
+                );
             }
 
             try {
                 $cycles = LlmCycleHelper::waitCycleAgent($agent, 5, 7);
             } catch (\Throwable $waitThrown) {
-                $duration = $this->calculateDurationSeconds($start);
-                $this->triggerAgentMessageFailed($attachmentsCount, $isStructured, $message, $duration, $waitThrown);
-                throw $waitThrown;
+                $this->triggerAgentMessageFailedAndThrow(
+                    $attachmentsCount,
+                    $isStructured,
+                    $message,
+                    $start,
+                    $waitThrown
+                );
             }
 
             if (!empty($cycles['error'])) {
-                $duration = $this->calculateDurationSeconds($start);
                 $wrapped = new RuntimeException(
                     !empty($cycles['errorMsg']) ? (string) $cycles['errorMsg'] : 'Ошибка при отправке сообщения в чат'
                 );
-                $this->triggerAgentMessageFailed($attachmentsCount, $isStructured, $message, $duration, $wrapped);
-                throw $wrapped;
+                $this->triggerAgentMessageFailedAndThrow(
+                    $attachmentsCount,
+                    $isStructured,
+                    $message,
+                    $start,
+                    $wrapped
+                );
             }
 
             $duration = $this->calculateDurationSeconds($start);
@@ -681,11 +706,46 @@ class ConfigurationAgent implements IDependConfigApp
     }
 
     /**
+     * Публикует событие ошибки отправки сообщения и пробрасывает исходное исключение.
+     *
+     * @param NeuronMessage $outgoingMessage Сообщение, при отправке которого произошла ошибка.
+     * @param \Throwable    $error           Перехваченное исключение.
+     *
+     * @throws \Throwable Всегда пробрасывает переданное исключение.
+     */
+    private function triggerAgentMessageFailedAndThrow(
+        int $attachmentsCount,
+        bool $isStructured,
+        NeuronMessage $outgoingMessage,
+        float $start,
+        \Throwable $error
+    ): never {
+        $duration = $this->calculateDurationSeconds($start);
+        $this->triggerAgentMessageFailed($attachmentsCount, $isStructured, $outgoingMessage, $duration, $error);
+        throw $error;
+    }
+
+    /**
      * Создаёт DTO события отправки сообщения агентом.
      */
     private function buildAgentMessageEventDto(int $attachmentsCount, bool $isStructured): AgentMessageEventDto
     {
-        return (new AgentMessageEventDto())
+        return $this->fillAgentMessageEventDto(
+            new AgentMessageEventDto(),
+            $attachmentsCount,
+            $isStructured
+        );
+    }
+
+    /**
+     * Заполняет общие поля DTO события отправки сообщения агентом.
+     */
+    private function fillAgentMessageEventDto(
+        AgentMessageEventDto $dto,
+        int $attachmentsCount,
+        bool $isStructured
+    ): AgentMessageEventDto {
+        return $dto
             ->setSessionKey($this->getSessionKey() ?? '')
             ->setRunId('')
             ->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM))
@@ -699,13 +759,13 @@ class ConfigurationAgent implements IDependConfigApp
      */
     private function buildAgentMessageErrorEventDto(int $attachmentsCount, bool $isStructured): AgentMessageErrorEventDto
     {
-        $dto = new AgentMessageErrorEventDto();
-        $dto->setSessionKey($this->getSessionKey() ?? '');
-        $dto->setRunId('');
-        $dto->setTimestamp((new \DateTimeImmutable())->format(\DateTimeInterface::ATOM));
-        $dto->setAgent($this);
-        $dto->setAttachmentsCount($attachmentsCount);
-        $dto->setStructured($isStructured);
+        /** @var AgentMessageErrorEventDto $dto */
+        $dto = $this->fillAgentMessageEventDto(
+            new AgentMessageErrorEventDto(),
+            $attachmentsCount,
+            $isStructured
+        );
+
         return $dto;
     }
 
@@ -863,6 +923,25 @@ class ConfigurationAgent implements IDependConfigApp
         return $this;
     }
 
+    /**
+     * Задаёт явный бюджет токенов на размышления модели.
+     *
+     * null — вернуться к автоматическому расчёту через {@see self::resolveThinkingBudget()}.
+     *
+     * @param int|null $thinkingBudget Бюджет в токенах или null для авторасчёта.
+     */
+    public function setThinkingBudget(?int $thinkingBudget): self
+    {
+        $this->thinkingBudget = $thinkingBudget;
+        $this->applyThinkingToExistingProviders();
+
+        if ($this->_agent !== null) {
+            $this->syncAgentProviderThinking();
+        }
+
+        return $this;
+    }
+
     //-----------------------------------------
 
     /**
@@ -873,10 +952,25 @@ class ConfigurationAgent implements IDependConfigApp
      */
     public function getProvider(): AIProviderInterface
     {
+        $provider = $this->resolveProviderInstance();
+        $this->applyThinkingToProviderInstance($provider);
+
+        return $this->wrapProviderWithGuards($provider);
+    }
+
+    /**
+     * Возвращает базовый экземпляр провайдера без guard-декораторов.
+     *
+     * Callable-конфигурация создаётся лениво и кешируется в {@see self::$_provider}.
+     *
+     * @return AIProviderInterface
+     */
+    private function resolveProviderInstance(): AIProviderInterface
+    {
         if ($this->provider instanceof AIProviderInterface) {
-            $this->applyThinkingToProviderInstance($this->provider);
-            return $this->wrapProviderWithGuards($this->provider);
+            return $this->provider;
         }
+
         if (CallableWrapper::isCallable($this->provider)) {
             if ($this->_provider === null) {
                 $providerConfig = $this->provider;
@@ -888,16 +982,14 @@ class ConfigurationAgent implements IDependConfigApp
                 $this->_provider = $provider;
             }
 
-            $this->applyThinkingToProviderInstance($this->_provider);
-            return $this->wrapProviderWithGuards($this->_provider);
+            return $this->_provider;
         }
 
         if ($this->_provider === null) {
             throw new RuntimeException('LLM provider is not configured.');
         }
 
-        $this->applyThinkingToProviderInstance($this->_provider);
-        return $this->wrapProviderWithGuards($this->_provider);
+        return $this->_provider;
     }
 
     /**
@@ -905,8 +997,7 @@ class ConfigurationAgent implements IDependConfigApp
      */
     public function getInputSafe(): InputSafe
     {
-        $configApp = $this->getConfigurationApp() ?? ConfigurationApp::getInstance();
-        return $configApp->getInputSafe();
+        return $this->getEffectiveConfigurationApp()->getInputSafe();
     }
 
     /**
@@ -914,8 +1005,15 @@ class ConfigurationAgent implements IDependConfigApp
      */
     public function getOutputSafe(): OutputSafe
     {
-        $configApp = $this->getConfigurationApp() ?? ConfigurationApp::getInstance();
-        return $configApp->getOutputSafe();
+        return $this->getEffectiveConfigurationApp()->getOutputSafe();
+    }
+
+    /**
+     * Возвращает конфигурацию приложения, связанную с агентом, либо глобальный singleton.
+     */
+    private function getEffectiveConfigurationApp(): ConfigurationApp
+    {
+        return $this->getConfigurationApp() ?? ConfigurationApp::getInstance();
     }
 
     /**
@@ -1123,10 +1221,17 @@ class ConfigurationAgent implements IDependConfigApp
     }
 
     /**
-     * Возвращает бюджет размышлений как 1/32 от контекстного окна.
+     * Возвращает бюджет размышлений в токенах.
+     *
+     * Если задан {@see self::$thinkingBudget}, используется он (с нижней границей 1).
+     * Иначе бюджет вычисляется как 1/32 от контекстного окна.
      */
     private function resolveThinkingBudget(): int
     {
+        if ($this->thinkingBudget !== null) {
+            return max(1, (int) $this->thinkingBudget);
+        }
+
         $contextWindow = max(1, (int) $this->contextWindow);
         return max(1, intdiv($contextWindow, 32));
     }
@@ -1161,7 +1266,7 @@ class ConfigurationAgent implements IDependConfigApp
             return $instructions;
         }
 
-        $configApp = $this->getConfigurationApp() ?? ConfigurationApp::getInstance();
+        $configApp = $this->getEffectiveConfigurationApp();
         $agentsPath = $configApp->getDirPriority()->resolveFile('AGENTS.md');
         if ($agentsPath === null || $agentsPath === '' || !is_file($agentsPath)) {
             return $instructions;
@@ -1380,7 +1485,7 @@ class ConfigurationAgent implements IDependConfigApp
      */
     private function buildHistoryTrimmer(): \NeuronAI\Chat\History\HistoryTrimmerInterface
     {
-        $configApp = $this->getConfigurationApp() ?? ConfigurationApp::getInstance();
+        $configApp = $this->getEffectiveConfigurationApp();
         $mode = (string) $configApp->get('history.trimmer', 'fluid');
 
         if ($mode === 'ccl_compact') {
@@ -1592,6 +1697,7 @@ class ConfigurationAgent implements IDependConfigApp
      *  - enableChatHistory (bool)
      *  - contextWindow (int)
      *  - thinking (bool)
+     *  - thinkingBudget (int|null)
      *  - history_id (int|null)
      *  - reponseStructClass (string|null)
      *  - provider (array|callable)
@@ -1645,6 +1751,11 @@ class ConfigurationAgent implements IDependConfigApp
 
         if (array_key_exists('thinking', $cfg)) {
             $config->thinking = (bool) $cfg['thinking'];
+        }
+
+        if (array_key_exists('thinkingBudget', $cfg)) {
+            $budget = $cfg['thinkingBudget'];
+            $config->thinkingBudget = $budget === null ? null : (int) $budget;
         }
 
         if (array_key_exists('history_id', $cfg)) {
