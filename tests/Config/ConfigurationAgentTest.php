@@ -755,6 +755,101 @@ JSONC;
     }
 
     /**
+     * Обычный clone сбрасывает cached callable-provider, чтобы runtime-состояние не разделялось.
+     */
+    public function testCloneResetsCachedProvider(): void
+    {
+        $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+            'safeInput' => false,
+            'safeOutput' => false,
+            'provider' => [
+                CallableWrapper::class,
+                'createObject',
+                'class' => OpenAILike::class,
+                'baseUri' => 'http://localhost:11521/v1',
+                'key' => 'sk-test',
+                'model' => 'base',
+                'parameters' => ['options' => ['num_ctx' => 32768]],
+            ],
+        ], ConfigurationApp::getInstance());
+
+        $cfg->getProvider();
+        $clone = clone $cfg;
+
+        $ref = new \ReflectionClass($clone);
+        $providerProp = $ref->getProperty('_provider');
+        $this->assertNull($providerProp->getValue($clone));
+    }
+
+    /**
+     * Временное отключение think на клоне не меняет provider исходного агента.
+     */
+    public function testCloneSetThinkDoesNotMutateOriginalProvider(): void
+    {
+        $provider = new OpenAILike(
+            baseUri: 'http://localhost:11521/v1',
+            key: 'sk-test',
+            model: 'base',
+            parameters: ['options' => ['num_ctx' => 32768]]
+        );
+
+        $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+            'thinking' => true,
+            'safeInput' => false,
+            'safeOutput' => false,
+            'provider' => $provider,
+        ], ConfigurationApp::getInstance());
+
+        $originalProvider = $cfg->getProvider();
+        $this->assertSame($provider, $originalProvider);
+        $this->assertTrue($this->getProviderParameters($originalProvider)['options']['think'] ?? false);
+
+        $clone = clone $cfg;
+        $clone->setThink(false);
+        $cloneProvider = $clone->getProvider();
+        $this->assertNotSame($originalProvider, $cloneProvider);
+        $this->assertFalse($this->getProviderParameters($cloneProvider)['options']['think'] ?? true);
+
+        $originalParams = $this->getProviderParameters($originalProvider);
+        $this->assertTrue($originalParams['options']['think'] ?? false);
+        $this->assertSame(1024, $originalParams['chat_template_kwargs']['thinking_token_budget'] ?? null);
+    }
+
+    /**
+     * Изменение thinkingBudget на клоне не переписывает budget исходного provider.
+     */
+    public function testCloneSetThinkingBudgetDoesNotMutateOriginalProvider(): void
+    {
+        $provider = new OpenAILike(
+            baseUri: 'http://localhost:11521/v1',
+            key: 'sk-test',
+            model: 'base',
+            parameters: ['options' => ['num_ctx' => 32768]]
+        );
+
+        $cfg = ConfigurationAgent::makeFromArray([
+            'contextWindow' => 32768,
+            'thinking' => true,
+            'thinkingBudget' => 1024,
+            'safeInput' => false,
+            'safeOutput' => false,
+            'provider' => $provider,
+        ], ConfigurationApp::getInstance());
+
+        $originalProvider = $cfg->getProvider();
+        $this->assertSame(1024, $this->getProviderParameters($originalProvider)['chat_template_kwargs']['thinking_budget'] ?? null);
+
+        $clone = clone $cfg;
+        $clone->setThinkingBudget(2048);
+        $cloneProvider = $clone->getProvider();
+
+        $this->assertSame(2048, $this->getProviderParameters($cloneProvider)['chat_template_kwargs']['thinking_budget'] ?? null);
+        $this->assertSame(1024, $this->getProviderParameters($originalProvider)['chat_template_kwargs']['thinking_budget'] ?? null);
+    }
+
+    /**
      * cloneForSession(RESET_EMPTY) при enableChatHistory и pure_history.save (по умолчанию true)
      * создаёт отдельную файловую историю с другим префиксом файла.
      */

@@ -812,6 +812,22 @@ class ConfigurationAgent implements IDependConfigApp
     }
 
     /**
+     * Подготавливает клон конфигурации к независимому runtime-исполнению.
+     *
+     * Кешированные agent/provider нельзя разделять между оригиналом и клоном:
+     * временные переопределения think/thinkingBudget мутируют параметры provider.
+     */
+    public function __clone(): void
+    {
+        $this->_agent = null;
+        $this->_provider = null;
+
+        if ($this->provider instanceof AIProviderInterface) {
+            $this->provider = clone $this->provider;
+        }
+    }
+
+    /**
      * Возвращает клон конфигурации с сброшенным кешем агента и новой in-memory историей чата.
      *
      * Используется для исполнения с дополнительными инструментами (например, skills) без изменения
@@ -828,8 +844,7 @@ class ConfigurationAgent implements IDependConfigApp
      */
     public function cloneForSession(ChatHistoryCloneMode $mode = ChatHistoryCloneMode::RESET_EMPTY): self
     {
-        $clone         = clone $this;
-        $clone->_agent = null;
+        $clone = clone $this;
         $targetHistory = null;
 
         if ($this->enableChatHistory) {
