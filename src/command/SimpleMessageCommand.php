@@ -111,6 +111,7 @@ class SimpleMessageCommand extends AbstractAgentCommand
             $configApp->setSessionKey($sessionId);
         }
 
+        // Установим логгеры событий (запись в файлы)
         $this->resolveFileLogger($configApp);
 
         $agentCfg = $configApp->getAgent($agentName);

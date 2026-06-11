@@ -25,17 +25,47 @@ $arDirs = [];
 
 /**
  * Директория в папке старта
- * 
- * Если в папке старта приложения есть папка `.neauronapp` то считаем эту папку приоритетной
  */
-$arDirs['APP_START_DIR'] = !defined('APP_START_DIR') ? getcwd() : APP_START_DIR;
-$arDirs['APP_CFG_DIR'] = $arDirs['APP_START_DIR'] . DIRECTORY_SEPARATOR . '.' . APP_ID;
-$arDirs = array_filter($arDirs, fn($val) => is_dir($val));
-
+$arDirs = [
+    'APP_START_DIR' => getenv('APP_START_DIR'), // директрия старта приложения (консольной команды)
+    'APP_CFG_DIR'   => getenv('APP_CFG_DIR')  , // директория с настройками приложения в директории старта
+    'APP_WORK_DIR'  => getenv('APP_WORK_DIR') , // директория пользователя с настройками приложения
+];
 /**
- * Директория приложения в домашней папке пользователя
+ * Ассоциативный массив с путями к основным директориям приложения.
+ *
+ * @var array{
+ *     APP_START_DIR: string|false, // директория старта приложения (консольной команды)
+ *     APP_CFG_DIR:   string|false, // директория с настройками приложения в директории старта
+ *     APP_WORK_DIR:  string|false, // директория пользователя с настройками приложения
+ * } $arDirs
  */
-if (!defined('APP_WORK_DIR')) {
+
+// используем null чтобы иметь возможность исключить некоторые директории из списка
+foreach ($arDirs as $dirName => &$dirValue) {
+    if ($dirValue === false) {
+        $dirValue = null;
+    }
+}
+unset($dirValue);
+// константы с директориями
+foreach ($arDirs as $dirName => &$dirValue) {
+    /**
+     * @var null|string $dirValue
+     */
+    if (is_null($dirValue) && defined($dirName)) {
+        $dirValue = constant($dirName);
+    }
+}
+unset($dirValue);
+// значения типовые
+if (is_null($arDirs['APP_START_DIR'])) {
+    $arDirs['APP_START_DIR'] = getcwd();
+}
+if (is_null($arDirs['APP_CFG_DIR'])) {
+    $arDirs['APP_CFG_DIR'] = $arDirs['APP_START_DIR'] . DIRECTORY_SEPARATOR . '.' . APP_ID;
+}
+if (is_null($arDirs['APP_WORK_DIR'])) {
     $homeDir = getenv('HOME');
 
     if ($homeDir === false || $homeDir === '') {
@@ -54,33 +84,44 @@ if (!defined('APP_WORK_DIR')) {
             exit(1);
         }
     }
+    $arDirs['APP_WORK_DIR'] = $workDir;
 } else {
-    $workDir = APP_WORK_DIR;
-    if (!is_dir($workDir)) {
-        fwrite(STDERR, sprintf("Unable to finde application directory: %s\n", $workDir));
-        exit(1);
-    }
+     $workDir = $arDirs['APP_WORK_DIR'];
 }
-$arDirs['APP_WORK_DIR'] = $workDir;
+// уберем то что не является директориями
+$arDirs = array_filter($arDirs, fn($val) => is_dir($val));
 
-// создаем директории для работы приложения в домашней папке приложения
-foreach ([
-        SkillProducer::getStorageDirName(),
-        TodoListProducer::getStorageDirName(),
-        ConfigurationApp::getSessionDirName(),
-        AgentProducer::getStorageDirName(),
-        ConfigurationApp::getLogDirName(),
-        ConfigurationApp::getStoreDirName(),
-        ConfigurationApp::getMindDirName()
-    ] as $subDir
-) {
-    $path = $workDir . DIRECTORY_SEPARATOR . $subDir;
-    if (!is_dir($path)) {
-        if (!mkdir($path, 0777, true) && !is_dir($path)) {
-            fwrite(STDERR, sprintf("Unable to create subdirectory: %s\n", $path));
-            exit(1);
+// создаем типовые директории в рабочей директории пользователя
+$existWorkDir = !empty($arDirs['APP_WORK_DIR']);
+if ($existWorkDir) {
+    // создаем директории для работы приложения в домашней папке приложения
+    foreach ([
+            SkillProducer::getStorageDirName(),
+            TodoListProducer::getStorageDirName(),
+            ConfigurationApp::getSessionDirName(),
+            AgentProducer::getStorageDirName(),
+            ConfigurationApp::getLogDirName(),
+            ConfigurationApp::getStoreDirName(),
+            ConfigurationApp::getMindDirName()
+        ] as $subDir
+    ) {
+        $path = $workDir . DIRECTORY_SEPARATOR . $subDir;
+        if (!is_dir($path)) {
+            if (!mkdir($path, 0777, true) && !is_dir($path)) {
+                fwrite(STDERR, sprintf("Unable to create subdirectory: %s\n", $path));
+                exit(1);
+            }
         }
     }
+}
+
+if (empty($arDirs)) {
+    fwrite(STDERR, "Критичная ошибка! Директории для работы приложения заданы не корректно! Список директорий пуст!\n");
+    exit(1);
+}
+if (empty($arDirs['APP_START_DIR'])) {
+    fwrite(STDERR, "Критичная ошибка! Директории старта должна быть! В ней работают инструменты bash!\n");
+    exit(1);
 }
 
 // приоритет директорий приложения
