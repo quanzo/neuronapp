@@ -7,8 +7,8 @@ namespace app\modules\neuron\mind\services;
 use app\modules\neuron\interfaces\MindSessionSummaryRefresherInterface;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
-use app\modules\neuron\classes\neuron\trimmers\ConfigurationAgentHistoryHeadSummarizer;
-use app\modules\neuron\mind\interfaces\MindSessionSummarySummarizerInterface;
+use app\modules\neuron\classes\neuron\trimmers\ConfigurationAgentHistorySummarizer;
+use app\modules\neuron\interfaces\HistorySummarizerInterface;
 use app\modules\neuron\classes\neuron\trimmers\FluidContextWindowTrimmer;
 use app\modules\neuron\classes\neuron\trimmers\TokenCounter;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
@@ -41,12 +41,12 @@ final class MindSessionSummaryService implements MindSessionSummaryRefresherInte
     /**
      * @param MindConfigDto                           $mindConfig         Effective-конфиг mind.
      * @param ConfigurationAgent|null                 $summarizerTemplate Агент-суммаризатор или null.
-     * @param MindSessionSummarySummarizerInterface|null $injectedSummarizer Подмена summarizer (тесты).
+     * @param HistorySummarizerInterface|null $injectedSummarizer Подмена summarizer (тесты).
      */
     private function __construct(
         private readonly MindConfigDto $mindConfig,
         private readonly ?ConfigurationAgent $summarizerTemplate,
-        private readonly ?MindSessionSummarySummarizerInterface $injectedSummarizer = null,
+        private readonly ?HistorySummarizerInterface $injectedSummarizer = null,
     ) {
     }
 
@@ -55,12 +55,12 @@ final class MindSessionSummaryService implements MindSessionSummaryRefresherInte
      *
      * @param MindConfigDto                         $mindConfig         Effective mind.
      * @param ConfigurationAgent                    $summarizerTemplate Агент-суммаризатор.
-     * @param MindSessionSummarySummarizerInterface $summarizer         Тестовый double.
+     * @param HistorySummarizerInterface $summarizer         Тестовый double.
      */
     public static function forTest(
         MindConfigDto $mindConfig,
         ConfigurationAgent $summarizerTemplate,
-        MindSessionSummarySummarizerInterface $summarizer,
+        HistorySummarizerInterface $summarizer,
     ): self {
         return new self($mindConfig, $summarizerTemplate, $summarizer);
     }
@@ -135,7 +135,7 @@ final class MindSessionSummaryService implements MindSessionSummaryRefresherInte
         $agent->setExcludeLongTermMind(true);
         $agent->setSessionKey(MindSummarySessionKeyHelper::forMainSession($sessionKey));
 
-        $summarizer = $this->injectedSummarizer ?? new ConfigurationAgentHistoryHeadSummarizer($agent);
+        $summarizer = $this->injectedSummarizer ?? new ConfigurationAgentHistorySummarizer($agent);
         $summaryMsg = $summarizer->summarize($windowMessages, $contextWindow, $maxChars, $previousSummary);
         if ($summaryMsg === null) {
             return;

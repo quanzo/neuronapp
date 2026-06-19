@@ -44,7 +44,7 @@ use app\modules\neuron\classes\safe\SafeAIProviderDecorator;
 use app\modules\neuron\classes\safe\exceptions\InputSafetyViolationException;
 use app\modules\neuron\classes\neuron\history\FileFullChatHistory;
 use app\modules\neuron\classes\neuron\trimmers\CclCodeHistoryTrimmer;
-use app\modules\neuron\classes\neuron\trimmers\ConfigurationAgentHistoryHeadSummarizer;
+use app\modules\neuron\classes\neuron\trimmers\ConfigurationAgentHistorySummarizer;
 use app\modules\neuron\classes\neuron\trimmers\FluidContextWindowTrimmer;
 use app\modules\neuron\classes\neuron\trimmers\TokenCounter;
 use app\modules\neuron\helpers\AttachmentHelper;
@@ -1507,7 +1507,7 @@ class ConfigurationAgent implements IDependConfigApp
             $tailRatio = (float) $configApp->get('history.ccl_compact.tail_ratio', 0.6);
             $keepRecent = (int) $configApp->get('history.ccl_compact.keep_recent_tool_results', 10);
 
-            $summarizer = new ConfigurationAgentHistoryHeadSummarizer($this);
+            $summarizer = new ConfigurationAgentHistorySummarizer($this);
             return (new CclCodeHistoryTrimmer(new TokenCounter(), $summarizer))
                 ->withTailRatio($tailRatio)
                 ->withKeepRecentToolResults($keepRecent);

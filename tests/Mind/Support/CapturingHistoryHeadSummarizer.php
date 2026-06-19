@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Mind\Support;
 
-use app\modules\neuron\mind\interfaces\MindSessionSummarySummarizerInterface;
+use app\modules\neuron\interfaces\HistorySummarizerInterface;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\Message;
 
 /**
- * Тестовый double {@see MindSessionSummarySummarizerInterface}: фиксирует previousSummary без LLM.
+ * Тестовый double {@see HistorySummarizerInterface}: фиксирует previousSummary без LLM.
  */
-final class CapturingHistoryHeadSummarizer implements MindSessionSummarySummarizerInterface
+final class CapturingHistoryHeadSummarizer implements HistorySummarizerInterface
 {
     private ?string $lastPreviousSummary = null;
 

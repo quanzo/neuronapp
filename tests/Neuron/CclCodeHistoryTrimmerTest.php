@@ -8,8 +8,8 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\neuron\trimmers\CclCodeHistoryTrimmer;
-use app\modules\neuron\classes\neuron\trimmers\ConfigurationAgentHistoryHeadSummarizer;
-use app\modules\neuron\classes\neuron\trimmers\HistoryHeadSummarizerInterface;
+use app\modules\neuron\classes\neuron\trimmers\ConfigurationAgentHistorySummarizer;
+use app\modules\neuron\interfaces\HistorySummarizerInterface;
 use app\modules\neuron\classes\neuron\trimmers\TokenCounter;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Enums\SourceType;
@@ -150,9 +150,13 @@ final class CclCodeHistoryTrimmerTest extends TestCase
         $messages[] = new Message(MessageRole::USER, 'After tool');
         $messages[] = new Message(MessageRole::ASSISTANT, 'After tool answer');
 
-        $summarizer = new class implements HistoryHeadSummarizerInterface {
-            public function summarize(array $headMessages, int $contextWindow): ?Message
-            {
+        $summarizer = new class implements HistorySummarizerInterface {
+            public function summarize(
+                array $headMessages,
+                int $contextWindow,
+                ?int $maxChars = null,
+                ?string $previousSummary = null,
+            ): ?Message {
                 return new Message(MessageRole::DEVELOPER, 'summary');
             }
         };
@@ -185,13 +189,17 @@ final class CclCodeHistoryTrimmerTest extends TestCase
         $messages[] = new Message(MessageRole::ASSISTANT, 'Tail A');
 
         $calls = 0;
-        $summarizer = new class ($calls) implements HistoryHeadSummarizerInterface {
+        $summarizer = new class ($calls) implements HistorySummarizerInterface {
             public function __construct(private int &$calls)
             {
             }
 
-            public function summarize(array $headMessages, int $contextWindow): ?Message
-            {
+            public function summarize(
+                array $headMessages,
+                int $contextWindow,
+                ?int $maxChars = null,
+                ?string $previousSummary = null,
+            ): ?Message {
                 $this->calls++;
                 return new Message(MessageRole::DEVELOPER, 'LLM summary');
             }
@@ -218,7 +226,7 @@ final class CclCodeHistoryTrimmerTest extends TestCase
         $agentCfg->provider = new SpyProvider('summarizer');
         $agentCfg->instructions = 'base';
 
-        $summarizer = (new ConfigurationAgentHistoryHeadSummarizer($agentCfg))
+        $summarizer = (new ConfigurationAgentHistorySummarizer($agentCfg))
             ->withImageMarker('[IMG]')
             ->withDocumentMarker('[DOC]')
             ->withMaxLineChars(2000);

@@ -7,7 +7,7 @@ namespace app\modules\neuron\classes\neuron\trimmers;
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\mind\helpers\MindSessionSummaryPromptHelper;
-use app\modules\neuron\mind\interfaces\MindSessionSummarySummarizerInterface;
+use app\modules\neuron\interfaces\HistorySummarizerInterface;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\Messages\ContentBlocks\FileContent;
 use NeuronAI\Chat\Messages\ContentBlocks\ImageContent;
@@ -25,23 +25,23 @@ use function mb_substr;
 use function trim;
 
 /**
- * LLM-суммаризатор «головы» истории на базе существующего {@see ConfigurationAgent}.
+ * LLM-суммаризатор фрагмента истории на базе существующего {@see ConfigurationAgent}.
  *
- * Реализация:
+ * Реализация {@see HistorySummarizerInterface}:
  * - создаёт клон конфигурации с пустой in-memory историей ({@see ChatHistoryCloneMode::RESET_EMPTY}),
  *   чтобы не загрязнять основную историю и не запускать рекурсивную компактизацию;
  * - отправляет в LLM один запрос с инструкциями для суммаризации и приложенным текстовым «транскриптом»
- *   head-сообщений;
- * - возвращает summary как одно сообщение с ролью DEVELOPER (для дальнейшей подстановки в историю).
+ *   сообщений;
+ * - возвращает summary как одно сообщение с ролью DEVELOPER (для подстановки в историю или индекс mind).
  *
  * Пример:
  *
  * <code>
- * $summarizer = new ConfigurationAgentHistoryHeadSummarizer($agentCfg);
- * $summary = $summarizer->summarize($headMessages, $contextWindow);
+ * $summarizer = new ConfigurationAgentHistorySummarizer($agentCfg);
+ * $summary = $summarizer->summarize($messages, $contextWindow);
  * </code>
  */
-final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummarizerInterface, MindSessionSummarySummarizerInterface
+final class ConfigurationAgentHistorySummarizer implements HistorySummarizerInterface
 {
     /**
      * Маркер, подставляемый вместо бинарного/медиа контента.
@@ -182,7 +182,7 @@ final class ConfigurationAgentHistoryHeadSummarizer implements HistoryHeadSummar
     }
 
     /**
-     * Строит текстовый транскрипт для head-сообщений.
+     * Строит текстовый транскрипт для сообщений.
      *
      * - медиа-блоки заменяются на текстовые маркеры;
      * - tool-call/tool-result представлены как строки, чтобы LLM могла учитывать их смысл,

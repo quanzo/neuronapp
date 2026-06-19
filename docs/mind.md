@@ -154,7 +154,7 @@ Legacy класс `UserMindMarkdownStorage` (`src/classes/storage/UserMindMarkdo
 
 При пересчёте summary (подписчик, `UserMindStorage::refreshSessionSummary`, CLI `mind:summary`) сервис читает текущее значение поля `summary` из индекса `sessions.md`. Если оно непустое, оно передаётся в промпт LLM как блок `PREVIOUS_SUMMARY` с задачей **merge**: сохранить важные факты из старого резюме, дополнить и уточнить по новому транскрипту, не дублировать формулировки. Если summary ещё не было — выполняется первичная свёртка транскрипта (как раньше).
 
-Сборка user-промпта: [`MindSessionSummaryPromptHelper`](src/mind/helpers/MindSessionSummaryPromptHelper.php); вызов LLM — [`ConfigurationAgentHistoryHeadSummarizer`](src/classes/neuron/trimmers/ConfigurationAgentHistoryHeadSummarizer.php) (опциональный 4-й аргумент `previousSummary`).
+Сборка user-промпта: [`MindSessionSummaryPromptHelper`](src/mind/helpers/MindSessionSummaryPromptHelper.php); контракт LLM-суммаризации — [`HistorySummarizerInterface`](src/interfaces/HistorySummarizerInterface.php), реализация — [`ConfigurationAgentHistorySummarizer`](src/classes/neuron/trimmers/ConfigurationAgentHistorySummarizer.php). Mind передаёт `maxChars` и `previousSummary` (merge); CCL compact вызывает тот же интерфейс без optional-параметров.
 
 Ограничения без изменений:
 
@@ -187,7 +187,7 @@ $result = $mind->refreshAllSessionSummaries($app, $service, $effective);
 3. **Подписчик** — не вызывает `refreshSessionSummary` для ключей с суффиксом `:__mind_summary__`; re-entrancy guard (`$summaryRefreshDepth`) при вложенном refresh.
 4. **Инструменты** — `mind.sessions` и `mind.search` не показывают служебные сессии (`isSummarySession`).
 
-Классы: `MindSummarySessionKeyHelper`, `MindSessionSummaryService`, `ConfigurationAgentHistoryHeadSummarizer` (проброс exclude во внутренний клон), `LongTermMindSubscriber`.
+Классы: `MindSummarySessionKeyHelper`, `MindSessionSummaryService`, `HistorySummarizerInterface`, `ConfigurationAgentHistorySummarizer` (проброс exclude во внутренний клон), `LongTermMindSubscriber`.
 
 ## Инструменты LLM для `.mind`
 

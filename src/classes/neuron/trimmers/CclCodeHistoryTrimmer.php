@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\modules\neuron\classes\neuron\trimmers;
 
+use app\modules\neuron\interfaces\HistorySummarizerInterface;
 use NeuronAI\Chat\Enums\MessageRole;
 use NeuronAI\Chat\History\HistoryTrimmerInterface;
 use NeuronAI\Chat\Messages\Message;
@@ -26,7 +27,7 @@ use function min;
  *    оставляя последние N tool-result без изменений.
  * 3) Если история всё ещё не влезает:
  *    - выбрать tail (хвост) по токенам;
- *    - свернуть head (голову) в одно summary-сообщение через {@see HistoryHeadSummarizerInterface};
+ *    - свернуть head (голову) в одно summary-сообщение через {@see HistorySummarizerInterface};
  *    - вернуть [summary, tail...] и при необходимости жёстко урезать tail через {@see FluidContextWindowTrimmer}.
  *
  * Особенности:
@@ -37,7 +38,7 @@ use function min;
  * Пример использования (через ConfigurationAgent):
  *
  * <code>
- * $summarizer = new ConfigurationAgentHistoryHeadSummarizer($agentCfg);
+ * $summarizer = new ConfigurationAgentHistorySummarizer($agentCfg);
  * $trimmer = (new CclCodeHistoryTrimmer(new TokenCounter(), $summarizer))
  *     ->withTailRatio(0.6)
  *     ->withKeepRecentToolResults(8);
@@ -67,7 +68,7 @@ final class CclCodeHistoryTrimmer implements HistoryTrimmerInterface
 
     public function __construct(
         private readonly TokenCounter $tokenCounter = new TokenCounter(),
-        private readonly ?HistoryHeadSummarizerInterface $headSummarizer = null,
+        private readonly ?HistorySummarizerInterface $headSummarizer = null,
     ) {
     }
 
