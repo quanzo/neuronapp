@@ -35,7 +35,7 @@ use app\modules\neuron\classes\dto\attachments\AttachmentDto;
 use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
 use app\modules\neuron\classes\dto\events\AgentMessageErrorEventDto;
 use app\modules\neuron\classes\dto\run\RunStateDto;
-use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\events\EventBus;
 use app\modules\neuron\classes\logger\ContextualLogger;
 use app\modules\neuron\classes\neuron\providers\LoggingAIProviderDecorator;
 use app\modules\neuron\classes\safe\InputSafe;
@@ -215,7 +215,7 @@ class ConfigurationAgent implements IDependConfigApp
      *
      * Включается для конфигурации, используемой при исполнении Skill/TodoList с опцией
      * `pure_context: true` ({@see \app\modules\neuron\classes\AbstractPromptWithParams::isPureContext()}).
-     * Подписчик {@see \app\modules\neuron\classes\events\subscribers\LongTermMindSubscriber} проверяет флаг
+     * Подписчик {@see \app\modules\neuron\subscribers\LongTermMindSubscriber} проверяет флаг
      * через {@see self::isExcludeLongTermMind()}.
      *
      * Пример:

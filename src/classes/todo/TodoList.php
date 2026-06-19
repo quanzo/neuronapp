@@ -15,7 +15,7 @@ use app\modules\neuron\classes\dto\events\TodoEventDto;
 use app\modules\neuron\classes\dto\events\TodoErrorEventDto;
 use app\modules\neuron\classes\dto\events\TodoGotoRejectedEventDto;
 use app\modules\neuron\classes\dto\params\SessionParamsDto;
-use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\enums\ChatHistoryCloneMode;
 use app\modules\neuron\helpers\AttachmentHelper;

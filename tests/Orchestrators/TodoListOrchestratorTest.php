@@ -8,7 +8,7 @@ use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\events\OrchestratorEventDto;
 use app\modules\neuron\classes\dir\DirPriority;
 use app\modules\neuron\classes\dto\run\RunStateDto;
-use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\classes\orchestrators\TodoListOrchestrator;
 use app\modules\neuron\classes\todo\TodoList;

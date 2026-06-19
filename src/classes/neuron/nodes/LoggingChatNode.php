@@ -6,7 +6,7 @@ namespace app\modules\neuron\classes\neuron\nodes;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\events\LlmInferenceEventDto;
-use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\helpers\LlmPayloadLogSanitizer;
 use NeuronAI\Agent\Events\AIInferenceEvent;
@@ -25,7 +25,7 @@ use function trim;
  * Публикует событие `llm.inference.prepared` через {@see EventBus}
  * с полным контекстом инференса (system prompt, инструменты, user-сообщение).
  * Событие долговременной памяти (`agent.message.completed`) публикует {@see ConfigurationAgent}, не этот узел.
- * Логирование выполняется подписчиком {@see \app\modules\neuron\classes\events\subscribers\LlmInferenceLoggingSubscriber}.
+ * Логирование выполняется подписчиком {@see \app\modules\neuron\subscribers\LlmInferenceLoggingSubscriber}.
  */
 final class LoggingChatNode extends \NeuronAI\Agent\Nodes\ChatNode
 {

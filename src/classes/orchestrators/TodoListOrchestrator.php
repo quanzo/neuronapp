@@ -10,7 +10,7 @@ use app\modules\neuron\classes\dto\events\OrchestratorErrorEventDto;
 use app\modules\neuron\classes\dto\events\OrchestratorResumeHistoryMissingEventDto;
 use app\modules\neuron\classes\dto\orchestrator\OrchestratorResultDto;
 use app\modules\neuron\classes\dto\params\SessionParamsDto;
-use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\classes\todo\TodoList;
 use app\modules\neuron\helpers\TodoCompletedStatusHelper;
@@ -371,7 +371,7 @@ class TodoListOrchestrator
      *
      * Если resume выполняется без `history_message_count` в чекпоинте, публикуется
      * {@see EventNameEnum::ORCHESTRATOR_RESUME_HISTORY_MISSING} с
-     * {@see OrchestratorResumeHistoryMissingEventDto}; логирование — у {@see \app\modules\neuron\classes\events\subscribers\OrchestratorLoggingSubscriber}.
+     * {@see OrchestratorResumeHistoryMissingEventDto}; логирование — у {@see \app\modules\neuron\subscribers\OrchestratorLoggingSubscriber}.
      */
     protected function resolveStartFromTodoIndexForTodoList(TodoList $todoList): int
     {

@@ -331,7 +331,7 @@ class ConfigurationApp
      * Читается из `config.jsonc` ключом `mind.collect` (вложенный объект `mind`, поле `collect`).
      * Значения `1`, `true`, строка `'true'` трактуются как включено; `0`, `false`, строка `'false'` — как выключено.
      * При отсутствии ключа по умолчанию сбор **выключен**; для записи в `.mind` задайте `mind.collect: true`.
-     * Подписчик {@see \app\modules\neuron\classes\events\subscribers\LongTermMindSubscriber} при выключенной опции
+     * Подписчик {@see \app\modules\neuron\subscribers\LongTermMindSubscriber} при выключенной опции
      * не записывает сообщения в файлы `.mind` (см. `docs/mind.md`).
      *
      * Пример в `config.jsonc`:

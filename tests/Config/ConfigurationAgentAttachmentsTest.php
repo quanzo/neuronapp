@@ -8,7 +8,7 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\attachments\TextAttachmentDto;
 use app\modules\neuron\classes\dto\events\AgentMessageEventDto;
 use app\modules\neuron\classes\dto\events\AgentMessageErrorEventDto;
-use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\events\EventBus;
 use app\modules\neuron\classes\neuron\Agent;
 use app\modules\neuron\enums\EventNameEnum;
 use NeuronAI\Agent\AgentHandler;

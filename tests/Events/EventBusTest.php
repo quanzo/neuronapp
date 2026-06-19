@@ -22,20 +22,20 @@ class EventBusTest extends TestCase
      */
     public static function setUpBeforeClass(): void
     {
-        if (!class_exists(\app\modules\neuron\classes\events\EventBus::class)) {
-            require_once __DIR__ . '/../../src/classes/events/EventBus.php';
+        if (!class_exists(\app\modules\neuron\events\EventBus::class)) {
+            require_once __DIR__ . '/../../src/events/EventBus.php';
         }
     }
 
     protected function setUp(): void
     {
         parent::setUp();
-        \app\modules\neuron\classes\events\EventBus::clear();
+        \app\modules\neuron\events\EventBus::clear();
     }
 
     protected function tearDown(): void
     {
-        \app\modules\neuron\classes\events\EventBus::clear();
+        \app\modules\neuron\events\EventBus::clear();
         parent::tearDown();
     }
 
@@ -48,12 +48,12 @@ class EventBusTest extends TestCase
         $objectB = new \stdClass();
         $calls = 0;
 
-        \app\modules\neuron\classes\events\EventBus::on('event.object', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('event.object', static function () use (&$calls): void {
             $calls++;
         }, $objectA);
 
-        \app\modules\neuron\classes\events\EventBus::trigger('event.object', $objectB, null);
-        \app\modules\neuron\classes\events\EventBus::trigger('event.object', $objectA, null);
+        \app\modules\neuron\events\EventBus::trigger('event.object', $objectB, null);
+        \app\modules\neuron\events\EventBus::trigger('event.object', $objectA, null);
 
         $this->assertSame(1, $calls);
     }
@@ -69,20 +69,20 @@ class EventBusTest extends TestCase
         $parentClass = get_parent_class($subject);
         $childClass = get_class($subject);
 
-        \app\modules\neuron\classes\events\EventBus::on('event.order', static function () use (&$order): void {
+        \app\modules\neuron\events\EventBus::on('event.order', static function () use (&$order): void {
             $order[] = 'global';
         }, '*');
-        \app\modules\neuron\classes\events\EventBus::on('event.order', static function () use (&$order): void {
+        \app\modules\neuron\events\EventBus::on('event.order', static function () use (&$order): void {
             $order[] = 'parent';
         }, $parentClass);
-        \app\modules\neuron\classes\events\EventBus::on('event.order', static function () use (&$order): void {
+        \app\modules\neuron\events\EventBus::on('event.order', static function () use (&$order): void {
             $order[] = 'child';
         }, $childClass);
-        \app\modules\neuron\classes\events\EventBus::on('event.order', static function () use (&$order): void {
+        \app\modules\neuron\events\EventBus::on('event.order', static function () use (&$order): void {
             $order[] = 'object';
         }, $subject);
 
-        \app\modules\neuron\classes\events\EventBus::trigger('event.order', $subject, null);
+        \app\modules\neuron\events\EventBus::trigger('event.order', $subject, null);
 
         $this->assertSame(['object', 'child', 'parent', 'global'], $order);
     }
@@ -96,14 +96,14 @@ class EventBusTest extends TestCase
         });
         $order = [];
 
-        \app\modules\neuron\classes\events\EventBus::on('event.class', static function () use (&$order): void {
+        \app\modules\neuron\events\EventBus::on('event.class', static function () use (&$order): void {
             $order[] = 'global';
         }, '*');
-        \app\modules\neuron\classes\events\EventBus::on('event.class', static function () use (&$order): void {
+        \app\modules\neuron\events\EventBus::on('event.class', static function () use (&$order): void {
             $order[] = 'child';
         }, $subjectClass);
 
-        \app\modules\neuron\classes\events\EventBus::trigger('event.class', $subjectClass, null);
+        \app\modules\neuron\events\EventBus::trigger('event.class', $subjectClass, null);
 
         $this->assertSame(['child', 'global'], $order);
     }
@@ -119,14 +119,14 @@ class EventBusTest extends TestCase
         $parentClass = get_parent_class($subject);
         $childClass = get_class($subject);
 
-        \app\modules\neuron\classes\events\EventBus::on('event.class.parent', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('event.class.parent', static function () use (&$calls): void {
             $calls[] = 'parent';
         }, $parentClass);
-        \app\modules\neuron\classes\events\EventBus::on('event.class.parent', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('event.class.parent', static function () use (&$calls): void {
             $calls[] = 'global';
         }, '*');
 
-        \app\modules\neuron\classes\events\EventBus::trigger('event.class.parent', $childClass, null);
+        \app\modules\neuron\events\EventBus::trigger('event.class.parent', $childClass, null);
 
         $this->assertSame(['global'], $calls);
     }
@@ -140,11 +140,11 @@ class EventBusTest extends TestCase
         };
         $calls = 0;
 
-        \app\modules\neuron\classes\events\EventBus::on('event.no-object', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('event.no-object', static function () use (&$calls): void {
             $calls++;
         }, $object);
 
-        \app\modules\neuron\classes\events\EventBus::trigger('event.no-object', get_class($object), null);
+        \app\modules\neuron\events\EventBus::trigger('event.no-object', get_class($object), null);
 
         $this->assertSame(0, $calls);
     }
@@ -162,12 +162,12 @@ class EventBusTest extends TestCase
             $calls++;
         };
 
-        \app\modules\neuron\classes\events\EventBus::on('event.off.object', $handler, $objectA);
-        \app\modules\neuron\classes\events\EventBus::on('event.off.object', $handler, $objectB);
-        \app\modules\neuron\classes\events\EventBus::off('event.off.object', $handler, $objectA);
+        \app\modules\neuron\events\EventBus::on('event.off.object', $handler, $objectA);
+        \app\modules\neuron\events\EventBus::on('event.off.object', $handler, $objectB);
+        \app\modules\neuron\events\EventBus::off('event.off.object', $handler, $objectA);
 
-        \app\modules\neuron\classes\events\EventBus::trigger('event.off.object', $objectA, null);
-        \app\modules\neuron\classes\events\EventBus::trigger('event.off.object', $objectB, null);
+        \app\modules\neuron\events\EventBus::trigger('event.off.object', $objectA, null);
+        \app\modules\neuron\events\EventBus::trigger('event.off.object', $objectB, null);
 
         $this->assertSame(1, $calls);
     }
@@ -184,13 +184,13 @@ class EventBusTest extends TestCase
             $calls[] = 'class';
         };
 
-        \app\modules\neuron\classes\events\EventBus::on('event.off.class', $handler, $subjectClass);
-        \app\modules\neuron\classes\events\EventBus::on('event.off.class', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('event.off.class', $handler, $subjectClass);
+        \app\modules\neuron\events\EventBus::on('event.off.class', static function () use (&$calls): void {
             $calls[] = 'global';
         }, '*');
-        \app\modules\neuron\classes\events\EventBus::off('event.off.class', $handler, $subjectClass);
+        \app\modules\neuron\events\EventBus::off('event.off.class', $handler, $subjectClass);
 
-        \app\modules\neuron\classes\events\EventBus::trigger('event.off.class', $subjectClass, null);
+        \app\modules\neuron\events\EventBus::trigger('event.off.class', $subjectClass, null);
 
         $this->assertSame(['global'], $calls);
     }
@@ -206,10 +206,10 @@ class EventBusTest extends TestCase
             $calls++;
         };
 
-        \app\modules\neuron\classes\events\EventBus::on('event.dup.object', $handler, $subject);
-        \app\modules\neuron\classes\events\EventBus::on('event.dup.object', $handler, $subject);
+        \app\modules\neuron\events\EventBus::on('event.dup.object', $handler, $subject);
+        \app\modules\neuron\events\EventBus::on('event.dup.object', $handler, $subject);
 
-        \app\modules\neuron\classes\events\EventBus::trigger('event.dup.object', $subject, null);
+        \app\modules\neuron\events\EventBus::trigger('event.dup.object', $subject, null);
 
         $this->assertSame(1, $calls);
     }
@@ -226,10 +226,10 @@ class EventBusTest extends TestCase
             $calls++;
         };
 
-        \app\modules\neuron\classes\events\EventBus::on('event.dup.class', $handler, $subjectClass);
-        \app\modules\neuron\classes\events\EventBus::on('event.dup.class', $handler, $subjectClass);
+        \app\modules\neuron\events\EventBus::on('event.dup.class', $handler, $subjectClass);
+        \app\modules\neuron\events\EventBus::on('event.dup.class', $handler, $subjectClass);
 
-        \app\modules\neuron\classes\events\EventBus::trigger('event.dup.class', $subjectClass, null);
+        \app\modules\neuron\events\EventBus::trigger('event.dup.class', $subjectClass, null);
 
         $this->assertSame(1, $calls);
     }
@@ -243,14 +243,14 @@ class EventBusTest extends TestCase
         });
         $calls = [];
 
-        \app\modules\neuron\classes\events\EventBus::on('event.global', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('event.global', static function () use (&$calls): void {
             $calls[] = 'global';
         }, '*');
-        \app\modules\neuron\classes\events\EventBus::on('event.global', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('event.global', static function () use (&$calls): void {
             $calls[] = 'class';
         }, $subjectClass);
 
-        \app\modules\neuron\classes\events\EventBus::trigger('event.global', '*', null);
+        \app\modules\neuron\events\EventBus::trigger('event.global', '*', null);
 
         $this->assertSame(['global'], $calls);
     }
@@ -263,17 +263,17 @@ class EventBusTest extends TestCase
     {
         $calls = [];
 
-        \app\modules\neuron\classes\events\EventBus::on('skill.completed', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('skill.completed', static function () use (&$calls): void {
             $calls[] = 'skill.completed';
         }, '*');
-        \app\modules\neuron\classes\events\EventBus::on('skill', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('skill', static function () use (&$calls): void {
             $calls[] = 'skill';
         }, '*');
-        \app\modules\neuron\classes\events\EventBus::on('*', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('*', static function () use (&$calls): void {
             $calls[] = '*';
         }, '*');
 
-        \app\modules\neuron\classes\events\EventBus::trigger('skill.completed', '*', null);
+        \app\modules\neuron\events\EventBus::trigger('skill.completed', '*', null);
 
         $this->assertSame(['skill.completed', 'skill', '*'], $calls);
     }
@@ -285,12 +285,12 @@ class EventBusTest extends TestCase
     {
         $calls = 0;
 
-        \app\modules\neuron\classes\events\EventBus::on('skill', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('skill', static function () use (&$calls): void {
             $calls++;
         }, '*');
 
-        \app\modules\neuron\classes\events\EventBus::trigger('skill.failed', '*', null);
-        \app\modules\neuron\classes\events\EventBus::trigger('skill.completed', '*', null);
+        \app\modules\neuron\events\EventBus::trigger('skill.failed', '*', null);
+        \app\modules\neuron\events\EventBus::trigger('skill.completed', '*', null);
 
         $this->assertSame(2, $calls);
     }
@@ -302,18 +302,18 @@ class EventBusTest extends TestCase
     {
         $calls = [];
 
-        \app\modules\neuron\classes\events\EventBus::on('skill.completed', static function () use (&$calls): bool {
+        \app\modules\neuron\events\EventBus::on('skill.completed', static function () use (&$calls): bool {
             $calls[] = 'skill.completed';
             return false;
         }, '*');
-        \app\modules\neuron\classes\events\EventBus::on('skill', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('skill', static function () use (&$calls): void {
             $calls[] = 'skill';
         }, '*');
-        \app\modules\neuron\classes\events\EventBus::on('*', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('*', static function () use (&$calls): void {
             $calls[] = '*';
         }, '*');
 
-        \app\modules\neuron\classes\events\EventBus::trigger('skill.completed', '*', null);
+        \app\modules\neuron\events\EventBus::trigger('skill.completed', '*', null);
 
         $this->assertSame(['skill.completed'], $calls);
     }
@@ -326,11 +326,11 @@ class EventBusTest extends TestCase
         $subject = new \stdClass();
         $receivedInitiator = null;
 
-        \app\modules\neuron\classes\events\EventBus::on('event.initiator', static function (mixed $payload, object|string $initiator) use (&$receivedInitiator): void {
+        \app\modules\neuron\events\EventBus::on('event.initiator', static function (mixed $payload, object|string $initiator) use (&$receivedInitiator): void {
             $receivedInitiator = $initiator;
         }, '*');
 
-        \app\modules\neuron\classes\events\EventBus::trigger('event.initiator', $subject, ['ok' => true]);
+        \app\modules\neuron\events\EventBus::trigger('event.initiator', $subject, ['ok' => true]);
 
         $this->assertSame($subject, $receivedInitiator);
     }
@@ -342,14 +342,14 @@ class EventBusTest extends TestCase
     {
         $calls = 0;
 
-        \app\modules\neuron\classes\events\EventBus::on('event.no-initiator', static function (): void {
+        \app\modules\neuron\events\EventBus::on('event.no-initiator', static function (): void {
             // Проверяем, что дополнительный аргумент не ломает вызов обработчика.
         }, '*');
-        \app\modules\neuron\classes\events\EventBus::on('event.no-initiator', static function () use (&$calls): void {
+        \app\modules\neuron\events\EventBus::on('event.no-initiator', static function () use (&$calls): void {
             $calls++;
         }, '*');
 
-        \app\modules\neuron\classes\events\EventBus::trigger('event.no-initiator', '*', null);
+        \app\modules\neuron\events\EventBus::trigger('event.no-initiator', '*', null);
 
         $this->assertSame(1, $calls);
     }

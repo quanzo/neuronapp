@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace app\modules\neuron\classes\events\subscribers;
+namespace app\modules\neuron\subscribers;
 
 use app\modules\neuron\classes\dto\events\SkillEventDto;
 use app\modules\neuron\classes\dto\events\SkillErrorEventDto;
-use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use Psr\Log\LoggerInterface;
 

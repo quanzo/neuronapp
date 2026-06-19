@@ -6,8 +6,8 @@ namespace Tests\Events;
 
 use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\dto\events\LlmInferenceEventDto;
-use app\modules\neuron\classes\events\EventBus;
-use app\modules\neuron\classes\events\subscribers\LlmInferenceLoggingSubscriber;
+use app\modules\neuron\events\EventBus;
+use app\modules\neuron\subscribers\LlmInferenceLoggingSubscriber;
 use app\modules\neuron\enums\EventNameEnum;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;

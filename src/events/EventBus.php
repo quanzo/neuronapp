@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\modules\neuron\classes\events;
+namespace app\modules\neuron\events;
 
 /**
  * Шина событий приложения.

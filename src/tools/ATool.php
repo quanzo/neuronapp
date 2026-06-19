@@ -8,7 +8,7 @@ use app\modules\neuron\classes\config\ConfigurationAgent;
 use app\modules\neuron\classes\config\ConfigurationApp;
 use app\modules\neuron\classes\dto\events\ToolEventDto;
 use app\modules\neuron\classes\dto\events\ToolErrorEventDto;
-use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use NeuronAI\Tools\Tool;
 

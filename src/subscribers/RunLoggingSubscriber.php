@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace app\modules\neuron\classes\events\subscribers;
+namespace app\modules\neuron\subscribers;
 
 use app\modules\neuron\classes\dto\events\BaseEventDto;
 use app\modules\neuron\classes\dto\events\RunEventDto;
 use app\modules\neuron\classes\dto\events\RunErrorEventDto;
-use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use Psr\Log\LoggerInterface;
 

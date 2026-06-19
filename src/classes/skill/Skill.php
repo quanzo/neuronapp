@@ -14,7 +14,7 @@ use app\modules\neuron\classes\dto\events\RunEventDto;
 use app\modules\neuron\classes\dto\events\RunErrorEventDto;
 use app\modules\neuron\classes\dto\events\SkillEventDto;
 use app\modules\neuron\classes\dto\events\SkillErrorEventDto;
-use app\modules\neuron\classes\events\EventBus;
+use app\modules\neuron\events\EventBus;
 use app\modules\neuron\enums\EventNameEnum;
 use app\modules\neuron\helpers\FileContextHelper;
 use app\modules\neuron\helpers\OptionsHelper;

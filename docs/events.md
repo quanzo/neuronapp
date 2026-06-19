@@ -1,6 +1,6 @@
 # Шина событий `EventBus`
 
-Документ описывает поведение синхронной шины событий `EventBus` (`src/classes/events/EventBus.php`).
+Документ описывает поведение синхронной шины событий `EventBus` (`src/events/EventBus.php`).
 
 ## Назначение
 
@@ -169,7 +169,7 @@ BaseEventDto (implements IArrayable, Stringable)
 
 ## Подписчики
 
-Подписчики находятся в `src/classes/events/subscribers`.
+Подписчики находятся в `src/subscribers`.
 
 Текущие подписчики:
 

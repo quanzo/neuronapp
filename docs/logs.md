@@ -87,7 +87,7 @@
   - payload — `LlmInferenceEventDto` (`src/classes/dto/events/LlmInferenceEventDto.php`);
   - содержит `toolsCount`, `toolsNames`, `toolRequiredParams`, `instructionsPreview`, `instructionsLength`, `userMessagePreview`, `userMessageLength`;
   - в debug-режиме дополнительно включает `messagesCount` и `messagesSanitized`;
-  - подписчик `LlmInferenceLoggingSubscriber` (`src/classes/events/subscribers/LlmInferenceLoggingSubscriber.php`) пишет лог уровня `info`;
+  - подписчик `LlmInferenceLoggingSubscriber` (`src/subscribers/LlmInferenceLoggingSubscriber.php`) пишет лог уровня `info`;
   - resolve логгера через `ConfigurationAgent` из payload (fallback на глобальный логгер).
 - событие `llm.request.payload`:
   - пишется в декораторе `LoggingAIProviderDecorator` (`src/classes/neuron/providers/LoggingAIProviderDecorator.php`);
