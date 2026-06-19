@@ -34,6 +34,8 @@ use const STR_PAD_LEFT;
  * вызове {@see EditTool}. Часто используется после {@see GlobTool} или
  * {@see GrepTool} для детального изучения найденных файлов.
  *
+ * Нумерация строк 1-based, согласована с {@see ChunckViewTool}.
+ *
  * Безопасность:
  * - Путь проверяется через {@see FileSystemHelper::isPathSafe()} для защиты
  *   от path-traversal атак (попыток выйти за пределы basePath через «..»).

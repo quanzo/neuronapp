@@ -11,6 +11,8 @@ use app\modules\neuron\interfaces\IArrayable;
  * ({@see \app\modules\neuron\tools\ChunckSizeTool}).
  *
  * Предоставляет сводную информацию о числе строк и символов в файле.
+ * Нумерация строк в связанных инструментах чтения файлов — 1-based;
+ * totalLines — общее количество строк (не индекс).
  *
  * Формат сериализации (toArray):
  * [

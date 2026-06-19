@@ -21,6 +21,10 @@ use function mb_strlen;
  * Удобен для LLM, чтобы оценить объём файла перед чтением его частями
  * с помощью {@see ChunckViewTool} или других инструментов.
  *
+ * Инструменты чтения файлов проекта ({@see ViewTool}, {@see ChunckViewTool})
+ * используют 1-based нумерацию строк; поле totalLines — общее количество строк
+ * (диапазон 1..totalLines), а не индекс.
+ *
  * Возвращает количество строк и символов только для текстовых файлов.
  */
 class ChunckSizeTool extends AChunckTool

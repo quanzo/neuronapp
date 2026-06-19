@@ -13,12 +13,14 @@ use app\modules\neuron\interfaces\IArrayable;
  * непрерывный фрагмент (чанк), ограниченный количеством строк и/или
  * максимальным размером в символах.
  *
+ * Нумерация строк 1-based, согласована с {@see \app\modules\neuron\tools\ViewTool}.
+ *
  * Формат сериализации (toArray):
  * [
  *     'filePath'     => string, // путь к файлу (как запрошен)
  *     'chunk'        => string, // содержимое чанка, строки разделены "\n"
- *     'startLine'    => int,    // номер первой строки чанка (0-based)
- *     'endLine'      => int,    // номер последней строки чанка (0-based)
+ *     'startLine'    => int,    // номер первой строки чанка (1-based)
+ *     'endLine'      => int,    // номер последней строки чанка (1-based); 0 если чанк пуст
  *     'chunkLength'  => int,    // длина чанка в символах
  *     'totalLines'   => int,    // общее число строк в файле
  *     'totalLength'  => int,    // полное количество символов в файле
@@ -29,8 +31,8 @@ final class ViewChunkResultDto implements IArrayable
     /**
      * @param string $filePath    Путь к файлу
      * @param string $chunk       Содержимое чанка (несколько строк)
-     * @param int    $startLine   Номер первой строки чанка (0-based)
-     * @param int    $endLine     Номер последней строки чанка (0-based)
+     * @param int    $startLine   Номер первой строки чанка (1-based)
+     * @param int    $endLine     Номер последней строки чанка (1-based); 0 если чанк пуст
      * @param int    $chunkLength Количество символов в чанке
      * @param int    $totalLines  Общее количество строк в файле
      * @param int    $totalLength Общее количество символов в файле

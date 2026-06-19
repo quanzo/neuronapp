@@ -9,7 +9,9 @@ use PHPUnit\Framework\TestCase;
 
 use function file_put_contents;
 use function json_decode;
+use function mb_strlen;
 use function mkdir;
+use function str_repeat;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -30,6 +32,7 @@ use const DIRECTORY_SEPARATOR;
  * - автоматическое оборачивание текста в regex
  * - фильтрацию по excludePatterns
  * - корректность работы сеттеров
+ * - contextLines: однострочный и многострочный lineContent, границы файла, усечение
  */
 final class GrepToolTest extends TestCase
 {
@@ -303,11 +306,104 @@ final class GrepToolTest extends TestCase
              ->setExcludePatterns([])
              ->setContextLines(2);
 
-        file_put_contents($this->tempDir . '/test.txt', "line1\nline2");
-        $json = $tool->__invoke('/line/');
+        file_put_contents($this->tempDir . '/test.txt', "line1\nline2\nline3\nline4\nline5");
+        $json = $tool->__invoke('/line3/');
         $data = json_decode($json, true);
 
-        $this->assertSame(2, $data['totalMatches']);
+        $this->assertSame(1, $data['totalMatches']);
+        $this->assertStringContainsString("\n", $data['matches'][0]['lineContent']);
+        $this->assertStringContainsString('3|line3', $data['matches'][0]['lineContent']);
+    }
+
+    /**
+     * contextLines=0 оставляет lineContent однострочным (регрессия).
+     */
+    public function testContextLinesZeroReturnsSingleLineContent(): void
+    {
+        file_put_contents($this->tempDir . '/ctx.txt', "before\nmatch\nafter");
+
+        $tool = new GrepTool(basePath: $this->tempDir, excludePatterns: [], contextLines: 0);
+        $data = json_decode($tool->__invoke('/match/'), true);
+
+        $this->assertSame('match', $data['matches'][0]['lineContent']);
+        $this->assertSame(2, $data['matches'][0]['lineNumber']);
+    }
+
+    /**
+     * contextLines=1 возвращает блок из трёх строк с префиксами N|.
+     */
+    public function testContextLinesOneReturnsThreeLineBlock(): void
+    {
+        file_put_contents($this->tempDir . '/ctx.txt', "before\nmatch\nafter");
+
+        $tool = new GrepTool(basePath: $this->tempDir, excludePatterns: [], contextLines: 1);
+        $data = json_decode($tool->__invoke('/match/'), true);
+
+        $this->assertSame(2, $data['matches'][0]['lineNumber']);
+        $this->assertStringContainsString("1|before", $data['matches'][0]['lineContent']);
+        $this->assertStringContainsString("2|match", $data['matches'][0]['lineContent']);
+        $this->assertStringContainsString("3|after", $data['matches'][0]['lineContent']);
+    }
+
+    /**
+     * У начала файла контекст «до» усечён.
+     */
+    public function testContextAtFileStartHasFewerBeforeLines(): void
+    {
+        file_put_contents($this->tempDir . '/ctx.txt', "match\nsecond");
+
+        $tool = new GrepTool(basePath: $this->tempDir, excludePatterns: [], contextLines: 2);
+        $data = json_decode($tool->__invoke('/match/'), true);
+
+        $this->assertStringNotContainsString("0|", $data['matches'][0]['lineContent']);
+        $this->assertStringContainsString("1|match", $data['matches'][0]['lineContent']);
+        $this->assertStringContainsString("2|second", $data['matches'][0]['lineContent']);
+    }
+
+    /**
+     * У конца файла контекст «после» усечён.
+     */
+    public function testContextAtFileEndHasFewerAfterLines(): void
+    {
+        file_put_contents($this->tempDir . '/ctx.txt', "first\nmatch");
+
+        $tool = new GrepTool(basePath: $this->tempDir, excludePatterns: [], contextLines: 2);
+        $data = json_decode($tool->__invoke('/match/'), true);
+
+        $this->assertStringContainsString("1|first", $data['matches'][0]['lineContent']);
+        $this->assertStringContainsString("2|match", $data['matches'][0]['lineContent']);
+        $this->assertStringNotContainsString("3|", $data['matches'][0]['lineContent']);
+    }
+
+    /**
+     * Длинный блок контекста усекается.
+     */
+    public function testContextBlockTruncation(): void
+    {
+        $longLine = str_repeat('x', 750);
+        file_put_contents(
+            $this->tempDir . '/big.txt',
+            $longLine . "\nneedle\n" . $longLine
+        );
+
+        $tool = new GrepTool(basePath: $this->tempDir, excludePatterns: [], contextLines: 1);
+        $data = json_decode($tool->__invoke('/needle/'), true);
+
+        $this->assertLessThanOrEqual(1500, mb_strlen($data['matches'][0]['lineContent']));
+        $this->assertStringEndsWith('...', $data['matches'][0]['lineContent']);
+    }
+
+    /**
+     * Отрицательный contextLines в конструкторе приводится к 0.
+     */
+    public function testNegativeContextLinesClampedToZero(): void
+    {
+        file_put_contents($this->tempDir . '/ctx.txt', "only");
+
+        $tool = new GrepTool(basePath: $this->tempDir, excludePatterns: [], contextLines: -3);
+        $data = json_decode($tool->__invoke('/only/'), true);
+
+        $this->assertSame('only', $data['matches'][0]['lineContent']);
     }
 
     /**

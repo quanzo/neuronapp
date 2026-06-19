@@ -19,7 +19,7 @@ use app\modules\neuron\interfaces\IArrayable;
  * [
  *     'filePath'    => string,  // относительный путь к файлу
  *     'lineNumber'  => int,     // номер строки (1-based)
- *     'lineContent' => string,  // содержимое строки (может быть усечено)
+ *     'lineContent' => string,  // строка совпадения или блок с контекстом (при contextLines > 0)
  *     'matchText'   => string,  // совпавший фрагмент (может быть усечён)
  * ]
  * ```
@@ -29,7 +29,7 @@ final class GrepMatchDto implements IArrayable
     /**
      * @param string $filePath    Путь к файлу с совпадением (относительный)
      * @param int    $lineNumber  Номер строки совпадения (1-based)
-     * @param string $lineContent Полное содержимое строки с совпадением
+     * @param string $lineContent Строка совпадения или многострочный блок с контекстом (contextLines > 0)
      * @param string $matchText   Найденный фрагмент текста
      */
     public function __construct(

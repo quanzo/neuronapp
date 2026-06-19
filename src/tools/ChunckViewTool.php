@@ -15,16 +15,20 @@ use function fopen;
 use function implode;
 use function is_array;
 use function is_resource;
+use function max;
 use function mb_strlen;
+use function rtrim;
 
 /**
  * Инструмент чтения текстового файла чанками строк.
  *
  * Позволяет LLM получать не весь файл целиком, а небольшой непрерывный фрагмент
  * (чанк), ограниченный:
- * - стартовым номером строки (0-based);
+ * - стартовым номером строки (1-based, включительно);
  * - количеством строк;
  * - максимальным размером чанка в символах.
+ *
+ * Нумерация строк согласована с {@see ViewTool} (1-based).
  *
  * Строки не разрываются: если добавление очередной строки приводит к превышению
  * лимита по символам, эта строка становится последней в чанке и не включается.
@@ -77,7 +81,7 @@ class ChunckViewTool extends AChunckTool
             ToolProperty::make(
                 name       : 'start_line',
                 type       : PropertyType::INTEGER,
-                description: 'Номер первой строки чанка (0-based). По умолчанию 0.',
+                description: 'Номер первой строки чанка (1-based, включительно). По умолчанию 1.',
                 required   : false,
             ),
             ToolProperty::make(
@@ -99,7 +103,7 @@ class ChunckViewTool extends AChunckTool
      * Читает чанк строк из текстового файла.
      *
      * @param string   $path       Путь к файлу
-     * @param int|null $start_line Номер первой строки чанка (0-based)
+     * @param int|null $start_line Номер первой строки чанка (1-based)
      * @param int|null $lines      Максимальное число строк в чанке
      * @param int|null $max_chars  Максимальный размер чанка в символах
      *
@@ -116,9 +120,9 @@ class ChunckViewTool extends AChunckTool
             return $validated;
         }
 
-        $start    = $start_line !== null && $start_line > 0 ? $start_line : 0;
-        $maxLines = $lines      !== null && $lines > 0 ? $lines : null;
-        $maxChars = $max_chars  !== null && $max_chars > 0 ? $max_chars : null;
+        $startLine = $start_line !== null ? max(1, $start_line) : 1;
+        $maxLines = $lines !== null && $lines > 0 ? $lines : null;
+        $maxChars = $max_chars !== null && $max_chars > 0 ? $max_chars : null;
 
         $handle = @fopen($validated['resolvedPath'], 'rb');
         if ($handle === false || !is_resource($handle)) {
@@ -127,13 +131,12 @@ class ChunckViewTool extends AChunckTool
             ]);
         }
 
-        $totalLines          = 0;
-        $totalLength         = 0;
-        $chunkLines          = [];
-        $chunkLength         = 0;
-        $currentIndex        = 0;
+        $totalLines = 0;
+        $totalLength = 0;
+        $chunkLines = [];
         $effectiveLineLength = 0;
-        $end                 = $start;
+        $currentLineNumber = 0;
+        $endLine = $startLine;
 
         while (!feof($handle)) {
             $line = fgets($handle);
@@ -150,27 +153,26 @@ class ChunckViewTool extends AChunckTool
             $lineLength = mb_strlen($line);
             $totalLines++;
             $totalLength += $lineLength;
+            $currentLineNumber++;
 
             if (
                 ($maxChars === null || ($effectiveLineLength + $lineLength + 1) < $maxChars)
                 && ($maxLines === null || count($chunkLines) < $maxLines)
-                && $currentIndex >= $start
+                && $currentLineNumber >= $startLine
             ) {
                 $effectiveLineLength += $lineLength + 1;
-                $chunkLines[]         = $line;
-                $end                  = $currentIndex;
+                $chunkLines[] = rtrim($line, "\r\n");
+                $endLine = $currentLineNumber;
             }
-
-            $currentIndex++;
         }
 
         fclose($handle);
 
-        if ($start >= $totalLines) {
+        if ($startLine > $totalLines) {
             return JsonHelper::encodeThrow([
                 'error' => sprintf(
                     "Начальная строка %d превышает общее количество строк в файле (%d).",
-                    $start,
+                    $startLine,
                     $totalLines,
                 ),
             ]);
@@ -180,8 +182,8 @@ class ChunckViewTool extends AChunckTool
         $dto = new ViewChunkResultDto(
             filePath   : $path,
             chunk      : $chunk,
-            startLine  : $start,
-            endLine    : $end,
+            startLine  : $startLine,
+            endLine    : $chunkLines === [] ? max(0, $startLine - 1) : $endLine,
             chunkLength: $effectiveLineLength,
             totalLines : $totalLines,
             totalLength: $totalLength,

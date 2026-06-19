@@ -12,6 +12,7 @@ use app\modules\neuron\tools\ATool;
 use NeuronAI\Tools\PropertyType;
 use NeuronAI\Tools\ToolProperty;
 
+use function array_slice;
 use function array_values;
 use function count;
 use function explode;
@@ -20,16 +21,20 @@ use function filesize;
 use function fnmatch;
 use function is_dir;
 use function is_file;
+use function max;
 use function mb_strlen;
 use function mb_substr;
+use function min;
 use function preg_last_error_msg;
 use function preg_match;
 use function scandir;
+use function str_pad;
 use function strlen;
 use function substr;
 
 use const DIRECTORY_SEPARATOR;
 use const PREG_OFFSET_CAPTURE;
+use const STR_PAD_LEFT;
 
 /**
  * Инструмент поиска текста или регулярного выражения внутри файлов.
@@ -68,7 +73,7 @@ class GrepTool extends ATool
     /** @var string[] Шаблоны для исключения директорий/файлов */
     protected array $excludePatterns = ['.git', 'node_modules', 'vendor'];
 
-    /** @var int Количество строк контекста вокруг совпадения (не используется в базовом режиме) */
+    /** @var int Количество строк контекста вокруг совпадения (аналог grep -C) */
     protected int $contextLines = 0;
 
     /**
@@ -97,7 +102,7 @@ class GrepTool extends ATool
         $this->maxMatches = $maxMatches;
         $this->maxFileSize = $maxFileSize;
         $this->excludePatterns = $excludePatterns;
-        $this->contextLines = $contextLines;
+        $this->contextLines = max(0, $contextLines);
     }
 
     /**
@@ -264,10 +269,12 @@ class GrepTool extends ATool
                     ? mb_substr($matchText, 0, 197) . '...'
                     : $matchText;
 
+                $lineContent = $this->buildLineContentForMatch($lines, $index, $line);
+
                 $matches[] = new GrepMatchDto(
                     filePath   : $filePath,
                     lineNumber : $index + 1,
-                    lineContent: mb_strlen($line) > 500 ? mb_substr($line, 0, 497) . '...' : $line,
+                    lineContent: $lineContent,
                     matchText  : $truncatedMatch,
                 );
             }
@@ -348,6 +355,75 @@ class GrepTool extends ATool
     }
 
     /**
+     * Формирует lineContent для совпадения: одна строка или блок с контекстом.
+     *
+     * @param string[] $lines       Все строки файла
+     * @param int      $matchIndex  Индекс строки совпадения (0-based)
+     * @param string   $matchLine   Содержимое строки совпадения
+     *
+     * @return string
+     */
+    private function buildLineContentForMatch(array $lines, int $matchIndex, string $matchLine): string
+    {
+        if ($this->contextLines <= 0) {
+            return $this->truncateSingleLine($matchLine, 500);
+        }
+
+        $lineCount = count($lines);
+        $from = max(0, $matchIndex - $this->contextLines);
+        $to = min($lineCount - 1, $matchIndex + $this->contextLines);
+        $endLineNumber = $to + 1;
+        $padWidth = strlen((string) $endLineNumber);
+
+        $numbered = [];
+        for ($i = $from; $i <= $to; $i++) {
+            $lineNumber = $i + 1;
+            $numbered[] = str_pad((string) $lineNumber, $padWidth, ' ', STR_PAD_LEFT)
+                . '|'
+                . $lines[$i];
+        }
+
+        $block = implode("\n", $numbered);
+        $maxLength = min(500 * (2 * $this->contextLines + 1), 5000);
+
+        return $this->truncateBlock($block, $maxLength);
+    }
+
+    /**
+     * Усекает одну строку результата до лимита символов.
+     *
+     * @param string $line      Строка
+     * @param int    $maxLength Максимальная длина
+     *
+     * @return string
+     */
+    private function truncateSingleLine(string $line, int $maxLength): string
+    {
+        if (mb_strlen($line) <= $maxLength) {
+            return $line;
+        }
+
+        return mb_substr($line, 0, $maxLength - 3) . '...';
+    }
+
+    /**
+     * Усекает многострочный блок контекста до лимита символов.
+     *
+     * @param string $block     Блок текста
+     * @param int    $maxLength Максимальная длина
+     *
+     * @return string
+     */
+    private function truncateBlock(string $block, int $maxLength): string
+    {
+        if (mb_strlen($block) <= $maxLength) {
+            return $block;
+        }
+
+        return mb_substr($block, 0, $maxLength - 3) . '...';
+    }
+
+    /**
      * Устанавливает базовую директорию для поиска.
      *
      * Все относительные пути в результатах будут вычислены от этой директории.
@@ -412,8 +488,8 @@ class GrepTool extends ATool
     /**
      * Устанавливает количество строк контекста вокруг каждого совпадения.
      *
-     * Аналог флага `-C` в grep. В текущей реализации зарезервировано
-     * для будущего использования.
+     * Аналог флага `-C` в grep. При значении > 0 поле lineContent в результате
+     * расширяется блоком строк до/после совпадения в формате `N|строка`.
      *
      * @param int $contextLines Число строк контекста до и после совпадения
      *
@@ -421,7 +497,7 @@ class GrepTool extends ATool
      */
     public function setContextLines(int $contextLines): self
     {
-        $this->contextLines = $contextLines;
+        $this->contextLines = max(0, $contextLines);
         return $this;
     }
 }
